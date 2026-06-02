@@ -1,0 +1,17 @@
+.DS_Store
+
+# Xcode user data and build output
+DerivedData/
+*/DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Swift Package Manager build output
+.build/
+.swiftpm/
+
+# Local assistant/session settings
+.claude/settings.local.json

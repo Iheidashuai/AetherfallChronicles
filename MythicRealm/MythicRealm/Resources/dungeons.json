@@ -1,0 +1,3170 @@
+[
+  {
+    "id": "dungeon_01_spider",
+    "name": "蛛影林地·外缘",
+    "description": "第 1 阶挑战，蛛影林地的外缘区域，产出 Lv.1 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "简单",
+    "rooms": [
+      {
+        "id": "d01_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d01_01_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d01_02_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d01_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d01_03_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d01_04_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d01_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d01_05_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d01_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d01_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d01_07_spider",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d01_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 1,
+    "recommendedPower": 1580
+  },
+  {
+    "id": "dungeon_02_spider",
+    "name": "蛛影林地·通道",
+    "description": "第 2 阶挑战，蛛影林地的通道区域，产出 Lv.2 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "简单",
+    "rooms": [
+      {
+        "id": "d02_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d02_01_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d02_02_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d02_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d02_03_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d02_04_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d02_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d02_05_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d02_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d02_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d02_07_spider",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d02_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 2,
+    "recommendedPower": 2030
+  },
+  {
+    "id": "dungeon_03_spider",
+    "name": "蛛影林地·前厅",
+    "description": "第 3 阶挑战，蛛影林地的前厅区域，产出 Lv.4 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "简单",
+    "rooms": [
+      {
+        "id": "d03_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d03_01_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d03_02_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d03_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d03_03_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d03_04_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d03_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d03_05_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d03_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d03_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d03_07_spider",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d03_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 4,
+    "recommendedPower": 2760
+  },
+  {
+    "id": "dungeon_04_spider",
+    "name": "蛛影林地·深处",
+    "description": "第 4 阶挑战，蛛影林地的深处区域，产出 Lv.5 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "简单",
+    "rooms": [
+      {
+        "id": "d04_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d04_01_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d04_02_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d04_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d04_03_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d04_04_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d04_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d04_05_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d04_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d04_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d04_07_spider",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d04_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 5,
+    "recommendedPower": 3400
+  },
+  {
+    "id": "dungeon_05_spider",
+    "name": "蛛影林地·祭坛",
+    "description": "第 5 阶挑战，蛛影林地的祭坛区域，产出 Lv.6 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "简单",
+    "rooms": [
+      {
+        "id": "d05_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d05_01_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d05_02_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d05_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d05_03_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d05_04_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d05_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d05_05_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d05_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d05_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d05_07_spider",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d05_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 6,
+    "recommendedPower": 3850
+  },
+  {
+    "id": "dungeon_06_spider",
+    "name": "蛛影林地·王座",
+    "description": "第 6 阶挑战，蛛影林地的王座区域，产出 Lv.7 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "简单",
+    "rooms": [
+      {
+        "id": "d06_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d06_01_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d06_02_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d06_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d06_03_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d06_04_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d06_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d06_05_spider",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d06_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d06_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d06_07_spider",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d06_06_spider",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 7,
+    "recommendedPower": 4360
+  },
+  {
+    "id": "dungeon_07_swamp",
+    "name": "腐沼边境·外缘",
+    "description": "第 7 阶挑战，腐沼边境的外缘区域，产出 Lv.9 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d07_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d07_01_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d07_02_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d07_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d07_03_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d07_04_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d07_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d07_05_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d07_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d07_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d07_07_swamp",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d07_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 9,
+    "recommendedPower": 5090
+  },
+  {
+    "id": "dungeon_08_swamp",
+    "name": "腐沼边境·通道",
+    "description": "第 8 阶挑战，腐沼边境的通道区域，产出 Lv.10 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d08_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d08_01_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d08_02_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d08_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d08_03_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d08_04_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d08_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d08_05_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d08_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d08_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d08_07_swamp",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d08_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 10,
+    "recommendedPower": 5670
+  },
+  {
+    "id": "dungeon_09_swamp",
+    "name": "腐沼边境·前厅",
+    "description": "第 9 阶挑战，腐沼边境的前厅区域，产出 Lv.11 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d09_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d09_01_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d09_02_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d09_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d09_03_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d09_04_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d09_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d09_05_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d09_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d09_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d09_07_swamp",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d09_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 11,
+    "recommendedPower": 6990
+  },
+  {
+    "id": "dungeon_10_swamp",
+    "name": "腐沼边境·深处",
+    "description": "第 10 阶挑战，腐沼边境的深处区域，产出 Lv.12 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d10_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d10_01_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d10_02_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d10_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d10_03_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d10_04_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d10_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d10_05_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d10_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d10_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d10_07_swamp",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d10_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 12,
+    "recommendedPower": 7600
+  },
+  {
+    "id": "dungeon_11_swamp",
+    "name": "腐沼边境·祭坛",
+    "description": "第 11 阶挑战，腐沼边境的祭坛区域，产出 Lv.14 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d11_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d11_01_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d11_02_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d11_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d11_03_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d11_04_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d11_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d11_05_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d11_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d11_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d11_07_swamp",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d11_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 14,
+    "recommendedPower": 8320
+  },
+  {
+    "id": "dungeon_12_swamp",
+    "name": "腐沼边境·王座",
+    "description": "第 12 阶挑战，腐沼边境的王座区域，产出 Lv.15 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d12_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d12_01_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d12_02_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d12_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d12_03_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d12_04_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d12_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d12_05_swamp",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d12_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d12_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d12_07_swamp",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d12_06_swamp",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 15,
+    "recommendedPower": 9100
+  },
+  {
+    "id": "dungeon_13_ruin",
+    "name": "精灵遗迹·外缘",
+    "description": "第 13 阶挑战，精灵遗迹的外缘区域，产出 Lv.16 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d13_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d13_01_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d13_02_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d13_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d13_03_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d13_04_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d13_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d13_05_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d13_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d13_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d13_07_ruin",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d13_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 16,
+    "recommendedPower": 9730
+  },
+  {
+    "id": "dungeon_14_ruin",
+    "name": "精灵遗迹·通道",
+    "description": "第 14 阶挑战，精灵遗迹的通道区域，产出 Lv.17 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d14_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d14_01_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d14_02_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d14_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d14_03_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d14_04_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d14_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d14_05_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d14_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d14_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d14_07_ruin",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d14_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 17,
+    "recommendedPower": 10240
+  },
+  {
+    "id": "dungeon_15_ruin",
+    "name": "精灵遗迹·前厅",
+    "description": "第 15 阶挑战，精灵遗迹的前厅区域，产出 Lv.19 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d15_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d15_01_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d15_02_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d15_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d15_03_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d15_04_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d15_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d15_05_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d15_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d15_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d15_07_ruin",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d15_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 19,
+    "recommendedPower": 11120
+  },
+  {
+    "id": "dungeon_16_ruin",
+    "name": "精灵遗迹·深处",
+    "description": "第 16 阶挑战，精灵遗迹的深处区域，产出 Lv.20 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d16_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d16_01_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d16_02_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d16_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d16_03_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d16_04_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d16_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d16_05_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d16_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d16_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d16_07_ruin",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d16_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 20,
+    "recommendedPower": 11950
+  },
+  {
+    "id": "dungeon_17_ruin",
+    "name": "精灵遗迹·祭坛",
+    "description": "第 17 阶挑战，精灵遗迹的祭坛区域，产出 Lv.21 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d17_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d17_01_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d17_02_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d17_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d17_03_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d17_04_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d17_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d17_05_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d17_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d17_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d17_07_ruin",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d17_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 21,
+    "recommendedPower": 12400
+  },
+  {
+    "id": "dungeon_18_ruin",
+    "name": "精灵遗迹·王座",
+    "description": "第 18 阶挑战，精灵遗迹的王座区域，产出 Lv.22 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "普通",
+    "rooms": [
+      {
+        "id": "d18_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d18_01_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d18_02_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d18_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d18_03_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d18_04_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d18_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d18_05_ruin",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d18_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d18_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d18_07_ruin",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d18_06_ruin",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 22,
+    "recommendedPower": 13110
+  },
+  {
+    "id": "dungeon_19_root",
+    "name": "暗影树心·外缘",
+    "description": "第 19 阶挑战，暗影树心的外缘区域，产出 Lv.24 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d19_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d19_01_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d19_02_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d19_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d19_03_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d19_04_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d19_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d19_05_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d19_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d19_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d19_07_root",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d19_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 24,
+    "recommendedPower": 14050
+  },
+  {
+    "id": "dungeon_20_root",
+    "name": "暗影树心·通道",
+    "description": "第 20 阶挑战，暗影树心的通道区域，产出 Lv.25 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d20_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d20_01_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d20_02_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d20_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d20_03_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d20_04_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d20_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d20_05_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d20_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d20_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d20_07_root",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d20_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 25,
+    "recommendedPower": 14630
+  },
+  {
+    "id": "dungeon_21_root",
+    "name": "暗影树心·前厅",
+    "description": "第 21 阶挑战，暗影树心的前厅区域，产出 Lv.26 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d21_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d21_01_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d21_02_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d21_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d21_03_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d21_04_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d21_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d21_05_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d21_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d21_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d21_07_root",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d21_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 26,
+    "recommendedPower": 15360
+  },
+  {
+    "id": "dungeon_22_root",
+    "name": "暗影树心·深处",
+    "description": "第 22 阶挑战，暗影树心的深处区域，产出 Lv.27 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d22_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d22_01_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d22_02_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d22_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d22_03_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d22_04_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d22_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d22_05_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d22_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d22_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d22_07_root",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d22_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 27,
+    "recommendedPower": 16070
+  },
+  {
+    "id": "dungeon_23_root",
+    "name": "暗影树心·祭坛",
+    "description": "第 23 阶挑战，暗影树心的祭坛区域，产出 Lv.29 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d23_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d23_01_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d23_02_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d23_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d23_03_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d23_04_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d23_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d23_05_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d23_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d23_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d23_07_root",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d23_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 29,
+    "recommendedPower": 16750
+  },
+  {
+    "id": "dungeon_24_root",
+    "name": "暗影树心·王座",
+    "description": "第 24 阶挑战，暗影树心的王座区域，产出 Lv.30 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d24_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d24_01_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d24_02_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d24_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d24_03_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d24_04_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d24_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d24_05_root",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d24_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d24_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d24_07_root",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d24_06_root",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 30,
+    "recommendedPower": 17690
+  },
+  {
+    "id": "dungeon_25_moon",
+    "name": "月光猎场·外缘",
+    "description": "第 25 阶挑战，月光猎场的外缘区域，产出 Lv.31 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d25_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d25_01_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d25_02_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d25_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d25_03_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d25_04_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d25_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d25_05_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d25_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d25_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d25_07_moon",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d25_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 31,
+    "recommendedPower": 18440
+  },
+  {
+    "id": "dungeon_26_moon",
+    "name": "月光猎场·通道",
+    "description": "第 26 阶挑战，月光猎场的通道区域，产出 Lv.32 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d26_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d26_01_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d26_02_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d26_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d26_03_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d26_04_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d26_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d26_05_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d26_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d26_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d26_07_moon",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d26_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 32,
+    "recommendedPower": 18900
+  },
+  {
+    "id": "dungeon_27_moon",
+    "name": "月光猎场·前厅",
+    "description": "第 27 阶挑战，月光猎场的前厅区域，产出 Lv.34 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d27_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d27_01_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d27_02_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d27_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d27_03_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d27_04_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d27_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d27_05_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d27_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d27_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d27_07_moon",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d27_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 34,
+    "recommendedPower": 19900
+  },
+  {
+    "id": "dungeon_28_moon",
+    "name": "月光猎场·深处",
+    "description": "第 28 阶挑战，月光猎场的深处区域，产出 Lv.35 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d28_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d28_01_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d28_02_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d28_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d28_03_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d28_04_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d28_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d28_05_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d28_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d28_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d28_07_moon",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d28_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 35,
+    "recommendedPower": 20850
+  },
+  {
+    "id": "dungeon_29_moon",
+    "name": "月光猎场·祭坛",
+    "description": "第 29 阶挑战，月光猎场的祭坛区域，产出 Lv.36 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d29_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d29_01_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d29_02_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d29_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d29_03_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d29_04_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d29_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d29_05_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d29_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d29_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d29_07_moon",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d29_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 36,
+    "recommendedPower": 21370
+  },
+  {
+    "id": "dungeon_30_moon",
+    "name": "月光猎场·王座",
+    "description": "第 30 阶挑战，月光猎场的王座区域，产出 Lv.37 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "困难",
+    "rooms": [
+      {
+        "id": "d30_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d30_01_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d30_02_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d30_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d30_03_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d30_04_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d30_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d30_05_moon",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d30_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d30_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d30_07_moon",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d30_06_moon",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 37,
+    "recommendedPower": 22070
+  },
+  {
+    "id": "dungeon_31_frost",
+    "name": "霜铁山脉·外缘",
+    "description": "第 31 阶挑战，霜铁山脉的外缘区域，产出 Lv.39 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d31_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d31_01_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d31_02_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d31_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d31_03_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d31_04_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d31_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d31_05_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d31_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d31_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d31_07_frost",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d31_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 39,
+    "recommendedPower": 23150
+  },
+  {
+    "id": "dungeon_32_frost",
+    "name": "霜铁山脉·通道",
+    "description": "第 32 阶挑战，霜铁山脉的通道区域，产出 Lv.40 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d32_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d32_01_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d32_02_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d32_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d32_03_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d32_04_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d32_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d32_05_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d32_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d32_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d32_07_frost",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d32_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 40,
+    "recommendedPower": 23730
+  },
+  {
+    "id": "dungeon_33_frost",
+    "name": "霜铁山脉·前厅",
+    "description": "第 33 阶挑战，霜铁山脉的前厅区域，产出 Lv.41 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d33_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d33_01_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d33_02_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d33_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d33_03_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d33_04_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d33_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d33_05_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d33_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d33_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d33_07_frost",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d33_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 41,
+    "recommendedPower": 24550
+  },
+  {
+    "id": "dungeon_34_frost",
+    "name": "霜铁山脉·深处",
+    "description": "第 34 阶挑战，霜铁山脉的深处区域，产出 Lv.42 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d34_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d34_01_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d34_02_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d34_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d34_03_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d34_04_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d34_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d34_05_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d34_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d34_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d34_07_frost",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d34_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 42,
+    "recommendedPower": 25390
+  },
+  {
+    "id": "dungeon_35_frost",
+    "name": "霜铁山脉·祭坛",
+    "description": "第 35 阶挑战，霜铁山脉的祭坛区域，产出 Lv.44 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d35_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d35_01_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d35_02_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d35_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d35_03_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d35_04_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d35_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d35_05_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d35_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d35_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d35_07_frost",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d35_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 44,
+    "recommendedPower": 26080
+  },
+  {
+    "id": "dungeon_36_frost",
+    "name": "霜铁山脉·王座",
+    "description": "第 36 阶挑战，霜铁山脉的王座区域，产出 Lv.45 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d36_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d36_01_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d36_02_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d36_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d36_03_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d36_04_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d36_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d36_05_frost",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d36_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d36_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d36_07_frost",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d36_06_frost",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 45,
+    "recommendedPower": 27110
+  },
+  {
+    "id": "dungeon_37_ember",
+    "name": "赤焰沙海·外缘",
+    "description": "第 37 阶挑战，赤焰沙海的外缘区域，产出 Lv.46 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d37_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d37_01_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d37_02_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d37_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d37_03_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d37_04_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d37_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d37_05_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d37_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d37_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d37_07_ember",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d37_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 46,
+    "recommendedPower": 27990
+  },
+  {
+    "id": "dungeon_38_ember",
+    "name": "赤焰沙海·通道",
+    "description": "第 38 阶挑战，赤焰沙海的通道区域，产出 Lv.47 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d38_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d38_01_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d38_02_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d38_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d38_03_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d38_04_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d38_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d38_05_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d38_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d38_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d38_07_ember",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d38_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 47,
+    "recommendedPower": 28690
+  },
+  {
+    "id": "dungeon_39_ember",
+    "name": "赤焰沙海·前厅",
+    "description": "第 39 阶挑战，赤焰沙海的前厅区域，产出 Lv.49 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d39_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d39_01_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d39_02_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d39_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d39_03_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d39_04_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d39_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d39_05_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d39_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d39_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d39_07_ember",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d39_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 49,
+    "recommendedPower": 29540
+  },
+  {
+    "id": "dungeon_40_ember",
+    "name": "赤焰沙海·深处",
+    "description": "第 40 阶挑战，赤焰沙海的深处区域，产出 Lv.50 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d40_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d40_01_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d40_02_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d40_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d40_03_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d40_04_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d40_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d40_05_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d40_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d40_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d40_07_ember",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d40_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 50,
+    "recommendedPower": 30620
+  },
+  {
+    "id": "dungeon_41_ember",
+    "name": "赤焰沙海·祭坛",
+    "description": "第 41 阶挑战，赤焰沙海的祭坛区域，产出 Lv.51 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d41_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d41_01_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d41_02_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d41_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d41_03_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d41_04_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d41_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d41_05_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d41_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d41_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d41_07_ember",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d41_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 51,
+    "recommendedPower": 31390
+  },
+  {
+    "id": "dungeon_42_ember",
+    "name": "赤焰沙海·王座",
+    "description": "第 42 阶挑战，赤焰沙海的王座区域，产出 Lv.52 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "精英",
+    "rooms": [
+      {
+        "id": "d42_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d42_01_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d42_02_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d42_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d42_03_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d42_04_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d42_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d42_05_ember",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d42_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d42_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d42_07_ember",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d42_06_ember",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 52,
+    "recommendedPower": 32180
+  },
+  {
+    "id": "dungeon_43_star",
+    "name": "星陨深渊·外缘",
+    "description": "第 43 阶挑战，星陨深渊的外缘区域，产出 Lv.54 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d43_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d43_01_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d43_02_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d43_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d43_03_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d43_04_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d43_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d43_05_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d43_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d43_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d43_07_star",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d43_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 54,
+    "recommendedPower": 33130
+  },
+  {
+    "id": "dungeon_44_star",
+    "name": "星陨深渊·通道",
+    "description": "第 44 阶挑战，星陨深渊的通道区域，产出 Lv.55 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d44_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d44_01_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d44_02_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d44_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d44_03_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d44_04_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d44_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d44_05_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d44_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d44_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d44_07_star",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d44_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 55,
+    "recommendedPower": 33960
+  },
+  {
+    "id": "dungeon_45_star",
+    "name": "星陨深渊·前厅",
+    "description": "第 45 阶挑战，星陨深渊的前厅区域，产出 Lv.56 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d45_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d45_01_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d45_02_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d45_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d45_03_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d45_04_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d45_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d45_05_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d45_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d45_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d45_07_star",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d45_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 56,
+    "recommendedPower": 34810
+  },
+  {
+    "id": "dungeon_46_star",
+    "name": "星陨深渊·深处",
+    "description": "第 46 阶挑战，星陨深渊的深处区域，产出 Lv.57 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d46_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d46_01_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d46_02_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d46_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d46_03_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d46_04_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d46_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d46_05_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d46_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d46_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d46_07_star",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d46_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 57,
+    "recommendedPower": 35680
+  },
+  {
+    "id": "dungeon_47_star",
+    "name": "星陨深渊·祭坛",
+    "description": "第 47 阶挑战，星陨深渊的祭坛区域，产出 Lv.59 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d47_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d47_01_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d47_02_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d47_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d47_03_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d47_04_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d47_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d47_05_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d47_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d47_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d47_07_star",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d47_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 59,
+    "recommendedPower": 36570
+  },
+  {
+    "id": "dungeon_48_star",
+    "name": "星陨深渊·王座",
+    "description": "第 48 阶挑战，星陨深渊的王座区域，产出 Lv.60 装备，包含低等级高品质稀有掉落。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d48_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d48_01_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d48_02_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d48_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d48_03_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d48_04_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d48_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d48_05_star",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d48_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d48_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d48_07_star",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d48_06_star",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 60,
+    "recommendedPower": 37480
+  }
+]
