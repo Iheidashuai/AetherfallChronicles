@@ -10,6 +10,7 @@ struct Account: Codable {
     var marketState: MarketState
     var robotLeaderboardState: RobotLeaderboardState
     var chatState: WorldChatState
+    var questState: QuestState
     var createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -22,6 +23,7 @@ struct Account: Codable {
         case marketState
         case robotLeaderboardState
         case chatState
+        case questState
         case createdAt
     }
 
@@ -35,6 +37,7 @@ struct Account: Codable {
         marketState: MarketState = MarketState(),
         robotLeaderboardState: RobotLeaderboardState = RobotLeaderboardState(),
         chatState: WorldChatState = WorldChatState(),
+        questState: QuestState = QuestState(),
         createdAt: Date
     ) {
         self.username = username
@@ -46,6 +49,7 @@ struct Account: Codable {
         self.marketState = marketState
         self.robotLeaderboardState = robotLeaderboardState
         self.chatState = chatState
+        self.questState = questState
         self.createdAt = createdAt
     }
 
@@ -60,6 +64,7 @@ struct Account: Codable {
         marketState = try container.decodeIfPresent(MarketState.self, forKey: .marketState) ?? MarketState()
         robotLeaderboardState = try container.decodeIfPresent(RobotLeaderboardState.self, forKey: .robotLeaderboardState) ?? RobotLeaderboardState()
         chatState = try container.decodeIfPresent(WorldChatState.self, forKey: .chatState) ?? WorldChatState()
+        questState = try container.decodeIfPresent(QuestState.self, forKey: .questState) ?? QuestState()
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 }
@@ -69,6 +74,13 @@ class AccountManager {
 
     private let accountsKey = "mythicrealm_accounts"
     private let sessionKey = "mythicrealm_session"
+    private let starterEquipmentTemplateIds = [
+        "eq_t01_weapon_03",
+        "eq_t01_helmet_02",
+        "eq_t01_armor_03",
+        "eq_t01_boots_02",
+        "eq_t01_gloves_02"
+    ]
 
     private var accountsURL: URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -117,6 +129,7 @@ class AccountManager {
             marketState: MarketState(),
             robotLeaderboardState: RobotLeaderboardState(),
             chatState: WorldChatState(),
+            questState: QuestState(),
             createdAt: Date()
         )
         accounts.append(account)
@@ -172,6 +185,7 @@ class AccountManager {
         accounts[index].marketState = gameState.marketState
         accounts[index].robotLeaderboardState = gameState.robotLeaderboardState
         accounts[index].chatState = gameState.chatState
+        accounts[index].questState = gameState.questState
 
         saveAccounts(accounts)
     }
@@ -192,9 +206,13 @@ class AccountManager {
         gameState.marketState = account.marketState
         gameState.robotLeaderboardState = account.robotLeaderboardState
         gameState.chatState = account.chatState
+        gameState.questState = account.questState
+        grantStarterEquipmentIfNeeded(gameState: gameState)
         MarketSystem.bootstrap(gameState: gameState)
         RobotLeaderboardSystem.bootstrap(gameState: gameState)
         WorldChatSystem.bootstrap(gameState: gameState)
+        QuestSystem.bootstrap(gameState: gameState)
+        saveGameState(gameState)
     }
 
     func createCharacter(name: String, gameState: GameState) {
@@ -205,9 +223,12 @@ class AccountManager {
         gameState.marketState = MarketState()
         gameState.robotLeaderboardState = RobotLeaderboardState()
         gameState.chatState = WorldChatState()
+        gameState.questState = QuestState()
+        grantStarterEquipmentIfNeeded(gameState: gameState)
         MarketSystem.bootstrap(gameState: gameState)
         RobotLeaderboardSystem.bootstrap(gameState: gameState)
         WorldChatSystem.bootstrap(gameState: gameState)
+        QuestSystem.bootstrap(gameState: gameState)
         saveGameState(gameState)
     }
 
@@ -220,6 +241,22 @@ class AccountManager {
             hash = ((hash << 5) &+ hash) &+ UInt64(char)
         }
         return String(hash, radix: 16)
+    }
+
+    private func grantStarterEquipmentIfNeeded(gameState: GameState) {
+        guard gameState.player != nil,
+              gameState.completedDungeonIds.isEmpty,
+              gameState.equippedItems.isEmpty else {
+            return
+        }
+
+        for templateId in starterEquipmentTemplateIds {
+            guard let template = ConfigLoader.shared.itemTemplates.first(where: { $0.id == templateId }),
+                  let slot = template.type.equipSlot else {
+                continue
+            }
+            gameState.equippedItems[slot] = Item(template: template)
+        }
     }
 
     private func loadAccounts() -> [Account] {

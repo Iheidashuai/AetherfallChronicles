@@ -34,6 +34,7 @@ struct WorldChatView: View {
         .onAppear {
             WorldChatSystem.bootstrap(gameState: gameState)
             WorldChatSystem.markOpened(gameState: gameState)
+            QuestSystem.record(.chatOpened, gameState: gameState)
         }
         .onReceive(livePulse) { now in
             WorldChatSystem.tick(gameState: gameState, now: now)
@@ -84,10 +85,14 @@ struct WorldChatView: View {
     }
 
     private func sendText() {
+        let outgoingText = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
         let result = WorldChatSystem.sendPlayerMessage(draftText, gameState: gameState)
         statusText = result.message
         guard result.success else { return }
 
+        if WorldChatSystem.quickPhrases.contains(outgoingText) {
+            QuestSystem.record(.chatQuickMessageSent, gameState: gameState)
+        }
         draftText = ""
         for reply in result.replies {
             DispatchQueue.main.asyncAfter(deadline: .now() + reply.delay) {
@@ -101,12 +106,16 @@ struct WorldChatView: View {
         case .none:
             return
         case .market:
+            QuestSystem.record(.chatActionUsed(action: action), gameState: gameState)
             gameState.currentScreen = .market
         case .leaderboard:
+            QuestSystem.record(.chatActionUsed(action: action), gameState: gameState)
             gameState.currentScreen = .leaderboard
         case .inventory:
+            QuestSystem.record(.chatActionUsed(action: action), gameState: gameState)
             gameState.currentScreen = .inventory
         case .dungeonList:
+            QuestSystem.record(.chatActionUsed(action: action), gameState: gameState)
             gameState.currentScreen = .dungeonList
         }
     }

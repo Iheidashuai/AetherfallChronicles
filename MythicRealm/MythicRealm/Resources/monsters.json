@@ -3,8 +3,8 @@
     "id": "m_d01_01_spider",
     "name": "蛛影毒蛛",
     "level": 1,
-    "maxHP": 106,
-    "strength": 13,
+    "maxHP": 62,
+    "strength": 6,
     "moveSpeed": 62,
     "attackRange": 42,
     "attackCooldown": 1.86,
@@ -32,15 +32,15 @@
         "dropRate": 0.11
       }
     ],
-    "expReward": 28,
-    "goldReward": 13
+    "expReward": 35,
+    "goldReward": 10
   },
   {
     "id": "m_d01_02_spider",
     "name": "蛛影缚网者",
     "level": 1,
-    "maxHP": 132,
-    "strength": 15,
+    "maxHP": 74,
+    "strength": 7,
     "moveSpeed": 63,
     "attackRange": 46,
     "attackCooldown": 1.82,
@@ -68,15 +68,15 @@
         "dropRate": 0.11
       }
     ],
-    "expReward": 28,
-    "goldReward": 13
+    "expReward": 35,
+    "goldReward": 10
   },
   {
     "id": "m_d01_03_spider",
     "name": "蛛影林地伏击者",
     "level": 1,
-    "maxHP": 159,
-    "strength": 18,
+    "maxHP": 86,
+    "strength": 8,
     "moveSpeed": 65,
     "attackRange": 50,
     "attackCooldown": 1.79,
@@ -104,15 +104,15 @@
         "dropRate": 0.11
       }
     ],
-    "expReward": 28,
-    "goldReward": 13
+    "expReward": 35,
+    "goldReward": 10
   },
   {
     "id": "m_d01_04_spider",
     "name": "蛛影裂牙猎蛛",
     "level": 2,
-    "maxHP": 190,
-    "strength": 21,
+    "maxHP": 98,
+    "strength": 9,
     "moveSpeed": 67,
     "attackRange": 54,
     "attackCooldown": 1.75,
@@ -140,15 +140,15 @@
         "dropRate": 0.11
       }
     ],
-    "expReward": 28,
-    "goldReward": 13
+    "expReward": 35,
+    "goldReward": 10
   },
   {
     "id": "m_d01_05_spider",
     "name": "蛛影蛛巢守卫",
     "level": 2,
-    "maxHP": 223,
-    "strength": 24,
+    "maxHP": 112,
+    "strength": 10,
     "moveSpeed": 68,
     "attackRange": 58,
     "attackCooldown": 1.72,
@@ -176,15 +176,15 @@
         "dropRate": 0.11
       }
     ],
-    "expReward": 28,
-    "goldReward": 13
+    "expReward": 40,
+    "goldReward": 12
   },
   {
     "id": "m_d01_06_spider",
     "name": "蛛影毒囊行者",
     "level": 2,
-    "maxHP": 333,
-    "strength": 28,
+    "maxHP": 145,
+    "strength": 12,
     "moveSpeed": 70,
     "attackRange": 62,
     "attackCooldown": 1.68,
@@ -213,14 +213,14 @@
       }
     ],
     "expReward": 45,
-    "goldReward": 23
+    "goldReward": 14
   },
   {
     "id": "m_d01_07_spider",
     "name": "蛛后",
     "level": 3,
-    "maxHP": 746,
-    "strength": 35,
+    "maxHP": 230,
+    "strength": 14,
     "moveSpeed": 70,
     "attackRange": 82,
     "attackCooldown": 1.65,
@@ -252,8 +252,8 @@
         "dropRate": 0.045
       }
     ],
-    "expReward": 83,
-    "goldReward": 43
+    "expReward": 85,
+    "goldReward": 30
   },
   {
     "id": "m_d02_01_spider",

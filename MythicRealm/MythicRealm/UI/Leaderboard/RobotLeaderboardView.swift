@@ -64,10 +64,14 @@ struct RobotLeaderboardView: View {
         }
         .onAppear {
             RobotLeaderboardSystem.refresh(gameState: gameState)
+            let rank = RobotLeaderboardSystem.rankedEntries(gameState: gameState).first(where: \.isPlayer)?.rank
+            QuestSystem.record(.leaderboardViewed(rank: rank), gameState: gameState)
             statusText = "公会档案已同步"
         }
         .onReceive(livePulse) { now in
             RobotLeaderboardSystem.refresh(gameState: gameState, now: now, forceMinute: true)
+            let rank = RobotLeaderboardSystem.rankedEntries(gameState: gameState).first(where: \.isPlayer)?.rank
+            QuestSystem.record(.leaderboardViewed(rank: rank), gameState: gameState, now: now)
             statusText = "排行榜已刷新"
         }
         .sheet(item: $selectedRobot) { robot in

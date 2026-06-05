@@ -1,0 +1,315 @@
+[
+  {
+    "id": "main_001_first_clear",
+    "title": "公会第一枚印章",
+    "category": "main",
+    "description": "通关蛛影林地·外缘。",
+    "lore": "银冠公会需要确认你的战斗记录。去蛛影林地外缘带回第一枚巡林印章。",
+    "priority": 10,
+    "navigationTarget": "dungeonList",
+    "conditions": [
+      { "id": "clear_dungeon_01", "type": "dungeonCompleted", "targetId": "dungeon_01_spider", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 80 },
+      { "type": "experience", "amount": 60 },
+      { "type": "itemTemplate", "targetId": "eq_t01_gloves_03", "amount": 1 }
+    ]
+  },
+  {
+    "id": "main_002_equip",
+    "title": "整理战利品",
+    "category": "main",
+    "description": "穿戴任意一件装备。",
+    "lore": "公会军需官说，真正的冒险者不会把好装备一直塞在背包底。",
+    "priority": 20,
+    "prerequisiteIds": ["main_001_first_clear"],
+    "navigationTarget": "inventory",
+    "conditions": [
+      { "id": "equip_any", "type": "equipmentEquipped", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 100 },
+      { "type": "experience", "amount": 70 }
+    ]
+  },
+  {
+    "id": "main_003_visit_market",
+    "title": "商会的价签",
+    "category": "main",
+    "description": "进入冒险者商会。",
+    "lore": "黑杉商队已经把新货摆上柜台。去看看市场价格，别让战利品睡在尘土里。",
+    "priority": 30,
+    "prerequisiteIds": ["main_002_equip"],
+    "navigationTarget": "market",
+    "conditions": [
+      { "id": "view_market", "type": "marketViewed", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 120 },
+      { "type": "experience", "amount": 80 }
+    ]
+  },
+  {
+    "id": "main_004_list_item",
+    "title": "第一张寄售牌",
+    "category": "main",
+    "description": "在商会上架 1 件装备。",
+    "lore": "商会书记给了你一块空白价签。把一件多余装备交给柜台，看看谁会停下脚步。",
+    "priority": 40,
+    "prerequisiteIds": ["main_003_visit_market"],
+    "navigationTarget": "market",
+    "conditions": [
+      { "id": "list_item", "type": "marketListed", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 140 },
+      { "type": "experience", "amount": 90 }
+    ]
+  },
+  {
+    "id": "main_005_view_leaderboard",
+    "title": "银冠战力榜",
+    "category": "main",
+    "description": "查看排行榜 1 次。",
+    "lore": "榜单不是王座，只是一面镜子。看看自己离下一位冒险者还差多少。",
+    "priority": 50,
+    "prerequisiteIds": ["main_004_list_item"],
+    "navigationTarget": "leaderboard",
+    "conditions": [
+      { "id": "view_leaderboard", "type": "leaderboardViewed", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 150 },
+      { "type": "experience", "amount": 100 }
+    ]
+  },
+  {
+    "id": "main_006_open_chat",
+    "title": "传讯水晶",
+    "category": "main",
+    "description": "打开世界聊天 1 次。",
+    "lore": "公会大厅的传讯水晶亮了起来。那里有市场传闻、榜单动向和其他冒险者的闲谈。",
+    "priority": 60,
+    "prerequisiteIds": ["main_005_view_leaderboard"],
+    "navigationTarget": "worldChat",
+    "conditions": [
+      { "id": "open_chat", "type": "chatOpened", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 160 },
+      { "type": "experience", "amount": 110 }
+    ]
+  },
+  {
+    "id": "main_007_enhance",
+    "title": "赤铜工坊的火星",
+    "category": "main",
+    "description": "强化任意装备 1 次。",
+    "lore": "赤铜铁匠博林把锤子搁在铁砧上：一件装备要见过火星，才算真正开始服役。",
+    "priority": 70,
+    "prerequisiteIds": ["main_006_open_chat"],
+    "navigationTarget": "inventory",
+    "conditions": [
+      { "id": "enhance_once", "type": "enhancementAttempts", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 180 },
+      { "type": "experience", "amount": 120 }
+    ]
+  },
+  {
+    "id": "main_008_power_2200",
+    "title": "边境认可",
+    "category": "main",
+    "description": "战力达到 2200。",
+    "lore": "银冠公会把你的名字写进边境候补名单。再提升一点战力，你就能接下更危险的委托。",
+    "priority": 80,
+    "prerequisiteIds": ["main_007_enhance"],
+    "navigationTarget": "inventory",
+    "conditions": [
+      { "id": "power_2200", "type": "combatPowerReached", "targetValue": 2200 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 220 },
+      { "type": "experience", "amount": 150 },
+      { "type": "itemTemplate", "targetId": "eq_t01_armor_03", "amount": 1 }
+    ]
+  },
+  {
+    "id": "daily_001_clear_twice",
+    "title": "巡林两回",
+    "category": "daily",
+    "description": "完成任意副本 2 次。",
+    "lore": "今日巡林记录需要两枚新鲜印章，公会书记会在晚钟前核对。",
+    "priority": 110,
+    "navigationTarget": "dungeonList",
+    "conditions": [
+      { "id": "daily_clear_any", "type": "dungeonClears", "targetValue": 2 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 120 },
+      { "type": "experience", "amount": 80 }
+    ]
+  },
+  {
+    "id": "daily_002_kill_20",
+    "title": "清剿蛛影",
+    "category": "daily",
+    "description": "击败 20 只怪物。",
+    "lore": "蛛网又爬上了旧路标。清出一段路，商队就能安全些。",
+    "priority": 120,
+    "navigationTarget": "dungeonList",
+    "conditions": [
+      { "id": "daily_kill_20", "type": "monsterKills", "targetValue": 20 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 100 },
+      { "type": "experience", "amount": 70 }
+    ]
+  },
+  {
+    "id": "daily_003_enhance",
+    "title": "工坊炉火",
+    "category": "daily",
+    "description": "强化任意装备 1 次。",
+    "lore": "赤铜工坊今天的炉火很稳，博林说适合敲上一锤。",
+    "priority": 130,
+    "navigationTarget": "inventory",
+    "conditions": [
+      { "id": "daily_enhance_once", "type": "enhancementAttempts", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 90 },
+      { "type": "experience", "amount": 60 }
+    ]
+  },
+  {
+    "id": "daily_004_leaderboard",
+    "title": "榜单晨检",
+    "category": "daily",
+    "description": "查看排行榜 1 次。",
+    "lore": "银冠战力榜每天都会动。看一眼目标，别让前面的背影跑远。",
+    "priority": 140,
+    "navigationTarget": "leaderboard",
+    "conditions": [
+      { "id": "daily_view_leaderboard", "type": "leaderboardViewed", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 80 },
+      { "type": "experience", "amount": 50 }
+    ]
+  },
+  {
+    "id": "daily_005_chat",
+    "title": "水晶回声",
+    "category": "daily",
+    "description": "打开世界聊天 1 次。",
+    "lore": "传讯水晶里总有新的价签、传闻和榜单碎语。今天也去听一听。",
+    "priority": 150,
+    "navigationTarget": "worldChat",
+    "conditions": [
+      { "id": "daily_open_chat", "type": "chatOpened", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 80 },
+      { "type": "experience", "amount": 50 }
+    ]
+  },
+  {
+    "id": "ach_001_rare_item",
+    "title": "蓝光初现",
+    "category": "achievement",
+    "description": "首次获得稀有及以上装备。",
+    "lore": "当第一缕蓝色魔光穿过蛛网，公会大厅里总会有人抬头。",
+    "priority": 210,
+    "navigationTarget": "dungeonList",
+    "conditions": [
+      { "id": "rare_item_once", "type": "itemQualityObtained", "targetId": "rare", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 220 },
+      { "type": "experience", "amount": 120 }
+    ]
+  },
+  {
+    "id": "ach_002_clear_10",
+    "title": "十枚巡林印章",
+    "category": "achievement",
+    "description": "累计通关任意副本 10 次。",
+    "lore": "十次归来，靴底会记住林地的泥，也会记住你没有退缩。",
+    "priority": 220,
+    "navigationTarget": "dungeonList",
+    "conditions": [
+      { "id": "clear_10", "type": "dungeonClears", "targetValue": 10 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 350 },
+      { "type": "experience", "amount": 220 }
+    ]
+  },
+  {
+    "id": "ach_003_enhance_success_3",
+    "title": "三次成锤",
+    "category": "achievement",
+    "description": "累计强化成功 3 次。",
+    "lore": "博林在账本旁画了三颗火星，这是他少见的称赞。",
+    "priority": 230,
+    "navigationTarget": "inventory",
+    "conditions": [
+      { "id": "enhance_success_3", "type": "enhancementSuccesses", "targetValue": 3 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 300 },
+      { "type": "experience", "amount": 180 }
+    ]
+  },
+  {
+    "id": "ach_004_market_purchase",
+    "title": "第一笔买入",
+    "category": "achievement",
+    "description": "首次从市场购买装备。",
+    "lore": "商会柜台敲下了第一枚属于你的买入印章。",
+    "priority": 240,
+    "navigationTarget": "market",
+    "conditions": [
+      { "id": "market_purchase_once", "type": "marketPurchased", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 260 },
+      { "type": "experience", "amount": 140 }
+    ]
+  },
+  {
+    "id": "ach_005_market_sale",
+    "title": "第一张成交单",
+    "category": "achievement",
+    "description": "首次在市场售出装备。",
+    "lore": "有人买走了你的战利品。商会书记把这张成交单夹进了你的档案。",
+    "priority": 250,
+    "navigationTarget": "market",
+    "conditions": [
+      { "id": "market_sale_once", "type": "marketSold", "targetValue": 1 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 260 },
+      { "type": "experience", "amount": 140 }
+    ]
+  },
+  {
+    "id": "ach_006_rank_top_100",
+    "title": "榜上有名",
+    "category": "achievement",
+    "description": "首次进入排行榜前 100。",
+    "lore": "银冠战力榜给你留出了一个位置，哪怕只是末席，也足够让新人记住你的名字。",
+    "priority": 260,
+    "navigationTarget": "leaderboard",
+    "conditions": [
+      { "id": "rank_top_100", "type": "leaderboardRankReached", "targetValue": 100 }
+    ],
+    "rewards": [
+      { "type": "gold", "amount": 300 },
+      { "type": "experience", "amount": 180 }
+    ]
+  }
+]

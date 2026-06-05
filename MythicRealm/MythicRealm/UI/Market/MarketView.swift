@@ -58,6 +58,7 @@ struct MarketView: View {
         }
         .onAppear {
             let result = MarketSystem.refreshMarket(gameState: gameState)
+            QuestSystem.record(.marketViewed, gameState: gameState)
             if statusMessage == nil && !result.success {
                 statusMessage = result.message
             }

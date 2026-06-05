@@ -138,6 +138,44 @@ struct HomeView: View {
                         )
                     }
 
+                    Button(action: { gameState.currentScreen = .quests }) {
+                        HStack(spacing: 12) {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "scroll.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.yellow)
+                                if QuestSystem.hasClaimableRewards(gameState.questState) {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 2, y: -2)
+                                }
+                            }
+                            .frame(width: 28)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("银冠公会委托")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text(QuestSystem.activeSummary(gameState: gameState))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.68)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                        }
+                        .padding(16)
+                        .background(Color.yellow.opacity(0.12))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.yellow.opacity(0.35), lineWidth: 1)
+                        )
+                    }
+
                     // Market button
                     Button(action: { gameState.currentScreen = .market }) {
                         HStack(spacing: 12) {
@@ -251,6 +289,7 @@ struct HomeView: View {
             MarketSystem.bootstrap(gameState: gameState)
             RobotLeaderboardSystem.bootstrap(gameState: gameState)
             WorldChatSystem.bootstrap(gameState: gameState)
+            QuestSystem.bootstrap(gameState: gameState)
         }
     }
 

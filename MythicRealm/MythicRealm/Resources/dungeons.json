@@ -10,10 +10,6 @@
         "monsters": [
           {
             "monsterId": "m_d01_01_spider",
-            "count": 2
-          },
-          {
-            "monsterId": "m_d01_02_spider",
             "count": 1
           }
         ],
@@ -24,10 +20,6 @@
         "monsters": [
           {
             "monsterId": "m_d01_03_spider",
-            "count": 2
-          },
-          {
-            "monsterId": "m_d01_04_spider",
             "count": 1
           }
         ],
@@ -38,10 +30,6 @@
         "monsters": [
           {
             "monsterId": "m_d01_05_spider",
-            "count": 2
-          },
-          {
-            "monsterId": "m_d01_06_spider",
             "count": 1
           }
         ],
@@ -53,17 +41,13 @@
           {
             "monsterId": "m_d01_07_spider",
             "count": 1
-          },
-          {
-            "monsterId": "m_d01_06_spider",
-            "count": 1
           }
         ],
         "isBossRoom": true
       }
     ],
     "recommendedLevel": 1,
-    "recommendedPower": 1580
+    "recommendedPower": 1000
   },
   {
     "id": "dungeon_02_spider",
@@ -129,7 +113,7 @@
       }
     ],
     "recommendedLevel": 2,
-    "recommendedPower": 2030
+    "recommendedPower": 1450
   },
   {
     "id": "dungeon_03_spider",
@@ -195,7 +179,7 @@
       }
     ],
     "recommendedLevel": 4,
-    "recommendedPower": 2760
+    "recommendedPower": 1850
   },
   {
     "id": "dungeon_04_spider",
@@ -261,7 +245,7 @@
       }
     ],
     "recommendedLevel": 5,
-    "recommendedPower": 3400
+    "recommendedPower": 2350
   },
   {
     "id": "dungeon_05_spider",
@@ -327,7 +311,7 @@
       }
     ],
     "recommendedLevel": 6,
-    "recommendedPower": 3850
+    "recommendedPower": 2850
   },
   {
     "id": "dungeon_06_spider",
@@ -393,7 +377,7 @@
       }
     ],
     "recommendedLevel": 7,
-    "recommendedPower": 4360
+    "recommendedPower": 3350
   },
   {
     "id": "dungeon_07_swamp",

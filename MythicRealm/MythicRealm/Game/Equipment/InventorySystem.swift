@@ -48,6 +48,8 @@ class InventorySystem {
 
         gameState.equippedItems[actualSlot] = item
         removeItem(item, from: gameState)
+        QuestSystem.record(.equipmentEquipped(itemQuality: item.quality, slot: actualSlot), gameState: gameState)
+        QuestSystem.record(.combatPowerChanged(power: combatPower(gameState: gameState)), gameState: gameState)
         gameState.saveProgress()
     }
 
@@ -141,6 +143,8 @@ class InventorySystem {
             current.enhancementLuck = 0
             replaceItem(current, gameState: gameState)
             WorldChatSystem.recordEnhancement(item: current, success: true, targetLevel: targetLevel, gameState: gameState)
+            QuestSystem.record(.enhancementAttempt(success: true), gameState: gameState)
+            QuestSystem.record(.combatPowerChanged(power: combatPower(gameState: gameState)), gameState: gameState)
             gameState.saveProgress()
             return EnhancementResult(success: true, message: "强化成功！\(current.displayName)")
         }
@@ -152,6 +156,8 @@ class InventorySystem {
         }
         replaceItem(current, gameState: gameState)
         WorldChatSystem.recordEnhancement(item: current, success: false, targetLevel: targetLevel, gameState: gameState)
+        QuestSystem.record(.enhancementAttempt(success: false), gameState: gameState)
+        QuestSystem.record(.combatPowerChanged(power: combatPower(gameState: gameState)), gameState: gameState)
         gameState.saveProgress()
 
         if downgrade > 0 {

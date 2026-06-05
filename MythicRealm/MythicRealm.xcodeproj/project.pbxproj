@@ -26,6 +26,10 @@
 		89593DFB8E6736DC6E47417F /* dungeons.json in Resources */ = {isa = PBXBuildFile; fileRef = F7937165D217EC24E107A1A4 /* dungeons.json */; };
 		89B88ABC30805642545921BE /* ConfigLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79C96530D9EEC39E86A4A03 /* ConfigLoader.swift */; };
 		9803CAFDB70DF0E83E65B085 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB4D3326CD2BD5ADF0468687 /* HomeView.swift */; };
+		A1B2C3D4E5F6071829304001 /* QuestModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304101 /* QuestModels.swift */; };
+		A1B2C3D4E5F6071829304002 /* QuestSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304102 /* QuestSystem.swift */; };
+		A1B2C3D4E5F6071829304003 /* QuestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304103 /* QuestView.swift */; };
+		A1B2C3D4E5F6071829304004 /* quests.json in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071829304104 /* quests.json */; };
 		B5CE74015410D782B9F8B96E /* CharacterPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DF7AA01139227F089E62E0 /* CharacterPanelView.swift */; };
 		B695111904D6E9D12FA6F337 /* MarketPricing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62B893F8578BC6FA6F1C7DC6 /* MarketPricing.swift */; };
 		B69AFDB09C9FEA28A2593006 /* AccountManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C9BC88B38F807A0C6CC3DC5 /* AccountManager.swift */; };
@@ -59,6 +63,10 @@
 		99DBFDFBC5C9D8BF9D1D47D9 /* MythicRealm.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MythicRealm.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9A53A584872839E41279746F /* RobotLeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotLeaderboardView.swift; sourceTree = "<group>"; };
 		9DC631400115A5CDFA6FDCE4 /* GameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameContainerView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071829304101 /* QuestModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestModels.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071829304102 /* QuestSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestSystem.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071829304103 /* QuestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071829304104 /* quests.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = quests.json; sourceTree = "<group>"; };
 		A7CC8170D0E0ADE0B39BF796 /* RobotLeaderboardSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotLeaderboardSystem.swift; sourceTree = "<group>"; };
 		C49C1ACF0E1C47D3ABCEF894 /* monsters.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = monsters.json; sourceTree = "<group>"; };
 		C5F025A6F14BCC4CDC03B3CD /* RobotLeaderboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RobotLeaderboardModels.swift; sourceTree = "<group>"; };
@@ -159,6 +167,7 @@
 				CC6704C0DED3D0BB57DB83E3 /* Leaderboard */,
 				B705DED8CBC8A4BCF9A5651D /* Market */,
 				ED5A8D518999F5F02146232D /* Menu */,
+				A1B2C3D4E5F6071829304202 /* Quest */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -214,6 +223,23 @@
 			path = Leaderboard;
 			sourceTree = "<group>";
 		};
+		A1B2C3D4E5F6071829304201 /* Quest */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6071829304101 /* QuestModels.swift */,
+				A1B2C3D4E5F6071829304102 /* QuestSystem.swift */,
+			);
+			path = Quest;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6071829304202 /* Quest */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6071829304103 /* QuestView.swift */,
+			);
+			path = Quest;
+			sourceTree = "<group>";
+		};
 		AE4711B4DDDEDEA18A34814A /* MythicRealm */ = {
 			isa = PBXGroup;
 			children = (
@@ -262,6 +288,7 @@
 				A5C1E9BC15336E6257FA0824 /* Leaderboard */,
 				7AF535FEC91D2A08F2218DAD /* Market */,
 				BA7E6DD34A51D3B072C82B07 /* Monster */,
+				A1B2C3D4E5F6071829304201 /* Quest */,
 			);
 			path = Game;
 			sourceTree = "<group>";
@@ -291,6 +318,7 @@
 				F7937165D217EC24E107A1A4 /* dungeons.json */,
 				7FD731097DD7E66172D2EECE /* items.json */,
 				C49C1ACF0E1C47D3ABCEF894 /* monsters.json */,
+				A1B2C3D4E5F6071829304104 /* quests.json */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -354,6 +382,7 @@
 				89593DFB8E6736DC6E47417F /* dungeons.json in Resources */,
 				7D9D219321C4629C34288851 /* items.json in Resources */,
 				3CE015B1F0922C716719075B /* monsters.json in Resources */,
+				A1B2C3D4E5F6071829304004 /* quests.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -384,6 +413,9 @@
 				3869D7F348A2A1EA74C68C5F /* MonsterConfig.swift in Sources */,
 				85331E04669219C5131D5DD7 /* MythicRealmApp.swift in Sources */,
 				4E7454ACAD7CEC7E17FF57AB /* PlayerData.swift in Sources */,
+				A1B2C3D4E5F6071829304001 /* QuestModels.swift in Sources */,
+				A1B2C3D4E5F6071829304002 /* QuestSystem.swift in Sources */,
+				A1B2C3D4E5F6071829304003 /* QuestView.swift in Sources */,
 				3ABC44CABCA485C8A894C17A /* RobotLeaderboardModels.swift in Sources */,
 				EC6A68B8D54167F635437680 /* RobotLeaderboardSystem.swift in Sources */,
 				CC4EB600C7E89336965B3DA0 /* RobotLeaderboardView.swift in Sources */,

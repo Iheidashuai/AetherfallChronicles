@@ -428,6 +428,14 @@ class TextBattleEngine: ObservableObject {
         for item in collectedLoot {
             _ = InventorySystem.addItem(item, to: GameState.shared)
         }
+        QuestSystem.record(
+            .dungeonCompleted(
+                dungeonId: dungeonConfig.id,
+                monstersKilled: totalMonstersKilled,
+                lootQualities: collectedLoot.map(\.quality)
+            ),
+            gameState: GameState.shared
+        )
         GameState.shared.saveProgress()
 
         let completedResult = DungeonResult(

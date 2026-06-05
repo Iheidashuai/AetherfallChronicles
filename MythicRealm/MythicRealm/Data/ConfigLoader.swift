@@ -6,6 +6,7 @@ class ConfigLoader {
     var itemTemplates: [ItemTemplate] = []
     var monsterConfigs: [MonsterConfig] = []
     var dungeonConfigs: [DungeonConfig] = []
+    var questConfigs: [QuestConfig] = []
 
     private init() {
         loadAll()
@@ -15,6 +16,7 @@ class ConfigLoader {
         itemTemplates = loadItemTemplates()
         monsterConfigs = loadMonsterConfigs()
         dungeonConfigs = loadDungeonConfigs()
+        questConfigs = loadQuestConfigs()
     }
 
     private func loadItemTemplates() -> [ItemTemplate] {
@@ -27,6 +29,10 @@ class ConfigLoader {
 
     private func loadDungeonConfigs() -> [DungeonConfig] {
         loadConfig(filename: "dungeons")
+    }
+
+    private func loadQuestConfigs() -> [QuestConfig] {
+        loadConfig(filename: "quests")
     }
 
     private func loadConfig<T: Decodable>(filename: String) -> [T] {

@@ -32,6 +32,7 @@ enum MarketSystem {
 
     static func bootstrap(gameState: GameState, now: Date = Date()) {
         var state = gameState.marketState
+        let previousRecordIds = Set(state.tradeRecords.map(\.id))
         let playerLevel = gameState.player?.level ?? 1
         resetDailyIfNeeded(state: &state, playerLevel: playerLevel, now: now)
         ensureRobotInventory(state: &state, playerLevel: playerLevel, now: now)
@@ -39,12 +40,14 @@ enum MarketSystem {
             simulate(state: &state, gameState: gameState, now: now, minimumTicks: 0)
         }
         gameState.marketState = state
+        recordNewPlayerSales(in: state, excluding: previousRecordIds, gameState: gameState)
         gameState.saveProgress()
     }
 
     @discardableResult
     static func refreshMarket(gameState: GameState, manual: Bool = false, now: Date = Date()) -> MarketActionResult {
         var state = gameState.marketState
+        let previousRecordIds = Set(state.tradeRecords.map(\.id))
         let playerLevel = gameState.player?.level ?? 1
         resetDailyIfNeeded(state: &state, playerLevel: playerLevel, now: now)
 
@@ -65,6 +68,7 @@ enum MarketSystem {
         ensureRobotInventory(state: &state, playerLevel: playerLevel, now: now)
         trimMarketState(&state)
         gameState.marketState = state
+        recordNewPlayerSales(in: state, excluding: previousRecordIds, gameState: gameState)
         gameState.saveProgress()
 
         if manual {
@@ -76,12 +80,14 @@ enum MarketSystem {
     @discardableResult
     static func pulseMarket(gameState: GameState, now: Date = Date()) -> MarketActionResult {
         var state = gameState.marketState
+        let previousRecordIds = Set(state.tradeRecords.map(\.id))
         let playerLevel = gameState.player?.level ?? 1
         resetDailyIfNeeded(state: &state, playerLevel: playerLevel, now: now)
         simulate(state: &state, gameState: gameState, now: now, minimumTicks: 1)
         ensureRobotInventory(state: &state, playerLevel: playerLevel, now: now)
         trimMarketState(&state)
         gameState.marketState = state
+        recordNewPlayerSales(in: state, excluding: previousRecordIds, gameState: gameState)
         gameState.saveProgress()
         return .success("商会正在撮合交易")
     }
@@ -144,6 +150,7 @@ enum MarketSystem {
 
         gameState.marketState = state
         WorldChatSystem.recordMarketListing(listing, gameState: gameState, now: now)
+        QuestSystem.record(.marketListed(itemQuality: item.quality, price: price), gameState: gameState, now: now)
         gameState.saveProgress()
         return .success("已寄售，扣除上架费 \(fee) 金")
     }
@@ -241,8 +248,22 @@ enum MarketSystem {
 
         gameState.marketState = state
         WorldChatSystem.recordPlayerPurchase(purchasedListing, gameState: gameState, now: now)
+        QuestSystem.record(.marketPurchased(itemQuality: item.quality, price: price), gameState: gameState, now: now)
         gameState.saveProgress()
         return .success("购买成功，装备已放入背包")
+    }
+
+    private static func recordNewPlayerSales(in state: MarketState, excluding previousRecordIds: Set<UUID>, gameState: GameState) {
+        let newSales = state.tradeRecords.filter { record in
+            !previousRecordIds.contains(record.id) && record.isPlayerRelated && record.recordType == .sale
+        }
+        for record in newSales {
+            QuestSystem.record(
+                .marketSold(itemQuality: .common, price: record.price, buyerName: record.buyerName),
+                gameState: gameState,
+                now: record.time
+            )
+        }
     }
 
     static func manualRefreshCost(state: MarketState) -> Int {

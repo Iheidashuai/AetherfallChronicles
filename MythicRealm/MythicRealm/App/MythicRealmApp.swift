@@ -39,6 +39,8 @@ struct ContentView: View {
                 RobotLeaderboardView()
             case .worldChat:
                 WorldChatView()
+            case .quests:
+                QuestView()
             case .characterPanel:
                 CharacterPanelView()
             case .dungeonResult:
@@ -60,6 +62,7 @@ enum GameScreen {
     case market
     case leaderboard
     case worldChat
+    case quests
     case characterPanel
     case dungeonResult
 }
@@ -75,6 +78,7 @@ class GameState: ObservableObject {
     @Published var marketState: MarketState = MarketState()
     @Published var robotLeaderboardState: RobotLeaderboardState = RobotLeaderboardState()
     @Published var chatState: WorldChatState = WorldChatState()
+    @Published var questState: QuestState = QuestState()
     @Published var dungeonResult: DungeonResult?
     @Published var selectedDungeonId: String?
     @Published var isPaused: Bool = false
@@ -100,6 +104,7 @@ class GameState: ObservableObject {
         marketState = MarketState()
         robotLeaderboardState = RobotLeaderboardState()
         chatState = WorldChatState()
+        questState = QuestState()
         selectedDungeonId = nil
         currentScreen = .login
     }
@@ -177,6 +182,14 @@ class GameState: ObservableObject {
         )
         dungeonResult = sweepResult
         WorldChatSystem.recordDungeonResult(sweepResult, gameState: self)
+        QuestSystem.record(
+            .dungeonCompleted(
+                dungeonId: dungeon.id,
+                monstersKilled: monstersKilled,
+                lootQualities: addedLoot.map(\.quality)
+            ),
+            gameState: self
+        )
         saveProgress()
         currentScreen = .dungeonResult
     }
