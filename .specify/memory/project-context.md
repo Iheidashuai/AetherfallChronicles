@@ -1,45 +1,56 @@
 # Project Context
 
-Last reviewed: 2026-06-06
+Last reviewed: 2026-06-07
 
 ## Current Repository Shape
 
-The repository currently contains an iOS MVP under `MythicRealm/` and design documents under `docs/specs/`.
-
-Important local files:
-
-- `MythicRealm/MythicRealm/App/MythicRealmApp.swift`: app entry, global `GameState`, screen routing.
-- `MythicRealm/MythicRealm/Data/AccountManager.swift`: local account, character, and save persistence using JSON files and `UserDefaults`.
-- `MythicRealm/MythicRealm/Data/ConfigLoader.swift`: JSON config loading for items, monsters, dungeons, and quests.
-- `MythicRealm/MythicRealm/Game/Combat/TextBattleEngine.swift`: current battle loop and battle log generation.
-- `MythicRealm/MythicRealm/Game/Equipment/*`: item model, inventory, loot, enhancement, combat power.
-- `MythicRealm/MythicRealm/Game/Market/*`: player listing, robot listing, trade simulation, pricing.
-- `MythicRealm/MythicRealm/Game/Leaderboard/*`: robot adventure simulation and ranking.
-- `MythicRealm/MythicRealm/Game/Chat/*`: simulated world chat, quick phrases, system events.
-- `MythicRealm/MythicRealm/Game/Quest/*`: quest progress, daily reset, reward claim.
-- `MythicRealm/MythicRealm/Resources/*.json`: source config data.
+The repository contains:
+- **Backend**: DDD Maven multi-module architecture (15 modules) at `backend-ddd/`
+- **Frontend**: H5 Vite + React app at `web/`
+- **Legacy**: the old iOS/Swift MVP has been removed from the repository
+- **Docs**: Architecture docs at `docs/architecture/`, specs at `docs/specs/`
 
 ## Observed Implementation Reality
 
-The README and older specs describe Swift + SpriteKit + SQLite + ECS and real-time 2D action combat. The current codebase is closer to:
+The README now describes the current H5 + Java implementation. Older specs may still mention Swift + SpriteKit + SQLite + ECS and real-time 2D action combat as historical migration context.
 
-- SwiftUI-driven menus and state.
-- Text/log-based auto battle.
-- Local JSON account/save persistence.
-- JSON config files.
-- Rich systems for market, bot leaderboard, chat, quest, inventory, and loot.
+The active product should prioritize a networked menu RPG with server-authoritative simulation. A Phaser battle scene is useful later if the game returns to real-time action combat.
 
-This means the first H5 version should prioritize a networked menu RPG with server-authoritative simulation. A Phaser battle scene is useful later if the game returns to real-time action combat.
+## Current Architecture: DDD Maven Multi-Module (2026-06-07)
 
-## Current H5 + Java Implementation Snapshot
+The repository now uses a complete DDD (Domain-Driven Design) architecture:
 
-The repository now includes a playable H5 + Java vertical slice:
+**Backend** (`backend-ddd/`):
+- **架构**: DDD 四层架构 (Domain/Application/Infrastructure/Interface)
+- **技术**: Spring Boot 3.3.0, Java 21, Maven multi-module
+- **数据层**: JdbcTemplate (not JPA), Flyway migrations
+- **事件驱动**: Spring Events for cross-domain communication
+- **模块数**: 15 个独立模块
+  - `mythic-realm-common` - 公共模块 (领域事件、异常)
+  - `mythic-realm-infrastructure` - 基础设施 (数据源、Redis、事件总线)
+  - `mythic-realm-domain-player` - 角色领域
+  - `mythic-realm-domain-equipment` - 装备领域
+  - `mythic-realm-domain-inventory` - 背包领域
+  - `mythic-realm-domain-enhancement` - 强化领域
+  - `mythic-realm-domain-dungeon` - 副本领域
+  - `mythic-realm-domain-market` - 市场领域
+  - `mythic-realm-domain-quest` - 任务领域
+  - `mythic-realm-domain-robot` - 机器人领域
+  - `mythic-realm-domain-chat` - 聊天领域
+  - `mythic-realm-domain-leaderboard` - 榜单领域
+  - `mythic-realm-domain-announcement` - 通告领域
+  - `mythic-realm-api` - API 网关 (全局异常处理)
+  - `mythic-realm-starter` - 启动模块
 
-- `backend/`: Spring Boot 3.x modular monolith on Java 21, Maven, Flyway, MySQL, Redis-backed sessions.
-- `web/`: Vite + React + TypeScript, Zustand for local screen state, TanStack Query for server state.
-- Local data services: project-local MySQL 8.4 on `127.0.0.1:3307`, Redis on `127.0.0.1:6379`; Docker is intentionally not used.
-- Game config source of truth at runtime: MySQL tables. JSON files in backend resources are seed inputs only.
-- Current seeded config scale: item templates, monsters, dungeons, quests, robot profiles, chat messages.
+**Frontend** (`web/`):
+- **技术**: Vite + React + TypeScript
+- **状态管理**: Zustand
+- **UI**: Tailwind CSS + Lucide Icons
+
+**数据服务**:
+- MySQL 8.4 on `127.0.0.1:3307`
+- Redis on `127.0.0.1:6379`
+- No Docker (local services)
 
 Implemented gameplay surface:
 
@@ -52,21 +63,6 @@ Implemented gameplay surface:
 - Market listing, cancel, robot/player purchase.
 - World chat with durable robot/system/player messages.
 - Leaderboard with 100+ robot profiles and the current player inserted into rank order.
-
-## Migration Boundary Map
-
-| Current Swift Area | Target Frontend | Target Backend |
-| --- | --- | --- |
-| `GameState` screen routing | React routes and Zustand client store | Session snapshot APIs |
-| `AccountManager` | Login/register screens | Auth, account, session services |
-| `PlayerData` | Character panel display | Player aggregate, level/stat domain service |
-| `Item`, `InventorySystem`, `LootSystem` | Inventory/equipment UI | Item instance, inventory, loot, enhancement services |
-| `TextBattleEngine` | Battle log playback, optional Phaser renderer | Dungeon run and battle result service |
-| `QuestSystem` | Quest board and reward actions | Quest progress and reward service |
-| `MarketSystem` | Market listing and purchase UI | Market service with transactions and locks |
-| `RobotLeaderboardSystem` | Leaderboard UI | Simulation scheduler and Redis/MySQL ranking |
-| `WorldChatSystem` | Chat UI, unread state | Chat service, bot/system message generation |
-| `Resources/*.json` | Read-only config payload cache | Versioned config service and startup validation |
 
 ## Durable Product Decisions
 
