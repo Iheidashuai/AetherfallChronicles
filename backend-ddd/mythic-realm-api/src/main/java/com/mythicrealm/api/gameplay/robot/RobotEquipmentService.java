@@ -8,6 +8,7 @@ import com.mythicrealm.api.gameplay.inventory.ItemRecord;
 import com.mythicrealm.api.gameplay.leaderboard.LeaderboardService.EquipmentSummary;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.player.PlayerService;
+import com.mythicrealm.api.gameplay.recharge.RechargeService;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Comparator;
@@ -27,17 +28,20 @@ public class RobotEquipmentService {
     private final GameConfigService gameConfigService;
     private final InventoryService inventoryService;
     private final PlayerService playerService;
+    private final RechargeService rechargeService;
 
     public RobotEquipmentService(
         JdbcTemplate jdbcTemplate,
         GameConfigService gameConfigService,
         InventoryService inventoryService,
-        PlayerService playerService
+        PlayerService playerService,
+        RechargeService rechargeService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.gameConfigService = gameConfigService;
         this.inventoryService = inventoryService;
         this.playerService = playerService;
+        this.rechargeService = rechargeService;
     }
 
     @Transactional
@@ -68,29 +72,97 @@ public class RobotEquipmentService {
         return new DropResolution(item, change);
     }
 
+    public EnhancementOpportunity enhancementOpportunity(PlayerRecord robot) {
+        ensureEquipment(robot);
+        EquippedItem target = bestEnhancementTarget(enhancementCandidates(robot));
+        if (target == null) {
+            return null;
+        }
+        long cost = enhancementCost(target.item());
+        boolean affordableNow = robot.gold() >= cost;
+        boolean affordableWithRecharge = robot.gold() + robot.realMoney() * RechargeService.GOLD_PER_RMB >= cost;
+        return new EnhancementOpportunity(
+            target.item().id(),
+            target.item().displayName(),
+            slotName(target.slot()),
+            target.item().enhancementLevel(),
+            target.item().enhancementLevel() + 1,
+            cost,
+            affordableNow,
+            affordableWithRecharge,
+            itemPower(target.item())
+        );
+    }
+
+    public EquipmentChange enhancePlannedEquipment(PlayerRecord robot, Random random) {
+        ensureEquipment(robot);
+        EquippedItem target = bestEnhancementTarget(enhancementCandidates(robot));
+        if (target == null) {
+            return null;
+        }
+        return enhanceEquipment(robot, target);
+    }
+
     public EquipmentChange enhanceRandomEquipment(PlayerRecord robot, Random random) {
         ensureEquipment(robot);
-        List<EquippedItem> rows = jdbcTemplate.query(
+        List<EquippedItem> rows = enhancementCandidates(robot);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        return enhanceEquipment(robot, rows.get(random.nextInt(rows.size())));
+    }
+
+    private List<EquippedItem> enhancementCandidates(PlayerRecord robot) {
+        return jdbcTemplate.query(
             """
             SELECT es.slot_name, ii.*
             FROM equipment_slot es
             JOIN item_instance ii ON ii.id = es.item_id
             WHERE es.player_id = ? AND ii.enhancement_level < 15
-            ORDER BY RAND()
-            LIMIT 1
             """,
             (rs, rowNum) -> new EquippedItem(rs.getString("slot_name"), mapItem(rs)),
             robot.id()
         );
-        if (rows.isEmpty()) {
-            return null;
-        }
+    }
 
-        EquippedItem equipped = rows.get(0);
-        int beforePower = inventoryService.combatPower(robot);
+    private EquippedItem bestEnhancementTarget(List<EquippedItem> candidates) {
+        return candidates.stream()
+            .max(Comparator
+                .comparingInt((EquippedItem item) -> plannedEnhancementValue(item.item()))
+                .thenComparing(item -> -item.item().enhancementLevel())
+                .thenComparing(item -> -SLOT_ORDER.indexOf(item.slot())))
+            .orElse(null);
+    }
+
+    private int plannedEnhancementValue(ItemRecord item) {
+        int levelPressure = Math.max(0, 15 - item.enhancementLevel()) * 10;
+        return itemPower(item) + qualityRank(item.quality()) * 80 + levelPressure;
+    }
+
+    private EquipmentChange enhanceEquipment(PlayerRecord robot, EquippedItem equipped) {
+        long cost = enhancementCost(equipped.item());
+        RechargeService.RechargeResult recharge = null;
+        PlayerRecord fundedRobot = robot;
+        if (fundedRobot.gold() < cost) {
+            recharge = rechargeService.rechargeForGoldNeed(
+                    fundedRobot.id(),
+                    cost,
+                    "robot_enhance",
+                    "强化【" + equipped.item().displayName() + "】"
+                )
+                .orElse(null);
+            if (recharge == null) {
+                return null;
+            }
+            fundedRobot = recharge.player();
+            if (fundedRobot.gold() < cost) {
+                return null;
+            }
+        }
+        int beforePower = inventoryService.combatPower(fundedRobot);
         InventoryService.EnhanceResult result;
         try {
-            result = inventoryService.enhance(robot, equipped.item().id());
+            result = inventoryService.enhance(fundedRobot, equipped.item().id());
         } catch (ApiException error) {
             return null;
         }
@@ -101,8 +173,17 @@ public class RobotEquipmentService {
             updatedItem.enhancementLevel(),
             result.inventory().combatPower() - beforePower,
             itemPower(updatedItem),
-            result.success()
+            result.success(),
+            recharge != null,
+            recharge == null ? 0 : recharge.rmbAmount(),
+            recharge == null ? 0 : recharge.goldAmount()
         );
+    }
+
+    private long enhancementCost(ItemRecord item) {
+        int targetLevel = item.enhancementLevel() + 1;
+        int itemLevel = Math.max(1, item.requiredLevel());
+        return (long) itemLevel * itemLevel * targetLevel * 10;
     }
 
     private void ensureEquipment(PlayerRecord robot) {
@@ -247,6 +328,7 @@ public class RobotEquipmentService {
 
     private int qualityRank(String quality) {
         return switch (quality) {
+            case "immortal" -> 6;
             case "legendary" -> 5;
             case "epic" -> 4;
             case "rare" -> 3;
@@ -293,6 +375,19 @@ public class RobotEquipmentService {
     private record EquippedItem(String slot, ItemRecord item) {
     }
 
+    public record EnhancementOpportunity(
+        long itemId,
+        String itemName,
+        String slotName,
+        int currentLevel,
+        int nextLevel,
+        long cost,
+        boolean affordableNow,
+        boolean affordableWithRecharge,
+        int itemPower
+    ) {
+    }
+
     public record DropResolution(ItemRecord item, EquipmentChange change) {
         public boolean equipped() {
             return change != null;
@@ -305,7 +400,13 @@ public class RobotEquipmentService {
         int enhancementLevel,
         int powerGain,
         int itemPower,
-        boolean success
+        boolean success,
+        boolean recharged,
+        long rechargeRmb,
+        long rechargeGold
     ) {
+        public EquipmentChange(String itemName, String slotName, int enhancementLevel, int powerGain, int itemPower, boolean success) {
+            this(itemName, slotName, enhancementLevel, powerGain, itemPower, success, false, 0, 0);
+        }
     }
 }

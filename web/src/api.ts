@@ -5,6 +5,9 @@ export type Player = {
   level: number;
   experience: number;
   gold: number;
+  realMoney: number;
+  wealthTierLevel: number;
+  wealthTier: string;
   strength: number;
   agility: number;
   constitution: number;
@@ -50,6 +53,12 @@ export type EnhanceResult = {
 export type BulkSellResult = {
   soldCount: number;
   goldGained: number;
+  inventory: InventorySnapshot;
+};
+
+export type EnhancementTransferResult = {
+  sourceItem: Item;
+  targetItem: Item;
   inventory: InventorySnapshot;
 };
 
@@ -318,6 +327,11 @@ export type RobotActivityView = {
   level: number;
   power: number;
   gold: number;
+  realMoney: number;
+  wealthTierLevel: number;
+  wealthTier: string;
+  rechargeRmb: number;
+  rechargeGold: number;
   dungeonClears: number;
   peakEnhancement: number;
   legendaryLootCount: number;
@@ -334,6 +348,81 @@ export type RobotActivityEvent = {
   kind: string;
   text: string;
   createdAt: string;
+};
+
+export type RechargeWallet = {
+  playerId: number;
+  playerName: string;
+  gold: number;
+  realMoney: number;
+  wealthTierLevel: number;
+  wealthTierCode: string;
+  wealthTier: string;
+  minIncome: number;
+  maxIncome: number;
+  exchangeRate: number;
+};
+
+export type RechargeTotals = {
+  totalRmb: number;
+  totalGold: number;
+  marketListedGold: number;
+  marketSoldGold: number;
+  robotGold: number;
+  robotRealMoney: number;
+  allPlayerGold: number;
+};
+
+export type WealthTierStat = {
+  wealthTierLevel: number;
+  wealthTier: string;
+  playerCount: number;
+  realMoneyTotal: number;
+  goldTotal: number;
+  minIncome: number;
+  maxIncome: number;
+};
+
+export type RobotRechargeRow = {
+  id: number;
+  playerId: number;
+  playerName: string;
+  wealthTierLevel: number;
+  wealthTier: string;
+  rmbAmount: number;
+  goldAmount: number;
+  reason: string;
+  sourceAction: string;
+  currentGold: number;
+  currentRealMoney: number;
+  createdAt: string;
+};
+
+export type CashIncomeRow = {
+  id: number;
+  playerId: number;
+  playerName: string;
+  wealthTierLevel: number;
+  wealthTier: string;
+  rmbAmount: number;
+  createdAt: string;
+};
+
+export type RechargeDashboard = {
+  wallet: RechargeWallet;
+  totals: RechargeTotals;
+  tierStats: WealthTierStat[];
+  robotRecharges: RobotRechargeRow[];
+  incomeEvents: CashIncomeRow[];
+};
+
+export type RechargeResult = {
+  player: Player;
+  rmbAmount: number;
+  goldAmount: number;
+  reason: string;
+  sourceAction: string;
+  wallet: RechargeWallet;
 };
 
 export class ApiError extends Error {
@@ -372,7 +461,17 @@ export async function api<T>(path: string, options: RequestInit = {}, token?: st
     }
     throw new ApiError(message, response.status);
   }
-  return response.json() as Promise<T>;
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  const text = await response.text();
+  if (!text.trim()) {
+    return undefined as T;
+  }
+  if (response.headers.get('content-type')?.includes('application/json')) {
+    return JSON.parse(text) as T;
+  }
+  return text as T;
 }
 
 export const authApi = {
@@ -425,9 +524,12 @@ export const gameApi = {
     ),
   inventory: (token: string) => api<InventorySnapshot>('/api/inventory', {}, token),
   equip: (token: string, itemId: number) => api<InventorySnapshot>(`/api/inventory/${itemId}/equip`, { method: 'POST' }, token),
+  equipBest: (token: string) => api<InventorySnapshot>('/api/inventory/equip-best', { method: 'POST' }, token),
   unequip: (token: string, itemId: number) => api<InventorySnapshot>(`/api/inventory/${itemId}/unequip`, { method: 'POST' }, token),
   sell: (token: string, itemId: number) => api<InventorySnapshot>(`/api/inventory/${itemId}/sell`, { method: 'POST' }, token),
   enhance: (token: string, itemId: number) => api<EnhanceResult>(`/api/inventory/${itemId}/enhance`, { method: 'POST' }, token),
+  transferEnhancement: (token: string, sourceItemId: number, targetItemId: number) =>
+    api<EnhancementTransferResult>('/api/inventory/transfer-enhancement', { method: 'POST', body: JSON.stringify({ sourceItemId, targetItemId }) }, token),
   bulkSell: (token: string, qualities: string[], itemTypes: string[] = []) =>
     api<BulkSellResult>('/api/inventory/bulk-sell', { method: 'POST', body: JSON.stringify({ qualities, itemTypes }) }, token),
   organizeInventory: (token: string, sort: string) =>
@@ -446,5 +548,8 @@ export const gameApi = {
   leaderboard: (token: string) => api<LeaderboardEntry[]>('/api/leaderboard/power', {}, token),
   robotActivity: (token: string) => api<RobotActivitySnapshot>('/api/robots/activity', {}, token),
   robotActivityDetail: (token: string, robotId: number) => api<RobotActivityDetail>(`/api/robots/${robotId}/activity`, {}, token),
+  rechargeDashboard: (token: string) => api<RechargeDashboard>('/api/recharge/dashboard', {}, token),
+  recharge: (token: string, rmbAmount: number) =>
+    api<RechargeResult>('/api/recharge', { method: 'POST', body: JSON.stringify({ rmbAmount }) }, token),
   announcements: (token: string) => api<GlobalAnnouncement[]>('/api/announcements', {}, token),
 };

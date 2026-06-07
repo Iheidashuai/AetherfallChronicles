@@ -29,6 +29,7 @@ public class RobotActivityLogService {
 
     @Transactional
     public void record(long robotId, String kind, String text) {
+        String normalizedText = normalizeText(text);
         RobotIdentity robot = jdbcTemplate.query(
             "SELECT name, title FROM player WHERE id = ? AND controller_type = 'robot'",
             (rs, rowNum) -> new RobotIdentity(rs.getString("name"), rs.getString("title")),
@@ -44,7 +45,7 @@ public class RobotActivityLogService {
             WHERE id = ?
             """,
             kind,
-            text,
+            normalizedText,
             robotId
         );
         jdbcTemplate.update(
@@ -56,23 +57,39 @@ public class RobotActivityLogService {
             robot.name(),
             robot.title(),
             kind,
-            text
+            normalizedText
         );
         jdbcTemplate.update(
-            "DELETE FROM robot_activity_log WHERE id NOT IN (SELECT id FROM (SELECT id FROM robot_activity_log ORDER BY created_at DESC, id DESC LIMIT 800) recent)"
+            "DELETE FROM robot_activity_log WHERE id NOT IN (SELECT id FROM (SELECT id FROM robot_activity_log ORDER BY created_at DESC, id DESC LIMIT 2400) recent)"
         );
+    }
+
+    private String normalizeText(String text) {
+        if (text == null || text.isBlank()) {
+            return "正在观察局势。";
+        }
+        String value = text.trim();
+        return value.substring(0, Math.min(240, value.length()));
     }
 
     public RobotActivitySnapshot snapshot() {
         List<RobotActivityView> robots = jdbcTemplate.query(
             """
-            SELECT id, account_id, name, title, profession, level, experience, gold, strength, agility,
-                   constitution, intelligence, spirit, free_points, dungeon_clears, peak_enhancement,
-                   legendary_loot_count, current_activity_kind, current_activity_text, current_activity_at,
-                   last_activity_at
-            FROM player
-            WHERE controller_type = 'robot'
-            ORDER BY current_activity_at DESC, level DESC, id DESC
+            SELECT p.id, p.account_id, p.name, p.title, p.profession, p.level, p.experience, p.gold,
+                   p.real_money, p.wealth_tier_level, p.wealth_tier, p.strength, p.agility,
+                   p.constitution, p.intelligence, p.spirit, p.free_points, p.dungeon_clears,
+                   p.peak_enhancement, p.legendary_loot_count, p.current_activity_kind,
+                   p.current_activity_text, p.current_activity_at, p.last_activity_at,
+                   COALESCE(recharge.total_rmb, 0) AS recharge_rmb,
+                   COALESCE(recharge.total_gold, 0) AS recharge_gold
+            FROM player p
+            LEFT JOIN (
+                SELECT player_id, SUM(rmb_amount) AS total_rmb, SUM(gold_amount) AS total_gold
+                FROM recharge_order
+                GROUP BY player_id
+            ) recharge ON recharge.player_id = p.id
+            WHERE p.controller_type = 'robot'
+            ORDER BY p.current_activity_at DESC, p.level DESC, p.id DESC
             """,
             (rs, rowNum) -> viewFromRow(rs)
         );
@@ -84,13 +101,21 @@ public class RobotActivityLogService {
     public RobotActivityDetail detail(long robotId) {
         RobotActivityView robot = jdbcTemplate.query(
             """
-            SELECT id, account_id, name, title, profession, level, experience, gold, strength, agility,
-                   constitution, intelligence, spirit, free_points, dungeon_clears, peak_enhancement,
-                   legendary_loot_count, current_activity_kind, current_activity_text, current_activity_at,
-                   last_activity_at
-            FROM player
-            WHERE id = ?
-              AND controller_type = 'robot'
+            SELECT p.id, p.account_id, p.name, p.title, p.profession, p.level, p.experience, p.gold,
+                   p.real_money, p.wealth_tier_level, p.wealth_tier, p.strength, p.agility,
+                   p.constitution, p.intelligence, p.spirit, p.free_points, p.dungeon_clears,
+                   p.peak_enhancement, p.legendary_loot_count, p.current_activity_kind,
+                   p.current_activity_text, p.current_activity_at, p.last_activity_at,
+                   COALESCE(recharge.total_rmb, 0) AS recharge_rmb,
+                   COALESCE(recharge.total_gold, 0) AS recharge_gold
+            FROM player p
+            LEFT JOIN (
+                SELECT player_id, SUM(rmb_amount) AS total_rmb, SUM(gold_amount) AS total_gold
+                FROM recharge_order
+                GROUP BY player_id
+            ) recharge ON recharge.player_id = p.id
+            WHERE p.id = ?
+              AND p.controller_type = 'robot'
             """,
             (rs, rowNum) -> viewFromRow(rs),
             robotId
@@ -173,6 +198,11 @@ public class RobotActivityLogService {
             robot.level(),
             inventoryService.combatPower(robot),
             robot.gold(),
+            robot.realMoney(),
+            robot.wealthTierLevel(),
+            robot.wealthTier(),
+            rs.getLong("recharge_rmb"),
+            rs.getLong("recharge_gold"),
             rs.getInt("dungeon_clears"),
             rs.getInt("peak_enhancement"),
             rs.getInt("legendary_loot_count"),
@@ -191,7 +221,10 @@ public class RobotActivityLogService {
             rs.getString("profession"),
             rs.getInt("level"),
             rs.getInt("experience"),
-            rs.getInt("gold"),
+            rs.getLong("gold"),
+            rs.getLong("real_money"),
+            rs.getInt("wealth_tier_level"),
+            rs.getString("wealth_tier"),
             rs.getInt("strength"),
             rs.getInt("agility"),
             rs.getInt("constitution"),
@@ -218,7 +251,12 @@ public class RobotActivityLogService {
         String profession,
         int level,
         int power,
-        int gold,
+        long gold,
+        long realMoney,
+        int wealthTierLevel,
+        String wealthTier,
+        long rechargeRmb,
+        long rechargeGold,
         int dungeonClears,
         int peakEnhancement,
         int legendaryLootCount,

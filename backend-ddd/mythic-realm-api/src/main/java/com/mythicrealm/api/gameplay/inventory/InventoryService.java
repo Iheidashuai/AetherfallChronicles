@@ -1,5 +1,6 @@
 package com.mythicrealm.api.gameplay.inventory;
 
+import com.mythicrealm.api.gameplay.announcement.AnnouncementService;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.ItemTemplate;
 import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
@@ -7,7 +8,9 @@ import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,13 +32,30 @@ public class InventoryService {
         "eq_t01_boots_02",
         "eq_t01_gloves_02"
     );
+    private static final List<String> EQUIPMENT_SLOT_ORDER = List.of(
+        "weapon",
+        "helmet",
+        "armor",
+        "legs",
+        "boots",
+        "gloves",
+        "necklace",
+        "ring1",
+        "ring2"
+    );
 
     private final JdbcTemplate jdbcTemplate;
     private final GameConfigService gameConfigService;
+    private final AnnouncementService announcementService;
 
-    public InventoryService(JdbcTemplate jdbcTemplate, GameConfigService gameConfigService) {
+    public InventoryService(
+        JdbcTemplate jdbcTemplate,
+        GameConfigService gameConfigService,
+        AnnouncementService announcementService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.gameConfigService = gameConfigService;
+        this.announcementService = announcementService;
     }
 
     public void grantStarterEquipment(long playerId) {
@@ -225,6 +245,44 @@ public class InventoryService {
     }
 
     @Transactional
+    public InventorySnapshot equipBest(PlayerRecord player) {
+        List<ItemRecord> candidates = new ArrayList<>(inventoryItems(player.id()));
+        candidates.addAll(equippedItems(player.id()).values());
+        if (candidates.isEmpty()) {
+            return snapshot(player);
+        }
+        Map<String, ItemRecord> bestBySlot = bestEquipmentSet(candidates);
+        Set<Long> equippedIds = bestBySlot.values().stream()
+            .map(ItemRecord::id)
+            .collect(Collectors.toSet());
+
+        jdbcTemplate.update("DELETE FROM equipment_slot WHERE player_id = ?", player.id());
+        jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ?", player.id());
+        for (var entry : bestBySlot.entrySet()) {
+            jdbcTemplate.update(
+                "INSERT INTO equipment_slot (player_id, slot_name, item_id) VALUES (?, ?, ?)",
+                player.id(),
+                entry.getKey(),
+                entry.getValue().id()
+            );
+        }
+
+        List<ItemRecord> remaining = candidates.stream()
+            .filter(item -> !equippedIds.contains(item.id()))
+            .sorted(sortComparator("quality"))
+            .toList();
+        for (int i = 0; i < remaining.size(); i++) {
+            jdbcTemplate.update(
+                "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
+                player.id(),
+                i,
+                remaining.get(i).id()
+            );
+        }
+        return snapshot(player);
+    }
+
+    @Transactional
     public InventorySnapshot unequip(PlayerRecord player, long itemId) {
         requireOwnedItem(player.id(), itemId);
         List<String> equippedSlots = jdbcTemplate.queryForList(
@@ -320,7 +378,41 @@ public class InventoryService {
             player.spirit(),
             player.freePoints()
         );
+        if (success) {
+            announcementService.publishEnhancementMilestone(player.name(), item.name(), nextLevel);
+        }
         return new EnhanceResult(success, cost, chance, snapshot(updatedPlayer));
+    }
+
+    @Transactional
+    public EnhancementTransferResult transferEnhancement(PlayerRecord player, long sourceItemId, long targetItemId) {
+        if (sourceItemId == targetItemId) {
+            throw ApiException.badRequest("来源装备和目标装备不能相同");
+        }
+        ItemRecord source = requireOwnedItem(player.id(), sourceItemId);
+        ItemRecord target = requireOwnedItem(player.id(), targetItemId);
+        if (source.enhancementLevel() <= 0) {
+            throw ApiException.badRequest("来源装备没有可转移的强化等级");
+        }
+        if (source.enhancementLevel() <= target.enhancementLevel()) {
+            throw ApiException.badRequest("目标装备强化等级不低于来源装备");
+        }
+
+        jdbcTemplate.update(
+            """
+            UPDATE item_instance
+            SET enhancement_level = CASE WHEN id = ? THEN 0 WHEN id = ? THEN ? ELSE enhancement_level END,
+                enhancement_luck = 0
+            WHERE player_id = ? AND id IN (?, ?)
+            """,
+            sourceItemId,
+            targetItemId,
+            source.enhancementLevel(),
+            player.id(),
+            sourceItemId,
+            targetItemId
+        );
+        return new EnhancementTransferResult(requireItem(sourceItemId), requireItem(targetItemId), snapshot(player));
     }
 
     @Transactional
@@ -523,8 +615,47 @@ public class InventoryService {
         };
     }
 
+    private Map<String, ItemRecord> bestEquipmentSet(List<ItemRecord> candidates) {
+        Map<String, ItemRecord> result = new LinkedHashMap<>();
+        Comparator<ItemRecord> byPower = Comparator.comparingInt(this::equipmentPower).thenComparingLong(ItemRecord::id);
+        for (String slot : EQUIPMENT_SLOT_ORDER) {
+            if (slot.startsWith("ring")) {
+                continue;
+            }
+            candidates.stream()
+                .filter(item -> slot.equals(equipSlotFor(item.itemType()).orElse(null)))
+                .max(byPower)
+                .ifPresent(item -> result.put(slot, item));
+        }
+        List<ItemRecord> bestRings = candidates.stream()
+            .filter(item -> "ring".equals(item.itemType()))
+            .sorted(byPower.reversed())
+            .limit(2)
+            .toList();
+        for (int i = 0; i < bestRings.size(); i++) {
+            result.put(i == 0 ? "ring1" : "ring2", bestRings.get(i));
+        }
+        return result;
+    }
+
+    private int equipmentPower(ItemRecord item) {
+        return Math.max(
+            1,
+            (int) Math.round(
+                item.enhancedAttackBonus() * 12
+                    + item.enhancedDefenseBonus() * 8
+                    + item.enhancedHpBonus() / 2.0
+                    + item.enhancedMpBonus() / 2.0
+                    + item.enhancedCritBonus() * 900
+                    + item.enhancementLevel() * 18
+                    + qualityRank(item.quality()) * 12
+            )
+        );
+    }
+
     private int qualityRank(String quality) {
         return switch (quality) {
+            case "immortal" -> 6;
             case "legendary" -> 5;
             case "epic" -> 4;
             case "rare" -> 3;
@@ -557,7 +688,7 @@ public class InventoryService {
         List<ItemRecord> inventory,
         Map<String, ItemRecord> equippedItems,
         int combatPower,
-        int gold,
+        long gold,
         int capacity
     ) {
     }
@@ -566,5 +697,8 @@ public class InventoryService {
     }
 
     public record BulkSellResult(int soldCount, int goldGained, InventorySnapshot inventory) {
+    }
+
+    public record EnhancementTransferResult(ItemRecord sourceItem, ItemRecord targetItem, InventorySnapshot inventory) {
     }
 }

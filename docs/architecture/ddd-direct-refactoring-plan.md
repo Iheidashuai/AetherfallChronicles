@@ -792,15 +792,15 @@ chmod +x create-all-modules.sh
 
 ## 第五步: 数据迁移
 
-### 5.1 迁移数据库脚本
+### 5.1 数据库脚本
 
-将原来的 SQL 文件迁移到新位置:
+个人单机学习项目只保留一份最新数据库结构:
 
-```bash
-# 复制 Flyway 迁移脚本
-cp -r backend/src/main/resources/db/migration/* \
-      aetherfall-backend/mythic-realm-starter/src/main/resources/db/migration/
+```text
+mythic-realm-starter/src/main/resources/db/migration/V1__latest_schema.sql
 ```
+
+以后改表、改种子数据、重做机器人经济，都直接更新这个最新 schema。项目启动时如果 Flyway 校验失败，允许清理本地库并重建最新结构。
 
 ### 5.2 迁移配置文件
 
@@ -819,7 +819,8 @@ spring:
 
   flyway:
     enabled: true
-    baseline-on-migrate: true
+    baseline-on-migrate: false
+    clean-disabled: false
     locations: classpath:db/migration
 
   redis:
@@ -840,8 +841,10 @@ logging:
     org.springframework.jdbc: DEBUG
 
 mythic:
+  database:
+    destructive-reset-on-migration-error: true
   config:
-    version: v1.0
+    version: latest
 ```
 
 ---

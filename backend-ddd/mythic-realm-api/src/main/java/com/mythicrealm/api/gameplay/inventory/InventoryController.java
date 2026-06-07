@@ -53,6 +53,15 @@ public class InventoryController {
         return snapshot;
     }
 
+    @PostMapping("/equip-best")
+    InventoryService.InventorySnapshot equipBest(@RequestHeader(name = "Authorization", required = false) String authorization) {
+        PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
+        var snapshot = inventoryService.equipBest(player);
+        questService.recordEvent(player.id(), QuestEvent.of("equipmentEquipped"));
+        questService.recordEvent(player.id(), new QuestEvent("combatPowerReached", null, snapshot.combatPower()));
+        return snapshot;
+    }
+
     @PostMapping("/{itemId}/unequip")
     InventoryService.InventorySnapshot unequip(
         @RequestHeader(name = "Authorization", required = false) String authorization,
@@ -88,6 +97,17 @@ public class InventoryController {
         return result;
     }
 
+    @PostMapping("/transfer-enhancement")
+    InventoryService.EnhancementTransferResult transferEnhancement(
+        @RequestHeader(name = "Authorization", required = false) String authorization,
+        @RequestBody EnhancementTransferRequest request
+    ) {
+        PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
+        var result = inventoryService.transferEnhancement(player, request.sourceItemId(), request.targetItemId());
+        questService.recordEvent(player.id(), new QuestEvent("combatPowerReached", null, result.inventory().combatPower()));
+        return result;
+    }
+
     @PostMapping("/bulk-sell")
     InventoryService.BulkSellResult bulkSell(
         @RequestHeader(name = "Authorization", required = false) String authorization,
@@ -110,5 +130,8 @@ public class InventoryController {
     }
 
     record OrganizeRequest(String sort) {
+    }
+
+    record EnhancementTransferRequest(long sourceItemId, long targetItemId) {
     }
 }

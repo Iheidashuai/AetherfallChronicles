@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type Screen = 'auth' | 'create-player' | 'home' | 'character' | 'inventory' | 'quests' | 'market' | 'chat' | 'leaderboard' | 'robots' | 'dungeons' | 'result';
+type Screen = 'auth' | 'create-player' | 'home' | 'character' | 'inventory' | 'blacksmith' | 'quests' | 'market' | 'chat' | 'leaderboard' | 'robots' | 'recharge' | 'dungeons' | 'result';
 
 type AppState = {
   token: string | null;

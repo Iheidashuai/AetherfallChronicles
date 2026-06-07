@@ -3150,5 +3150,2183 @@
     ],
     "recommendedLevel": 60,
     "recommendedPower": 37480
+  },
+  {
+    "id": "dungeon_49_tomb",
+    "name": "暮光王陵·外缘",
+    "description": "第 49 阶挑战，暮光王陵的外缘区域，产出 Lv.61 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d49_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d49_01_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d49_02_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d49_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d49_03_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d49_04_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d49_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d49_05_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d49_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d49_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d49_07_tomb",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d49_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 61,
+    "recommendedPower": 38420
+  },
+  {
+    "id": "dungeon_50_tomb",
+    "name": "暮光王陵·通道",
+    "description": "第 50 阶挑战，暮光王陵的通道区域，产出 Lv.62 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d50_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d50_01_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d50_02_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d50_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d50_03_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d50_04_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d50_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d50_05_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d50_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d50_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d50_07_tomb",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d50_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 62,
+    "recommendedPower": 39380
+  },
+  {
+    "id": "dungeon_51_tomb",
+    "name": "暮光王陵·前厅",
+    "description": "第 51 阶挑战，暮光王陵的前厅区域，产出 Lv.63 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d51_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d51_01_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d51_02_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d51_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d51_03_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d51_04_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d51_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d51_05_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d51_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d51_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d51_07_tomb",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d51_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 63,
+    "recommendedPower": 40390
+  },
+  {
+    "id": "dungeon_52_tomb",
+    "name": "暮光王陵·深处",
+    "description": "第 52 阶挑战，暮光王陵的深处区域，产出 Lv.64 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d52_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d52_01_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d52_02_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d52_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d52_03_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d52_04_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d52_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d52_05_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d52_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d52_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d52_07_tomb",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d52_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 64,
+    "recommendedPower": 41430
+  },
+  {
+    "id": "dungeon_53_tomb",
+    "name": "暮光王陵·祭坛",
+    "description": "第 53 阶挑战，暮光王陵的祭坛区域，产出 Lv.65 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d53_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d53_01_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d53_02_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d53_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d53_03_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d53_04_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d53_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d53_05_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d53_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d53_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d53_07_tomb",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d53_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 65,
+    "recommendedPower": 42500
+  },
+  {
+    "id": "dungeon_54_tomb",
+    "name": "暮光王陵·王座",
+    "description": "第 54 阶挑战，暮光王陵的王座区域，产出 Lv.66 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "噩梦",
+    "rooms": [
+      {
+        "id": "d54_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d54_01_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d54_02_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d54_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d54_03_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d54_04_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d54_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d54_05_tomb",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d54_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d54_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d54_07_tomb",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d54_06_tomb",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 66,
+    "recommendedPower": 43620
+  },
+  {
+    "id": "dungeon_55_soul",
+    "name": "裂魂荒原·外缘",
+    "description": "第 55 阶挑战，裂魂荒原的外缘区域，产出 Lv.67 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d55_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d55_01_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d55_02_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d55_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d55_03_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d55_04_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d55_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d55_05_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d55_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d55_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d55_07_soul",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d55_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 67,
+    "recommendedPower": 44760
+  },
+  {
+    "id": "dungeon_56_soul",
+    "name": "裂魂荒原·通道",
+    "description": "第 56 阶挑战，裂魂荒原的通道区域，产出 Lv.68 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d56_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d56_01_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d56_02_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d56_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d56_03_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d56_04_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d56_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d56_05_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d56_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d56_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d56_07_soul",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d56_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 68,
+    "recommendedPower": 45940
+  },
+  {
+    "id": "dungeon_57_soul",
+    "name": "裂魂荒原·前厅",
+    "description": "第 57 阶挑战，裂魂荒原的前厅区域，产出 Lv.69 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d57_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d57_01_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d57_02_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d57_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d57_03_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d57_04_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d57_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d57_05_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d57_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d57_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d57_07_soul",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d57_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 69,
+    "recommendedPower": 47160
+  },
+  {
+    "id": "dungeon_58_soul",
+    "name": "裂魂荒原·深处",
+    "description": "第 58 阶挑战，裂魂荒原的深处区域，产出 Lv.70 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d58_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d58_01_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d58_02_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d58_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d58_03_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d58_04_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d58_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d58_05_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d58_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d58_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d58_07_soul",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d58_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 70,
+    "recommendedPower": 48400
+  },
+  {
+    "id": "dungeon_59_soul",
+    "name": "裂魂荒原·祭坛",
+    "description": "第 59 阶挑战，裂魂荒原的祭坛区域，产出 Lv.71 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d59_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d59_01_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d59_02_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d59_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d59_03_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d59_04_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d59_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d59_05_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d59_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d59_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d59_07_soul",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d59_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 71,
+    "recommendedPower": 49690
+  },
+  {
+    "id": "dungeon_60_soul",
+    "name": "裂魂荒原·王座",
+    "description": "第 60 阶挑战，裂魂荒原的王座区域，产出 Lv.72 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d60_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d60_01_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d60_02_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d60_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d60_03_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d60_04_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d60_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d60_05_soul",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d60_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d60_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d60_07_soul",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d60_06_soul",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 72,
+    "recommendedPower": 51010
+  },
+  {
+    "id": "dungeon_61_obsidian",
+    "name": "黑曜天塔·外缘",
+    "description": "第 61 阶挑战，黑曜天塔的外缘区域，产出 Lv.73 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d61_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d61_01_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d61_02_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d61_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d61_03_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d61_04_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d61_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d61_05_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d61_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d61_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d61_07_obsidian",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d61_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 73,
+    "recommendedPower": 52360
+  },
+  {
+    "id": "dungeon_62_obsidian",
+    "name": "黑曜天塔·通道",
+    "description": "第 62 阶挑战，黑曜天塔的通道区域，产出 Lv.74 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d62_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d62_01_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d62_02_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d62_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d62_03_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d62_04_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d62_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d62_05_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d62_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d62_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d62_07_obsidian",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d62_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 74,
+    "recommendedPower": 53760
+  },
+  {
+    "id": "dungeon_63_obsidian",
+    "name": "黑曜天塔·前厅",
+    "description": "第 63 阶挑战，黑曜天塔的前厅区域，产出 Lv.75 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d63_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d63_01_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d63_02_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d63_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d63_03_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d63_04_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d63_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d63_05_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d63_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d63_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d63_07_obsidian",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d63_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 75,
+    "recommendedPower": 55180
+  },
+  {
+    "id": "dungeon_64_obsidian",
+    "name": "黑曜天塔·深处",
+    "description": "第 64 阶挑战，黑曜天塔的深处区域，产出 Lv.76 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d64_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d64_01_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d64_02_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d64_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d64_03_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d64_04_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d64_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d64_05_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d64_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d64_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d64_07_obsidian",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d64_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 76,
+    "recommendedPower": 56640
+  },
+  {
+    "id": "dungeon_65_obsidian",
+    "name": "黑曜天塔·祭坛",
+    "description": "第 65 阶挑战，黑曜天塔的祭坛区域，产出 Lv.77 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d65_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d65_01_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d65_02_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d65_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d65_03_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d65_04_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d65_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d65_05_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d65_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d65_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d65_07_obsidian",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d65_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 77,
+    "recommendedPower": 58140
+  },
+  {
+    "id": "dungeon_66_obsidian",
+    "name": "黑曜天塔·王座",
+    "description": "第 66 阶挑战，黑曜天塔的王座区域，产出 Lv.78 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "深渊",
+    "rooms": [
+      {
+        "id": "d66_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d66_01_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d66_02_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d66_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d66_03_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d66_04_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d66_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d66_05_obsidian",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d66_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d66_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d66_07_obsidian",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d66_06_obsidian",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 78,
+    "recommendedPower": 59660
+  },
+  {
+    "id": "dungeon_67_froststar",
+    "name": "永冻星环·外缘",
+    "description": "第 67 阶挑战，永冻星环的外缘区域，产出 Lv.79 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "地狱",
+    "rooms": [
+      {
+        "id": "d67_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d67_01_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d67_02_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d67_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d67_03_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d67_04_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d67_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d67_05_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d67_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d67_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d67_07_froststar",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d67_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 79,
+    "recommendedPower": 61230
+  },
+  {
+    "id": "dungeon_68_froststar",
+    "name": "永冻星环·通道",
+    "description": "第 68 阶挑战，永冻星环的通道区域，产出 Lv.80 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "地狱",
+    "rooms": [
+      {
+        "id": "d68_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d68_01_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d68_02_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d68_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d68_03_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d68_04_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d68_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d68_05_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d68_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d68_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d68_07_froststar",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d68_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 80,
+    "recommendedPower": 62830
+  },
+  {
+    "id": "dungeon_69_froststar",
+    "name": "永冻星环·前厅",
+    "description": "第 69 阶挑战，永冻星环的前厅区域，产出 Lv.81 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "地狱",
+    "rooms": [
+      {
+        "id": "d69_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d69_01_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d69_02_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d69_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d69_03_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d69_04_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d69_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d69_05_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d69_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d69_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d69_07_froststar",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d69_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 81,
+    "recommendedPower": 64460
+  },
+  {
+    "id": "dungeon_70_froststar",
+    "name": "永冻星环·深处",
+    "description": "第 70 阶挑战，永冻星环的深处区域，产出 Lv.82 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "地狱",
+    "rooms": [
+      {
+        "id": "d70_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d70_01_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d70_02_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d70_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d70_03_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d70_04_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d70_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d70_05_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d70_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d70_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d70_07_froststar",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d70_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 82,
+    "recommendedPower": 66140
+  },
+  {
+    "id": "dungeon_71_froststar",
+    "name": "永冻星环·祭坛",
+    "description": "第 71 阶挑战，永冻星环的祭坛区域，产出 Lv.83 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "地狱",
+    "rooms": [
+      {
+        "id": "d71_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d71_01_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d71_02_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d71_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d71_03_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d71_04_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d71_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d71_05_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d71_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d71_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d71_07_froststar",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d71_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 83,
+    "recommendedPower": 67840
+  },
+  {
+    "id": "dungeon_72_froststar",
+    "name": "永冻星环·王座",
+    "description": "第 72 阶挑战，永冻星环的王座区域，产出 Lv.84 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "地狱",
+    "rooms": [
+      {
+        "id": "d72_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d72_01_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d72_02_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d72_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d72_03_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d72_04_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d72_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d72_05_froststar",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d72_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d72_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d72_07_froststar",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d72_06_froststar",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 84,
+    "recommendedPower": 69580
+  },
+  {
+    "id": "dungeon_73_sanctum",
+    "name": "终焉圣所·外缘",
+    "description": "第 73 阶挑战，终焉圣所的外缘区域，产出 Lv.85 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "终焉",
+    "rooms": [
+      {
+        "id": "d73_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d73_01_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d73_02_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d73_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d73_03_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d73_04_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d73_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d73_05_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d73_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d73_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d73_07_sanctum",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d73_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 85,
+    "recommendedPower": 71360
+  },
+  {
+    "id": "dungeon_74_sanctum",
+    "name": "终焉圣所·通道",
+    "description": "第 74 阶挑战，终焉圣所的通道区域，产出 Lv.86 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "终焉",
+    "rooms": [
+      {
+        "id": "d74_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d74_01_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d74_02_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d74_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d74_03_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d74_04_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d74_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d74_05_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d74_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d74_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d74_07_sanctum",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d74_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 86,
+    "recommendedPower": 73160
+  },
+  {
+    "id": "dungeon_75_sanctum",
+    "name": "终焉圣所·前厅",
+    "description": "第 75 阶挑战，终焉圣所的前厅区域，产出 Lv.87 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "终焉",
+    "rooms": [
+      {
+        "id": "d75_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d75_01_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d75_02_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d75_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d75_03_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d75_04_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d75_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d75_05_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d75_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d75_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d75_07_sanctum",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d75_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 87,
+    "recommendedPower": 75010
+  },
+  {
+    "id": "dungeon_76_sanctum",
+    "name": "终焉圣所·深处",
+    "description": "第 76 阶挑战，终焉圣所的深处区域，产出 Lv.88 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "终焉",
+    "rooms": [
+      {
+        "id": "d76_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d76_01_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d76_02_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d76_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d76_03_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d76_04_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d76_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d76_05_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d76_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d76_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d76_07_sanctum",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d76_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 88,
+    "recommendedPower": 76890
+  },
+  {
+    "id": "dungeon_77_sanctum",
+    "name": "终焉圣所·祭坛",
+    "description": "第 77 阶挑战，终焉圣所的祭坛区域，产出 Lv.89 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "终焉",
+    "rooms": [
+      {
+        "id": "d77_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d77_01_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d77_02_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d77_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d77_03_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d77_04_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d77_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d77_05_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d77_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d77_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d77_07_sanctum",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d77_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 89,
+    "recommendedPower": 78800
+  },
+  {
+    "id": "dungeon_78_sanctum",
+    "name": "终焉圣所·王座",
+    "description": "第 78 阶挑战，终焉圣所的王座区域，产出 Lv.90 装备；正常副本最高掉落史诗品质。",
+    "difficulty": "终焉",
+    "rooms": [
+      {
+        "id": "d78_outer",
+        "monsters": [
+          {
+            "monsterId": "m_d78_01_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d78_02_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d78_inner",
+        "monsters": [
+          {
+            "monsterId": "m_d78_03_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d78_04_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d78_guard",
+        "monsters": [
+          {
+            "monsterId": "m_d78_05_sanctum",
+            "count": 2
+          },
+          {
+            "monsterId": "m_d78_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "d78_boss",
+        "monsters": [
+          {
+            "monsterId": "m_d78_07_sanctum",
+            "count": 1
+          },
+          {
+            "monsterId": "m_d78_06_sanctum",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 90,
+    "recommendedPower": 80760
+  },
+  {
+    "id": "special_bloodmoon_1",
+    "name": "血月裂隙·阶位 I",
+    "description": "特殊副本，推荐 Lv.70 以上挑战。只产出传说与不朽装备，不开放扫荡。",
+    "difficulty": "特殊",
+    "rooms": [
+      {
+        "id": "bloodmoon_1_outer",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_1_01",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_1_02",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_1_inner",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_1_03",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_1_04",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_1_guard",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_1_05",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_1_06",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_1_boss",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_1_07",
+            "count": 1
+          },
+          {
+            "monsterId": "m_bloodmoon_1_06",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 70,
+    "recommendedPower": 62000
+  },
+  {
+    "id": "special_bloodmoon_2",
+    "name": "血月裂隙·阶位 II",
+    "description": "特殊副本，推荐 Lv.80 以上挑战。只产出传说与不朽装备，不开放扫荡。",
+    "difficulty": "特殊",
+    "rooms": [
+      {
+        "id": "bloodmoon_2_outer",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_2_01",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_2_02",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_2_inner",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_2_03",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_2_04",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_2_guard",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_2_05",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_2_06",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_2_boss",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_2_07",
+            "count": 1
+          },
+          {
+            "monsterId": "m_bloodmoon_2_06",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 80,
+    "recommendedPower": 88000
+  },
+  {
+    "id": "special_bloodmoon_3",
+    "name": "血月裂隙·阶位 III",
+    "description": "特殊副本，推荐 Lv.90 以上挑战。只产出传说与不朽装备，不开放扫荡。",
+    "difficulty": "特殊",
+    "rooms": [
+      {
+        "id": "bloodmoon_3_outer",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_3_01",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_3_02",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_3_inner",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_3_03",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_3_04",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_3_guard",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_3_05",
+            "count": 2
+          },
+          {
+            "monsterId": "m_bloodmoon_3_06",
+            "count": 1
+          }
+        ],
+        "isBossRoom": false
+      },
+      {
+        "id": "bloodmoon_3_boss",
+        "monsters": [
+          {
+            "monsterId": "m_bloodmoon_3_07",
+            "count": 1
+          },
+          {
+            "monsterId": "m_bloodmoon_3_06",
+            "count": 1
+          }
+        ],
+        "isBossRoom": true
+      }
+    ],
+    "recommendedLevel": 90,
+    "recommendedPower": 118000
   }
 ]

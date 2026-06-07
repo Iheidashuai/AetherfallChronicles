@@ -348,6 +348,15 @@ input:focus {
   gap: 12px;
 }
 
+.dungeon-card.special {
+  border-color: rgba(180, 24, 48, 0.5);
+  border-left-color: #c91834;
+  background:
+    linear-gradient(135deg, rgba(180, 24, 48, 0.16), rgba(255, 212, 111, 0.06)),
+    rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
 .dungeon-card h2 {
   margin: 4px 0 6px;
 }
@@ -829,6 +838,12 @@ input:focus {
   border-color: rgba(255, 189, 98, 0.35);
 }
 
+.equipment-chip.immortal {
+  color: #ffd1dc;
+  border-color: rgba(255, 45, 85, 0.42);
+  background: rgba(130, 0, 28, 0.2);
+}
+
 .leaderboard-power {
   text-align: right;
 }
@@ -1072,6 +1087,13 @@ input:focus {
   border-color: rgba(255, 189, 98, 0.42);
 }
 
+.drop-preview-card.immortal {
+  border-color: rgba(255, 45, 85, 0.55);
+  background:
+    linear-gradient(135deg, rgba(139, 0, 32, 0.24), rgba(0, 0, 0, 0.2)),
+    rgba(255, 255, 255, 0.04);
+}
+
 .drop-more {
   display: grid;
   place-items: center;
@@ -1149,6 +1171,12 @@ input:focus {
   border-color: rgba(255, 189, 98, 0.75);
 }
 
+.loot-card.immortal,
+.item-detail.immortal {
+  border-color: rgba(255, 45, 85, 0.78);
+  box-shadow: 0 0 24px rgba(190, 18, 60, 0.2);
+}
+
 .battle-stage {
   min-height: 340px;
   max-height: 56vh;
@@ -1215,6 +1243,12 @@ input:focus {
   gap: 8px;
 }
 
+.tool-action-wide {
+  width: 100%;
+  min-height: 42px;
+  justify-content: center;
+}
+
 .item-card.selectable {
   cursor: pointer;
 }
@@ -1227,6 +1261,7 @@ input:focus {
   position: absolute;
   top: 10px;
   right: 10px;
+  z-index: 2;
   width: 24px;
   height: 24px;
   display: grid;
@@ -1364,7 +1399,14 @@ input:focus {
   align-items: center;
   gap: 28px;
   min-width: max-content;
-  animation: ticker-slide 64s linear infinite;
+}
+
+.global-ticker-track.is-animated {
+  animation: ticker-slide var(--ticker-duration, 18s) linear 1 forwards;
+}
+
+.global-ticker-track.is-static {
+  min-width: 0;
 }
 
 .global-ticker-track span {
@@ -1380,7 +1422,7 @@ input:focus {
 
 @keyframes ticker-slide {
   to {
-    transform: translateX(-50%);
+    transform: translateX(calc(-100% - 28px));
   }
 }
 
@@ -1548,6 +1590,11 @@ input:focus {
   color: #ffdd98;
 }
 
+.battle-line.immortal-loot p {
+  color: #ffd1dc;
+  text-shadow: 0 0 12px rgba(255, 45, 85, 0.42);
+}
+
 .battle-line.enemy p,
 .battle-line.danger p {
   color: #ffb0b0;
@@ -1644,6 +1691,13 @@ input:focus {
   border-color: rgba(255, 189, 98, 0.55);
 }
 
+.loot-detail-card.immortal {
+  border-color: rgba(255, 45, 85, 0.62);
+  background:
+    linear-gradient(135deg, rgba(139, 0, 32, 0.18), rgba(255, 255, 255, 0.055)),
+    rgba(255, 255, 255, 0.04);
+}
+
 .result-modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -1688,6 +1742,14 @@ input:focus {
     0 0 30px rgba(255, 145, 64, 0.24);
 }
 
+.quality.immortal {
+  color: #ff4d6d;
+  text-shadow:
+    0 0 7px rgba(255, 45, 85, 0.76),
+    0 0 18px rgba(190, 18, 60, 0.5),
+    0 0 34px rgba(127, 29, 29, 0.32);
+}
+
 .item-card:has(.quality.uncommon) {
   border-color: rgba(121, 223, 135, 0.24);
 }
@@ -1702,6 +1764,10 @@ input:focus {
 
 .item-card:has(.quality.legendary) {
   border-color: rgba(255, 189, 98, 0.42);
+}
+
+.item-card:has(.quality.immortal) {
+  border-color: rgba(255, 45, 85, 0.5);
 }
 
 .enhance-effect {
@@ -1726,7 +1792,7 @@ input:focus {
   overflow: hidden;
 }
 
-.enhance-effect > * {
+.enhance-effect > *:not(.power-up-indicator) {
   position: relative;
   z-index: 1;
 }
@@ -1817,8 +1883,16 @@ input:focus {
     0 0 36px rgba(255, 145, 64, 0.28);
 }
 
+.enhance-effect .quality.immortal {
+  text-shadow:
+    0 0 8px rgba(255, 120, 145, 0.9),
+    0 0 22px rgba(255, 45, 85, 0.62),
+    0 0 38px rgba(127, 29, 29, 0.34);
+}
+
 .enhance-max .quality.epic,
-.enhance-max .quality.legendary {
+.enhance-max .quality.legendary,
+.enhance-max .quality.immortal {
   animation: enhanceTextGleam 2.8s ease-in-out infinite;
 }
 
@@ -2017,6 +2091,10 @@ input:focus {
   border-color: rgba(255, 189, 98, 0.52);
 }
 
+.speaker-equipment-card.immortal {
+  border-color: rgba(255, 45, 85, 0.56);
+}
+
 .center-screen {
   display: grid;
   place-items: center;
@@ -2182,13 +2260,137 @@ body {
 
 .dungeon-screen .top-bar,
 .dungeon-screen .battle-brief,
-.dungeon-filter-panel {
+.dungeon-filter-panel,
+.dungeon-mode-tabs {
   flex: 0 0 auto;
+}
+
+.dungeon-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dungeon-mode-tabs button {
+  min-height: 54px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.055);
+  color: #d8d1c8;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.dungeon-mode-tabs button small {
+  min-width: 24px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: #11131a;
+  background: #d5c17a;
+  text-align: center;
+}
+
+.dungeon-mode-tabs button.active {
+  color: #fff5dc;
+  border-color: rgba(213, 193, 122, 0.45);
+  background: rgba(213, 193, 122, 0.14);
+}
+
+.dungeon-mode-tabs button.bloodmoon.active {
+  border-color: rgba(255, 45, 85, 0.5);
+  background: rgba(180, 24, 48, 0.18);
+}
+
+.dungeon-mode-tabs button.bloodmoon.active small {
+  color: #fff5dc;
+  background: #be123c;
+}
+
+.special-dungeon-panel {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  align-content: start;
+  padding-right: 4px;
+}
+
+.bloodmoon-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 45, 85, 0.32);
+  background:
+    linear-gradient(135deg, rgba(139, 0, 32, 0.24), rgba(213, 193, 122, 0.08)),
+    rgba(255, 255, 255, 0.055);
+}
+
+.bloodmoon-hero h2 {
+  margin: 4px 0 6px;
+  color: #fff5dc;
+  font-size: 20px;
+}
+
+.bloodmoon-hero p {
+  max-width: 680px;
+  color: #d8d1c8;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bloodmoon-tier-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.bloodmoon-tier-row button {
+  min-height: 76px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.055);
+  color: #d8d1c8;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+}
+
+.bloodmoon-tier-row button.active {
+  border-color: rgba(255, 45, 85, 0.52);
+  background: rgba(190, 18, 60, 0.18);
+}
+
+.bloodmoon-tier-row span,
+.bloodmoon-tier-row small {
+  color: #a8a39e;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.bloodmoon-tier-row strong {
+  color: #fff5dc;
+  font-size: 17px;
+}
+
+.bloodmoon-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
 .dungeon-filter-panel {
   display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr) minmax(300px, auto) auto;
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -2207,13 +2409,15 @@ body {
   white-space: nowrap;
 }
 
-.risk-filter-row {
+.risk-filter-row,
+.level-filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.risk-filter-row button {
+.risk-filter-row button,
+.level-filter-row button {
   min-height: 34px;
   border: 0;
   border-radius: 8px;
@@ -2224,7 +2428,8 @@ body {
   font-weight: 900;
 }
 
-.risk-filter-row button.active {
+.risk-filter-row button.active,
+.level-filter-row button.active {
   color: #14120c;
   background: #d5c17a;
 }
@@ -2389,6 +2594,11 @@ body {
   color: #ffe1b4;
 }
 
+.quality-sell.immortal {
+  background: rgba(190, 18, 60, 0.18);
+  color: #ffd1dc;
+}
+
 .slot-button {
   width: 100%;
   color: inherit;
@@ -2402,6 +2612,105 @@ body {
 
 .inventory-slot-grid {
   grid-template-columns: 1fr;
+}
+
+.blacksmith-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.blacksmith-workbench {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(460px, 0.95fr);
+  gap: 14px;
+}
+
+.blacksmith-panel {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.blacksmith-panel .inventory-main-title {
+  flex: 0 0 auto;
+}
+
+.blacksmith-item-grid {
+  flex: 1;
+}
+
+.transfer-panel {
+  overflow: hidden;
+}
+
+.transfer-columns {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.transfer-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transfer-column h3 {
+  margin: 0;
+  color: #fff5dc;
+  font-size: 14px;
+}
+
+.transfer-list {
+  min-height: 0;
+  max-height: 320px;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.transfer-item-option {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f4f0e8;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.transfer-item-option:hover:not(:disabled),
+.transfer-item-option.selected {
+  border-color: rgba(139, 199, 208, 0.58);
+  background: rgba(139, 199, 208, 0.14);
+}
+
+.transfer-item-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.transfer-item-option strong,
+.transfer-item-option small {
+  overflow-wrap: anywhere;
+}
+
+.transfer-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .equipped-slot-card {
@@ -2736,6 +3045,10 @@ body {
   border-color: rgba(213, 193, 122, 0.42);
 }
 
+.market-sale-card.immortal {
+  border-color: rgba(255, 45, 85, 0.5);
+}
+
 .market-sale-card span {
   color: #a8a39e;
   font-size: 11px;
@@ -2929,6 +3242,11 @@ body {
   border-color: rgba(255, 189, 98, 0.42);
 }
 
+.robot-card.immortal,
+.robot-event.immortal {
+  border-color: rgba(255, 45, 85, 0.5);
+}
+
 .robot-detail-modal {
   width: min(1180px, calc(100vw - 32px));
   max-height: min(88vh, 860px);
@@ -3020,6 +3338,10 @@ body {
   border-color: rgba(255, 189, 98, 0.42);
 }
 
+.robot-equipment-card.immortal {
+  border-color: rgba(255, 45, 85, 0.5);
+}
+
 .robot-history-list {
   min-height: 0;
   max-height: min(58vh, 620px);
@@ -3029,6 +3351,176 @@ body {
   gap: 10px;
   padding-right: 4px;
   scroll-behavior: smooth;
+}
+
+.recharge-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.recharge-workbench {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(280px, 0.9fr) minmax(360px, 1.25fr) minmax(260px, 0.8fr);
+  gap: 14px;
+}
+
+.recharge-wallet-panel,
+.recharge-tier-panel,
+.recharge-ledger-panel,
+.recharge-income-panel {
+  min-height: 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.recharge-wallet-hero {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(121, 223, 135, 0.15), rgba(139, 199, 208, 0.1));
+  border: 1px solid rgba(121, 223, 135, 0.22);
+}
+
+.recharge-wallet-hero h1 {
+  font-size: 30px;
+}
+
+.recharge-wallet-hero p {
+  color: #bcb5ad;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recharge-wallet-hero strong {
+  color: #fff6d7;
+  font-size: 18px;
+}
+
+.recharge-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.recharge-form input {
+  min-width: 0;
+  height: 44px;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.recharge-quick-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.recharge-quick-row button {
+  min-width: 0;
+  height: 36px;
+  border-radius: 8px;
+  color: #ddd6cd;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.recharge-quick-row button.active {
+  color: #102119;
+  background: #79df87;
+  border-color: transparent;
+}
+
+.recharge-quick-row button:disabled {
+  opacity: 0.45;
+}
+
+.recharge-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.recharge-preview span {
+  color: #a8a39e;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.recharge-preview strong {
+  color: #fff6d7;
+}
+
+.recharge-tier-list,
+.recharge-ledger-list,
+.recharge-income-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.wealth-tier-card,
+.robot-recharge-card,
+.cash-income-card {
+  padding: 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  gap: 6px;
+}
+
+.wealth-tier-card > div,
+.robot-recharge-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wealth-tier-card span,
+.wealth-tier-card small,
+.robot-recharge-card span,
+.robot-recharge-card small,
+.cash-income-card span {
+  color: #a8a39e;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.wealth-tier-card strong,
+.robot-recharge-card strong,
+.cash-income-card strong {
+  color: #f5ead6;
+}
+
+.wealth-tier-card p,
+.robot-recharge-card p,
+.cash-income-card p {
+  color: #ddd6cd;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 span.enhance-badge {
@@ -3157,7 +3649,9 @@ button.equipment-chip {
   .home-header,
   .home-workbench,
   .inventory-workbench,
+  .blacksmith-workbench,
   .market-workbench,
+  .recharge-workbench,
   .robot-detail-layout,
   .result-screen {
     display: grid;
@@ -3167,16 +3661,30 @@ button.equipment-chip {
   .inventory-side,
   .inventory-main,
   .inventory-tools-panel,
+  .blacksmith-panel,
   .market-sell-panel,
   .market-board,
   .market-activity-panel,
+  .recharge-wallet-panel,
+  .recharge-tier-panel,
+  .recharge-ledger-panel,
+  .recharge-income-panel,
+  .recharge-tier-list,
+  .recharge-ledger-list,
+  .recharge-income-list,
   .robot-roster,
   .robot-equipment-grid,
   .robot-history-list,
   .quest-list,
   .leaderboard-list,
+  .special-dungeon-panel,
   .dungeon-screen .dungeon-list {
     overflow: visible;
+  }
+
+  .transfer-columns,
+  .transfer-preview {
+    grid-template-columns: 1fr;
   }
 
   .robot-list-head {
@@ -3198,6 +3706,10 @@ button.equipment-chip {
   }
 
   .market-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .recharge-stats {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -3224,6 +3736,21 @@ button.equipment-chip {
   }
 
   .dungeon-filter-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .special-dungeon-panel {
+    flex: 0 0 auto;
+    padding-right: 0;
+  }
+
+  .dungeon-mode-tabs,
+  .bloodmoon-tier-row,
+  .bloodmoon-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .bloodmoon-hero {
     grid-template-columns: 1fr;
   }
 

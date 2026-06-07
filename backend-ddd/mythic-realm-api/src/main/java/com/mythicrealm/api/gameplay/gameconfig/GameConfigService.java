@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 @DependsOn("flywayInitializer")
 public class GameConfigService {
     private final JdbcTemplate jdbcTemplate;
-    private final DatabaseConfigSeeder configSeeder;
 
     private List<ItemTemplate> itemTemplates = List.of();
     private List<MonsterConfig> monsters = List.of();
@@ -31,14 +30,12 @@ public class GameConfigService {
     private String checksum = "";
     private String configVersion = "";
 
-    public GameConfigService(JdbcTemplate jdbcTemplate, DatabaseConfigSeeder configSeeder) {
+    public GameConfigService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-        this.configSeeder = configSeeder;
         load();
     }
 
     public final void load() {
-        configSeeder.ensureSeeded();
         itemTemplates = loadItems();
         monsters = loadMonsters();
         dungeons = loadDungeons();
@@ -327,6 +324,7 @@ public class GameConfigService {
 
     private int qualityRank(String quality) {
         return switch (quality) {
+            case "immortal" -> 6;
             case "legendary" -> 5;
             case "epic" -> 4;
             case "rare" -> 3;

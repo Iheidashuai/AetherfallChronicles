@@ -7,7 +7,10 @@ public record PlayerRecord(
     String profession,
     int level,
     int experience,
-    int gold,
+    long gold,
+    long realMoney,
+    int wealthTierLevel,
+    String wealthTier,
     int strength,
     int agility,
     int constitution,
@@ -15,6 +18,41 @@ public record PlayerRecord(
     int spirit,
     int freePoints
 ) {
+    public PlayerRecord(
+        long id,
+        long accountId,
+        String name,
+        String profession,
+        int level,
+        int experience,
+        long gold,
+        int strength,
+        int agility,
+        int constitution,
+        int intelligence,
+        int spirit,
+        int freePoints
+    ) {
+        this(
+            id,
+            accountId,
+            name,
+            profession,
+            level,
+            experience,
+            gold,
+            0,
+            0,
+            "贫民",
+            strength,
+            agility,
+            constitution,
+            intelligence,
+            spirit,
+            freePoints
+        );
+    }
+
     public double maxHp() {
         return 100 + constitution * 10 * (1 + level * 0.1);
     }

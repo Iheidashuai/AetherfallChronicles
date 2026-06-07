@@ -458,7 +458,8 @@ spring:
 
   flyway:
     enabled: true
-    baseline-on-migrate: true
+    baseline-on-migrate: false
+    clean-disabled: false
     locations: classpath:db/migration
 
   redis:
@@ -478,8 +479,10 @@ logging:
     com.mythicrealm: DEBUG
 
 mythic:
+  database:
+    destructive-reset-on-migration-error: true
   config:
-    version: v1.0
+    version: latest
 EOF
 
 # 创建 db/migration 目录

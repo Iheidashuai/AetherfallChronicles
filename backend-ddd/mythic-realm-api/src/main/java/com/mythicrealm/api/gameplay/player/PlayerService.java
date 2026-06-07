@@ -1,8 +1,11 @@
 package com.mythicrealm.api.gameplay.player;
 
 import com.mythicrealm.api.gameplay.auth.AuthenticatedAccount;
+import com.mythicrealm.api.gameplay.announcement.AnnouncementService;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
+import com.mythicrealm.api.gameplay.recharge.WealthTierService;
+import com.mythicrealm.api.gameplay.recharge.WealthTierService.WealthTier;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.Locale;
@@ -20,10 +23,19 @@ public class PlayerService {
 
     private final JdbcTemplate jdbcTemplate;
     private final InventoryService inventoryService;
+    private final AnnouncementService announcementService;
+    private final WealthTierService wealthTierService;
 
-    public PlayerService(JdbcTemplate jdbcTemplate, @Lazy InventoryService inventoryService) {
+    public PlayerService(
+        JdbcTemplate jdbcTemplate,
+        @Lazy InventoryService inventoryService,
+        AnnouncementService announcementService,
+        WealthTierService wealthTierService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.inventoryService = inventoryService;
+        this.announcementService = announcementService;
+        this.wealthTierService = wealthTierService;
     }
 
     @Transactional
@@ -34,25 +46,29 @@ public class PlayerService {
             throw ApiException.badRequest("该账号已经创建角色");
         }
 
+        WealthTier tier = wealthTierService.topTier();
         var keyHolder = new GeneratedKeyHolder();
         try {
             jdbcTemplate.update(connection -> {
                 PreparedStatement ps = connection.prepareStatement(
                     """
                     INSERT INTO player
-                    (account_id, name, profession, strength, agility, constitution, intelligence, spirit)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (account_id, name, profession, real_money, wealth_tier_level, wealth_tier,
+                     strength, agility, constitution, intelligence, spirit)
+                    VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     Statement.RETURN_GENERATED_KEYS
                 );
                 ps.setLong(1, account.accountId());
                 ps.setString(2, name.trim());
                 ps.setString(3, stats.profession());
-                ps.setInt(4, stats.strength());
-                ps.setInt(5, stats.agility());
-                ps.setInt(6, stats.constitution());
-                ps.setInt(7, stats.intelligence());
-                ps.setInt(8, stats.spirit());
+                ps.setInt(4, tier.level());
+                ps.setString(5, tier.name());
+                ps.setInt(6, stats.strength());
+                ps.setInt(7, stats.agility());
+                ps.setInt(8, stats.constitution());
+                ps.setInt(9, stats.intelligence());
+                ps.setInt(10, stats.spirit());
                 return ps;
             }, keyHolder);
         } catch (DuplicateKeyException error) {
@@ -153,7 +169,9 @@ public class PlayerService {
             freePoints,
             playerId
         );
-        return requireById(playerId);
+        PlayerRecord updatedPlayer = requireById(playerId);
+        announcementService.publishLevelMilestones(updatedPlayer.name(), player.level(), updatedPlayer.level());
+        return updatedPlayer;
     }
 
     public static int experienceRequired(int level) {
@@ -171,7 +189,10 @@ public class PlayerService {
             rs.getString("profession"),
             rs.getInt("level"),
             rs.getInt("experience"),
-            rs.getInt("gold"),
+            rs.getLong("gold"),
+            rs.getLong("real_money"),
+            rs.getInt("wealth_tier_level"),
+            rs.getString("wealth_tier"),
             rs.getInt("strength"),
             rs.getInt("agility"),
             rs.getInt("constitution"),

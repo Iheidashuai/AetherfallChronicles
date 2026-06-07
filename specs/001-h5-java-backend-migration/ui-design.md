@@ -79,7 +79,7 @@ Primary experience:
 - Show summary metrics above list: robot/player count, current player rank, top power.
 - List scrolls internally.
 - Current player row must be visually distinct.
-- Robot population should feel active; target at least 100 robots for the current milestone.
+- Robot population should feel active; target at least 200 robots for the current milestone.
 
 ## Visual System
 
@@ -99,6 +99,6 @@ Primary experience:
 
 - Frontend app: `web/src/App.tsx`
 - Frontend styles: `web/src/styles.css`
-- Backend battle authority: `backend/src/main/java/com/mythicrealm/backend/dungeon/DungeonService.java`
-- Backend inventory authority: `backend/src/main/java/com/mythicrealm/backend/inventory/InventoryService.java`
-- Robot population migration: `backend/src/main/resources/db/migration/V3__expand_robot_population.sql`
+- Backend battle authority: `backend-ddd/mythic-realm-api/src/main/java/com/mythicrealm/api/gameplay/dungeon/DungeonService.java`
+- Backend inventory authority: `backend-ddd/mythic-realm-api/src/main/java/com/mythicrealm/api/gameplay/inventory/InventoryService.java`
+- Robot population and latest schema: `backend-ddd/mythic-realm-starter/src/main/resources/db/migration/V1__latest_schema.sql`

@@ -1,28 +1,14 @@
 # DDD 领域架构总结
 
-本文档总结了三个简单领域的 DDD 架构实现：聊天、榜单和通告。
+本文档总结了当前聊天、榜单和通告的实现位置。项目已经收敛为个人单机学习游戏，不再维护旧 `backend/` 包路径。
 
 ## 1. 聊天领域 (Chat Domain)
 
 ### 目录结构
 ```
-backend/src/main/java/com/mythicrealm/backend/chat/
-├── domain/
-│   ├── model/
-│   │   └── ChatMessage.java (聚合根)
-│   ├── repository/
-│   │   └── ChatMessageRepository.java
-│   └── event/
-│       └── MessageSentEvent.java
-├── application/
-│   └── ChatApplicationService.java
-├── infrastructure/
-│   └── persistence/
-│       └── ChatMessageRepositoryImpl.java
-└── interfaces/
-    ├── ChatDomainController.java
-    └── dto/
-        └── ChatMessageDTO.java
+backend-ddd/mythic-realm-api/src/main/java/com/mythicrealm/api/gameplay/chat/
+├── ChatController.java
+└── ChatService.java
 ```
 
 ### 核心职责
@@ -40,18 +26,9 @@ backend/src/main/java/com/mythicrealm/backend/chat/
 
 ### 目录结构
 ```
-backend/src/main/java/com/mythicrealm/backend/leaderboard/
-├── domain/
-│   ├── model/
-│   │   └── LeaderboardEntry.java (值对象)
-│   └── service/
-│       └── LeaderboardDomainService.java
-├── application/
-│   └── LeaderboardApplicationService.java
-└── interfaces/
-    ├── LeaderboardDomainController.java
-    └── dto/
-        └── LeaderboardDTO.java
+backend-ddd/mythic-realm-api/src/main/java/com/mythicrealm/api/gameplay/leaderboard/
+├── LeaderboardController.java
+└── LeaderboardService.java
 ```
 
 ### 核心职责
@@ -73,24 +50,9 @@ backend/src/main/java/com/mythicrealm/backend/leaderboard/
 
 ### 目录结构
 ```
-backend/src/main/java/com/mythicrealm/backend/announcement/
-├── domain/
-│   ├── model/
-│   │   └── Announcement.java (聚合根)
-│   ├── repository/
-│   │   └── AnnouncementRepository.java
-│   └── event/
-│       └── AnnouncementPublishedEvent.java
-├── application/
-│   ├── AnnouncementApplicationService.java
-│   └── AnnouncementEventListener.java
-├── infrastructure/
-│   └── persistence/
-│       └── AnnouncementRepositoryImpl.java
-└── interfaces/
-    ├── AnnouncementDomainController.java
-    └── dto/
-        └── AnnouncementDTO.java
+backend-ddd/mythic-realm-api/src/main/java/com/mythicrealm/api/gameplay/announcement/
+├── AnnouncementController.java
+└── AnnouncementService.java
 ```
 
 ### 核心职责

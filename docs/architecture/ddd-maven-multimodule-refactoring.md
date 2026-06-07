@@ -650,9 +650,8 @@ mythic-realm-starter/
     │       ├── application.yml
     │       ├── application-dev.yml
     │       ├── application-prod.yml
-    │       └── db/migration/              # Flyway 迁移脚本
-    │           ├── V1__initial_schema.sql
-    │           └── V2__add_enhancement.sql
+    │       └── db/migration/              # 单机最新 schema
+    │           └── V1__latest_schema.sql
     └── test/
         └── java/
             └── MythicRealmApplicationTests.java

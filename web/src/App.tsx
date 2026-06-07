@@ -1,5 +1,5 @@
 import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowUp,
@@ -13,10 +13,12 @@ import {
   FastForward,
   Gem,
   Gauge,
+  Hammer,
   HeartPulse,
   LogOut,
   MessageCircle,
   Package,
+  Repeat2,
   ScrollText,
   Send,
   Shield,
@@ -46,23 +48,29 @@ import type {
   MarketListing,
   MarketSale,
   QuestRow,
+  CashIncomeRow,
+  RobotRechargeRow,
   RobotActivityDetail,
   RobotActivityEvent,
   RobotActivityView,
+  WealthTierStat,
 } from './api';
 import { useAppStore } from './store';
 
 type InventoryAction = 'equip' | 'sell' | 'enhance';
 type FeedbackVariant = 'success' | 'error';
+type DungeonMode = 'normal' | 'special';
 type DungeonClearFilter = 'all' | 'uncleared' | 'cleared';
 type DungeonRiskFilter = 'all' | 'safe' | 'normal' | 'risky' | 'deadly';
+type DungeonLevelFilter = 'all' | '1-30' | '31-60' | '61-90';
 type LeaderboardMetric = 'power' | 'gold' | 'level';
 type ProfessionFilter = 'all' | 'warrior' | 'mage' | 'ranger';
 type MarketSortKey = 'listedAt' | 'level' | 'quality';
 type MarketItemTypeFilter = 'all' | 'weapon' | 'helmet' | 'armor' | 'legs' | 'boots' | 'gloves' | 'necklace' | 'ring';
-type MarketQualityFilter = 'all' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+type MarketQualityFilter = 'all' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'immortal';
 type MarketLedgerTab = 'listed' | 'sold';
 type RobotFilterKey = 'name' | 'minGold' | 'maxGold' | 'minPower' | 'maxPower' | 'minLevel' | 'maxLevel';
+const ANNOUNCEMENT_SEEN_STORAGE_KEY = 'mythic.announcements.seen';
 
 type RobotFilters = Record<RobotFilterKey, string>;
 
@@ -116,11 +124,13 @@ export function App() {
           {screen === 'home' && token && <HomeScreen token={token} />}
           {screen === 'character' && token && <CharacterScreen token={token} />}
           {screen === 'inventory' && token && <InventoryScreen token={token} />}
+          {screen === 'blacksmith' && token && <BlacksmithScreen token={token} />}
           {screen === 'quests' && token && <QuestScreen token={token} />}
           {screen === 'market' && token && <MarketScreen token={token} />}
           {screen === 'chat' && token && <ChatScreen token={token} />}
           {screen === 'leaderboard' && token && <LeaderboardScreen token={token} />}
           {screen === 'robots' && token && <RobotActivityScreen token={token} />}
+          {screen === 'recharge' && token && <RechargeScreen token={token} />}
           {screen === 'dungeons' && token && (
             <DungeonScreen
               token={token}
@@ -130,7 +140,7 @@ export function App() {
               }}
             />
           )}
-          {screen === 'result' && lastResult && <ResultScreen result={lastResult} />}
+          {screen === 'result' && lastResult && <ResultScreen result={lastResult} onResult={setLastResult} />}
         </div>
       </div>
     </main>
@@ -193,15 +203,34 @@ function AuthScreen() {
 }
 
 function GlobalTicker({ announcements }: { announcements: GlobalAnnouncement[] }) {
-  const visibleAnnouncements = announcements.filter((announcement) => announcement.kind !== 'level');
-  const items = visibleAnnouncements.length > 0 ? visibleAnnouncements : [{
-    id: 0,
-    kind: 'system',
-    actorName: '银冠公会',
-    text: '世界通告接入中，远征记录会在这里滚动。',
-    priority: 0,
-    createdAt: new Date().toISOString(),
-  }];
+  const [seenKeys, setSeenKeys] = useState<Set<string>>(() => readSeenAnnouncementKeys());
+  const uniqueAnnouncements = announcements.filter((announcement, index, list) =>
+    list.findIndex((item) => item.kind === announcement.kind && item.text === announcement.text) === index
+  );
+  const items = uniqueAnnouncements.filter((announcement) => !seenKeys.has(announcementSeenKey(announcement)));
+  const itemKeys = items.map(announcementSeenKey).join('|');
+  const displayDuration = items.length <= 1 ? 8000 : Math.min(45000, Math.max(14000, items.length * 7000));
+
+  useEffect(() => {
+    if (!itemKeys) {
+      return;
+    }
+    const keysToMark = itemKeys.split('|').filter(Boolean);
+    const timeout = window.setTimeout(() => {
+      setSeenKeys((currentSeenKeys) => {
+        const nextSeenKeys = new Set([...currentSeenKeys, ...keysToMark]);
+        writeSeenAnnouncementKeys(nextSeenKeys);
+        return nextSeenKeys;
+      });
+    }, displayDuration);
+    return () => window.clearTimeout(timeout);
+  }, [displayDuration, itemKeys]);
+
+  if (items.length === 0) {
+    return null;
+  }
+  const trackClassName = `global-ticker-track${items.length > 1 ? ' is-animated' : ' is-static'}`;
+  const trackStyle = { '--ticker-duration': `${displayDuration}ms` } as CSSProperties;
   return (
     <div className="global-ticker">
       <div className="global-ticker-label">
@@ -209,9 +238,9 @@ function GlobalTicker({ announcements }: { announcements: GlobalAnnouncement[] }
         <strong>全服通告</strong>
       </div>
       <div className="global-ticker-window">
-        <div className="global-ticker-track">
-          {[...items, ...items].map((item, index) => (
-            <span key={`${item.id}-${index}`}>
+        <div className={trackClassName} style={trackStyle}>
+          {items.map((item) => (
+            <span key={announcementSeenKey(item)}>
               <b>{announcementKindName(item.kind)}</b>
               {item.text}
             </span>
@@ -220,6 +249,28 @@ function GlobalTicker({ announcements }: { announcements: GlobalAnnouncement[] }
       </div>
     </div>
   );
+}
+
+function announcementSeenKey(announcement: GlobalAnnouncement) {
+  return `${announcement.id}:${announcement.createdAt}`;
+}
+
+function readSeenAnnouncementKeys() {
+  try {
+    const raw = window.localStorage.getItem(ANNOUNCEMENT_SEEN_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function writeSeenAnnouncementKeys(keys: Set<string>) {
+  try {
+    window.localStorage.setItem(ANNOUNCEMENT_SEEN_STORAGE_KEY, JSON.stringify(Array.from(keys).slice(-160)));
+  } catch {
+    // Ignore storage quota/private mode failures; the ticker still works for the current render.
+  }
 }
 
 function CreatePlayerScreen({ token }: { token: string }) {
@@ -295,9 +346,9 @@ function HomeScreen({ token }: { token: string }) {
 
         <div className="stat-grid">
           <Metric label="战力" value={data.combatPower.toString()} />
-          <Metric label="金币" value={data.player.gold.toString()} />
+          <Metric label="金币" value={formatNumber(data.player.gold)} />
+          <Metric label="余额" value={`${formatNumber(data.player.realMoney)} 元`} />
           <Metric label="背包" value={`${data.inventoryCount}/${data.inventoryCapacity}`} />
-          <Metric label="任务" value={`${data.config.questCount}`} />
         </div>
       </div>
 
@@ -309,8 +360,10 @@ function HomeScreen({ token }: { token: string }) {
           <div className="nav-grid">
             <NavTile icon={<Swords size={20} />} title="副本" detail={`${data.config.dungeonCount} 个副本`} onClick={() => setScreen('dungeons')} />
             <NavTile icon={<Backpack size={20} />} title="背包" detail="穿戴 · 出售 · 强化" onClick={() => setScreen('inventory')} />
+            <NavTile icon={<Hammer size={20} />} title="铁匠铺" detail="强化 · 转移" onClick={() => setScreen('blacksmith')} />
             <NavTile icon={<ScrollText size={20} />} title="任务" detail="主线 · 日常 · 成就" onClick={() => setScreen('quests')} />
             <NavTile icon={<ShoppingBag size={20} />} title="市场" detail="寄售 · 购买" onClick={() => setScreen('market')} />
+            <NavTile icon={<Coins size={20} />} title="充值" detail={data.player.wealthTier} onClick={() => setScreen('recharge')} />
             <NavTile icon={<MessageCircle size={20} />} title="聊天" detail="世界频道" onClick={() => setScreen('chat')} />
             <NavTile icon={<Trophy size={20} />} title="榜单" detail="战力排名" onClick={() => setScreen('leaderboard')} />
             <NavTile icon={<Gauge size={20} />} title="动态" detail="机器人后台" onClick={() => setScreen('robots')} />
@@ -372,8 +425,11 @@ function CharacterScreen({ token }: { token: string }) {
 function DungeonScreen({ token, onResult }: { token: string; onResult: (result: DungeonRunResult) => void }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
+  const [mode, setMode] = useState<DungeonMode>('normal');
   const [clearFilter, setClearFilter] = useState<DungeonClearFilter>('all');
   const [riskFilter, setRiskFilter] = useState<DungeonRiskFilter>('all');
+  const [levelFilter, setLevelFilter] = useState<DungeonLevelFilter>('all');
+  const [selectedSpecialId, setSelectedSpecialId] = useState<string | null>(null);
   const [sweepResult, setSweepResult] = useState<DungeonSweepResult | null>(null);
   const [selectedLoot, setSelectedLoot] = useState<Item | null>(null);
   const { data, isLoading, error } = useQuery({
@@ -406,11 +462,16 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
     return <ErrorScreen message={(error as Error)?.message ?? '副本加载失败'} />;
   }
   const combatPower = homeQuery.data?.combatPower ?? 0;
-  const visibleDungeons = data.filter((dungeon) => {
-    const risk = dungeonRisk(combatPower, dungeon.recommendedPower).level as DungeonRiskFilter;
+  const playerLevel = homeQuery.data?.player.level ?? 0;
+  const normalDungeons = data.filter((dungeon) => !isSpecialDungeon(dungeon));
+  const specialDungeons = data.filter(isSpecialDungeon);
+  const selectedSpecialDungeon = specialDungeons.find((dungeon) => dungeon.id === selectedSpecialId) ?? specialDungeons[0] ?? null;
+  const visibleDungeons = normalDungeons.filter((dungeon) => {
+    const risk = dungeonRisk(combatPower, dungeon.recommendedPower, playerLevel, dungeon.recommendedLevel).level as DungeonRiskFilter;
     const matchesClear = clearFilter === 'all' || (clearFilter === 'cleared' ? dungeon.cleared : !dungeon.cleared);
     const matchesRisk = riskFilter === 'all' || risk === riskFilter;
-    return matchesClear && matchesRisk;
+    const matchesLevel = dungeonMatchesLevelFilter(dungeon, levelFilter);
+    return matchesClear && matchesRisk && matchesLevel;
   });
 
   return (
@@ -425,47 +486,86 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
           </div>
         </div>
       )}
-      <div className="dungeon-filter-panel">
-        <div className="segmented three">
-          {[
-            ['all', '全部'],
-            ['uncleared', '未通过'],
-            ['cleared', '已通过'],
-          ].map(([value, label]) => (
-            <button key={value} className={clearFilter === value ? 'active' : ''} onClick={() => setClearFilter(value as DungeonClearFilter)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="risk-filter-row">
-          {[
-            ['all', '全部风险'],
-            ['safe', '碾压'],
-            ['normal', '稳妥'],
-            ['risky', '危险'],
-            ['deadly', '极危'],
-          ].map(([value, label]) => (
-            <button key={value} className={riskFilter === value ? `active ${value}` : value} onClick={() => setRiskFilter(value as DungeonRiskFilter)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <strong>{visibleDungeons.length}/{data.length} 个副本</strong>
+      <div className="dungeon-mode-tabs">
+        <button className={mode === 'normal' ? 'active' : ''} onClick={() => setMode('normal')}>
+          <Swords size={16} />
+          正常副本
+          <small>{normalDungeons.length}</small>
+        </button>
+        <button className={mode === 'special' ? 'active bloodmoon' : 'bloodmoon'} onClick={() => setMode('special')}>
+          <Sparkles size={16} />
+          特殊副本
+          <small>{specialDungeons.length}</small>
+        </button>
       </div>
-      <div className="dungeon-list">
-        {visibleDungeons.length === 0 && <EmptyState text="当前筛选下没有副本，换个风险档再看。" />}
-        {visibleDungeons.map((dungeon) => (
-          <DungeonCard
-            key={dungeon.id}
-            dungeon={dungeon}
-            combatPower={combatPower}
-            loading={mutation.isPending}
-            sweepLoading={sweepMutation.isPending}
-            onRun={() => mutation.mutate(dungeon.id)}
-            onSweep={() => sweepMutation.mutate(dungeon.id)}
-          />
-        ))}
-      </div>
+      {mode === 'normal' ? (
+        <>
+          <div className="dungeon-filter-panel">
+            <div className="segmented three">
+              {[
+                ['all', '全部'],
+                ['uncleared', '未通过'],
+                ['cleared', '已通过'],
+              ].map(([value, label]) => (
+                <button key={value} className={clearFilter === value ? 'active' : ''} onClick={() => setClearFilter(value as DungeonClearFilter)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="risk-filter-row">
+              {[
+                ['all', '全部风险'],
+                ['safe', '碾压'],
+                ['normal', '稳妥'],
+                ['risky', '危险'],
+                ['deadly', '极危'],
+              ].map(([value, label]) => (
+                <button key={value} className={riskFilter === value ? `active ${value}` : value} onClick={() => setRiskFilter(value as DungeonRiskFilter)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="level-filter-row">
+              {[
+                ['all', '全部等级'],
+                ['1-30', 'Lv.1-30'],
+                ['31-60', 'Lv.31-60'],
+                ['61-90', 'Lv.61-90'],
+              ].map(([value, label]) => (
+                <button key={value} className={levelFilter === value ? 'active' : ''} onClick={() => setLevelFilter(value as DungeonLevelFilter)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <strong>{visibleDungeons.length}/{normalDungeons.length} 个副本</strong>
+          </div>
+          <div className="dungeon-list">
+            {visibleDungeons.length === 0 && <EmptyState text="当前筛选下没有副本，换个风险档再看。" />}
+            {visibleDungeons.map((dungeon) => (
+              <DungeonCard
+                key={dungeon.id}
+                dungeon={dungeon}
+                combatPower={combatPower}
+                playerLevel={playerLevel}
+                loading={mutation.isPending}
+                sweepLoading={sweepMutation.isPending}
+                onRun={() => mutation.mutate(dungeon.id)}
+                onSweep={() => sweepMutation.mutate(dungeon.id)}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <SpecialDungeonPanel
+          dungeons={specialDungeons}
+          selectedDungeon={selectedSpecialDungeon}
+          combatPower={combatPower}
+          playerLevel={playerLevel}
+          loading={mutation.isPending}
+          onSelect={setSelectedSpecialId}
+          onRun={(dungeonId) => mutation.mutate(dungeonId)}
+        />
+      )}
       {mutation.error && (
         <FeedbackDialog
           variant="error"
@@ -488,7 +588,67 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
   );
 }
 
-function ResultScreen({ result }: { result: DungeonRunResult }) {
+function SpecialDungeonPanel({ dungeons, selectedDungeon, combatPower, playerLevel, loading, onSelect, onRun }: {
+  dungeons: Dungeon[];
+  selectedDungeon: Dungeon | null;
+  combatPower: number;
+  playerLevel: number;
+  loading: boolean;
+  onSelect: (dungeonId: string) => void;
+  onRun: (dungeonId: string) => void;
+}) {
+  if (dungeons.length === 0 || !selectedDungeon) {
+    return <EmptyState text="特殊副本尚未开放。" />;
+  }
+  const sortedDungeons = [...dungeons].sort((left, right) => left.recommendedLevel - right.recommendedLevel);
+  const highDrops = selectedDungeon.drops.filter((drop) => drop.quality === 'legendary' || drop.quality === 'immortal');
+  const legendaryChance = combinedDropChance(highDrops.filter((drop) => drop.quality === 'legendary'));
+  const immortalChance = combinedDropChance(highDrops.filter((drop) => drop.quality === 'immortal'));
+  const risk = dungeonRisk(combatPower, selectedDungeon.recommendedPower, playerLevel, selectedDungeon.recommendedLevel);
+
+  return (
+    <div className="special-dungeon-panel">
+      <div className="bloodmoon-hero">
+        <div>
+          <span className="eyebrow">特殊副本 · 血月裂隙</span>
+          <h2>传说与不朽装备唯一来源</h2>
+          <p>不开放扫荡，成功通关后进入高阶掉落结算。传说 15 次未出保底，不朽 60 次后软保底。</p>
+        </div>
+        <strong className={`risk-pill ${risk.level}`}>{risk.label}</strong>
+      </div>
+      <div className="bloodmoon-tier-row">
+        {sortedDungeons.map((dungeon, index) => (
+          <button
+            key={dungeon.id}
+            className={dungeon.id === selectedDungeon.id ? 'active' : ''}
+            onClick={() => onSelect(dungeon.id)}
+          >
+            <span>阶位 {index + 1}</span>
+            <strong>Lv.{dungeon.recommendedLevel}</strong>
+            <small>{dungeon.recommendedPower}</small>
+          </button>
+        ))}
+      </div>
+      <div className="bloodmoon-stats">
+        <Metric label="推荐战力" value={formatNumber(selectedDungeon.recommendedPower)} />
+        <Metric label="传说期望" value={formatDropRate(legendaryChance)} />
+        <Metric label="不朽期望" value={formatDropRate(immortalChance)} />
+      </div>
+      <DungeonCard
+        dungeon={selectedDungeon}
+        combatPower={combatPower}
+        playerLevel={playerLevel}
+        loading={loading}
+        sweepLoading={false}
+        special
+        onRun={() => onRun(selectedDungeon.id)}
+        onSweep={() => undefined}
+      />
+    </div>
+  );
+}
+
+function ResultScreen({ result, onResult }: { result: DungeonRunResult; onResult: (result: DungeonRunResult) => void }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
   const token = useAppStore((state) => state.token);
@@ -535,6 +695,21 @@ function ResultScreen({ result }: { result: DungeonRunResult }) {
     }
     setScreen('home');
   }
+
+  const retryMutation = useMutation({
+    mutationFn: () => {
+      if (!token) {
+        throw new Error('登录已失效，请重新登录');
+      }
+      return gameApi.runDungeon(token, result.dungeonId);
+    },
+    onSuccess: async (nextResult) => {
+      onResult(nextResult);
+      if (token) {
+        await invalidateGameQueries(queryClient, token);
+      }
+    },
+  });
 
   const currentFrame = frames[Math.min(visibleFrames - 1, frames.length - 1)];
   const currentEnemy = currentFrame.enemyName ?? (result.success ? '区域已肃清' : '推进中断');
@@ -612,10 +787,20 @@ function ResultScreen({ result }: { result: DungeonRunResult }) {
           result={result}
           onClose={() => setShowSummary(false)}
           onReturn={returnHome}
+          onRetry={!result.success ? () => retryMutation.mutate() : undefined}
+          retrying={retryMutation.isPending}
           onSelectLoot={setSelectedLoot}
         />
       )}
       {selectedLoot && <ItemDetail item={toEquipmentDetail(selectedLoot)} onClose={() => setSelectedLoot(null)} />}
+      {retryMutation.error && (
+        <FeedbackDialog
+          variant="error"
+          title="重试失败"
+          message={retryMutation.error.message}
+          onClose={() => retryMutation.reset()}
+        />
+      )}
     </section>
   );
 }
@@ -650,6 +835,17 @@ function InventoryScreen({ token }: { token: string }) {
     onSuccess: async (snapshot) => {
       queryClient.setQueryData(['inventory', token], snapshot);
       setEquipCandidate(null);
+      await invalidateGameQueries(queryClient, token);
+    },
+  });
+  const equipBestMutation = useMutation({
+    mutationFn: () => gameApi.equipBest(token),
+    onMutate: () => {
+      setNotice(null);
+    },
+    onSuccess: async (snapshot) => {
+      queryClient.setQueryData(['inventory', token], snapshot);
+      setNotice('已穿戴当前最高战力装备');
       await invalidateGameQueries(queryClient, token);
     },
   });
@@ -722,9 +918,10 @@ function InventoryScreen({ token }: { token: string }) {
   const equipped = equipmentSlotPairs(data.equippedItems);
   const equippedCount = equipped.filter(([, item]) => Boolean(item)).length;
   const activeTypes = itemTypesForCategory(category);
-  const busy = equipMutation.isPending || unequipMutation.isPending || sellMutation.isPending || enhanceMutation.isPending || bulkSellMutation.isPending || organizeMutation.isPending;
+  const busy = equipMutation.isPending || equipBestMutation.isPending || unequipMutation.isPending || sellMutation.isPending || enhanceMutation.isPending || bulkSellMutation.isPending || organizeMutation.isPending;
   const inventoryActionError =
     equipMutation.error?.message ??
+    equipBestMutation.error?.message ??
     unequipMutation.error?.message ??
     sellMutation.error?.message ??
     enhanceMutation.error?.message ??
@@ -739,6 +936,7 @@ function InventoryScreen({ token }: { token: string }) {
   function closeInventoryFeedback() {
     setNotice(null);
     equipMutation.reset();
+    equipBestMutation.reset();
     unequipMutation.reset();
     sellMutation.reset();
     enhanceMutation.reset();
@@ -860,6 +1058,10 @@ function InventoryScreen({ token }: { token: string }) {
 
         <aside className="inventory-tools-panel">
           <SectionTitle icon={<Backpack size={18} />} title="背包工具" />
+          <button className="mini-action tool-action-wide" disabled={busy || data.inventory.length === 0} onClick={() => equipBestMutation.mutate()}>
+            <ArrowUp size={16} />
+            {equipBestMutation.isPending ? '穿戴中...' : '一键穿戴最高战力'}
+          </button>
           <div className="segmented filter-tabs">
             {[
               ['all', '全部'],
@@ -894,6 +1096,7 @@ function InventoryScreen({ token }: { token: string }) {
               ['rare', '稀有'],
               ['epic', '史诗'],
               ['legendary', '传说'],
+              ['immortal', '不朽'],
             ].map(([quality, label]) => (
               <button
                 key={quality}
@@ -946,6 +1149,206 @@ function InventoryScreen({ token }: { token: string }) {
           title={inventoryFeedback.title}
           message={inventoryFeedback.message}
           onClose={closeInventoryFeedback}
+        />
+      )}
+    </section>
+  );
+}
+
+function BlacksmithScreen({ token }: { token: string }) {
+  const setScreen = useAppStore((state) => state.setScreen);
+  const queryClient = useQueryClient();
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [enhanceItem, setEnhanceItem] = useState<Item | null>(null);
+  const [enhanceMessage, setEnhanceMessage] = useState<string | null>(null);
+  const [sourceItemId, setSourceItemId] = useState<number | null>(null);
+  const [targetItemId, setTargetItemId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['inventory', token],
+    queryFn: () => gameApi.inventory(token),
+  });
+  const allEquipment = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+    return sortItems([...Object.values(data.equippedItems), ...data.inventory], 'quality');
+  }, [data]);
+  const sourceItems = useMemo(() => allEquipment.filter((item) => item.enhancementLevel > 0), [allEquipment]);
+  const selectedSource = allEquipment.find((item) => item.id === sourceItemId) ?? null;
+  const selectedTarget = allEquipment.find((item) => item.id === targetItemId) ?? null;
+  const canTransfer = Boolean(selectedSource && selectedTarget && selectedSource.enhancementLevel > selectedTarget.enhancementLevel);
+
+  useEffect(() => {
+    if (!data) {
+      return;
+    }
+    if (sourceItemId && !sourceItems.some((item) => item.id === sourceItemId)) {
+      setSourceItemId(null);
+    }
+    if (targetItemId && (!allEquipment.some((item) => item.id === targetItemId) || targetItemId === sourceItemId)) {
+      setTargetItemId(null);
+    }
+  }, [allEquipment, data, sourceItemId, sourceItems, targetItemId]);
+
+  const enhanceMutation = useMutation({
+    mutationFn: (itemId: number) => gameApi.enhance(token, itemId),
+    onMutate: () => {
+      setNotice(null);
+    },
+    onSuccess: async (result) => {
+      queryClient.setQueryData(['inventory', token], result.inventory);
+      setEnhanceMessage(result.success ? '强化成功，装备属性已提升。' : '强化失败，幸运值提升，下次成功率提高。');
+      const refreshed = [...result.inventory.inventory, ...Object.values(result.inventory.equippedItems)].find((item) => item.id === enhanceItem?.id);
+      if (refreshed) {
+        setEnhanceItem(refreshed);
+      }
+      await invalidateGameQueries(queryClient, token);
+    },
+  });
+  const transferMutation = useMutation({
+    mutationFn: () => {
+      if (!sourceItemId || !targetItemId) {
+        throw new Error('请选择来源装备和目标装备');
+      }
+      return gameApi.transferEnhancement(token, sourceItemId, targetItemId);
+    },
+    onMutate: () => {
+      setNotice(null);
+    },
+    onSuccess: async (result) => {
+      queryClient.setQueryData(['inventory', token], result.inventory);
+      setSourceItemId(null);
+      setTargetItemId(result.targetItem.id);
+      setNotice(`已继承到 ${equipmentDisplayName(result.targetItem)}`);
+      await invalidateGameQueries(queryClient, token);
+    },
+  });
+
+  if (isLoading) {
+    return <LoadingScreen title="点燃锻炉" />;
+  }
+  if (error || !data) {
+    return <ErrorScreen message={(error as Error)?.message ?? '铁匠铺加载失败'} />;
+  }
+
+  const busy = enhanceMutation.isPending || transferMutation.isPending;
+  const blacksmithError = enhanceMutation.error?.message ?? transferMutation.error?.message;
+  const feedback = blacksmithError
+    ? { variant: 'error' as const, title: '操作失败', message: blacksmithError }
+    : notice
+      ? { variant: 'success' as const, title: '操作完成', message: notice }
+      : null;
+
+  function closeFeedback() {
+    setNotice(null);
+    enhanceMutation.reset();
+    transferMutation.reset();
+  }
+
+  return (
+    <section className="screen blacksmith-screen">
+      <TopBar title="铁匠铺" onBack={() => setScreen('home')} />
+      <div className="blacksmith-workbench">
+        <section className="blacksmith-panel">
+          <div className="inventory-main-title">
+            <SectionTitle icon={<Hammer size={18} />} title="装备强化" />
+            <strong>{data.gold} 金</strong>
+          </div>
+          <div className="item-grid blacksmith-item-grid">
+            {allEquipment.length === 0 && <EmptyState text="当前没有可强化装备。" />}
+            {allEquipment.map((item) => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                label={itemLocationLabel(item, data.equippedItems)}
+                onSelect={() => setSelectedItem(item)}
+              >
+                <button className="mini-action" disabled={busy || item.enhancementLevel >= 15} onClick={(event) => {
+                  event.stopPropagation();
+                  setEnhanceMessage(null);
+                  setEnhanceItem(item);
+                }}>
+                  {item.enhancementLevel >= 15 ? '满级' : '强化'}
+                </button>
+              </ItemCard>
+            ))}
+          </div>
+        </section>
+
+        <section className="blacksmith-panel transfer-panel">
+          <div className="inventory-main-title">
+            <SectionTitle icon={<Repeat2 size={18} />} title="强化转移" />
+            <strong>{sourceItems.length} 件可转移</strong>
+          </div>
+          <div className="transfer-columns">
+            <div className="transfer-column">
+              <h3>来源装备</h3>
+              <div className="transfer-list">
+                {sourceItems.length === 0 && <EmptyState text="暂无带强化等级的装备。" />}
+                {sourceItems.map((item) => (
+                  <TransferItemOption
+                    key={item.id}
+                    item={item}
+                    selected={item.id === sourceItemId}
+                    onSelect={() => {
+                      setSourceItemId(item.id);
+                      if (targetItemId === item.id) {
+                        setTargetItemId(null);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="transfer-column">
+              <h3>目标装备</h3>
+              <div className="transfer-list">
+                {allEquipment.filter((item) => item.id !== sourceItemId).length === 0 && <EmptyState text="暂无可继承的目标装备。" />}
+                {allEquipment.filter((item) => item.id !== sourceItemId).map((item) => (
+                  <TransferItemOption
+                    key={item.id}
+                    item={item}
+                    selected={item.id === targetItemId}
+                    disabled={Boolean(selectedSource && item.enhancementLevel >= selectedSource.enhancementLevel)}
+                    onSelect={() => setTargetItemId(item.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="transfer-preview">
+            <CompareCard title="来源装备" item={selectedSource} />
+            <CompareCard title="继承目标" item={selectedTarget} highlight />
+          </div>
+          {selectedSource && selectedTarget && !canTransfer && <div className="modal-warning">目标装备强化等级需低于来源装备。</div>}
+          <div className="result-modal-actions">
+            <button className="primary-action" disabled={busy || !canTransfer} onClick={() => transferMutation.mutate()}>
+              {transferMutation.isPending ? '转移中...' : '开始转移'}
+            </button>
+          </div>
+        </section>
+      </div>
+      {selectedItem && <ItemDetail item={toEquipmentDetail(selectedItem)} onClose={() => setSelectedItem(null)} />}
+      {enhanceItem && (
+        <EnhanceModal
+          item={enhanceItem}
+          gold={data.gold}
+          message={enhanceMessage}
+          loading={enhanceMutation.isPending}
+          onClose={() => {
+            setEnhanceItem(null);
+            setEnhanceMessage(null);
+          }}
+          onEnhance={() => enhanceMutation.mutate(enhanceItem.id)}
+        />
+      )}
+      {feedback && (
+        <FeedbackDialog
+          variant={feedback.variant}
+          title={feedback.title}
+          message={feedback.message}
+          onClose={closeFeedback}
         />
       )}
     </section>
@@ -1289,6 +1692,8 @@ function RobotActivityScreen({ token }: { token: string }) {
   const activeCount = filteredRobots.filter((robot) => robot.currentActivityKind !== 'rest').length;
   const marketCount = filteredRobots.filter((robot) => robot.currentActivityKind.startsWith('market')).length;
   const totalGold = filteredRobots.reduce((sum, robot) => sum + robot.gold, 0);
+  const totalRealMoney = filteredRobots.reduce((sum, robot) => sum + robot.realMoney, 0);
+  const totalRecharge = filteredRobots.reduce((sum, robot) => sum + robot.rechargeRmb, 0);
   const peakPower = Math.max(...filteredRobots.map((robot) => robot.power), 0);
 
   return (
@@ -1299,6 +1704,8 @@ function RobotActivityScreen({ token }: { token: string }) {
         <Metric label="正在行动" value={activeCount.toString()} />
         <Metric label="商会相关" value={marketCount.toString()} />
         <Metric label="机器人金币" value={`${formatNumber(totalGold)} 金`} />
+        <Metric label="真实余额" value={`${formatNumber(totalRealMoney)} 元`} />
+        <Metric label="累计充值" value={`${formatNumber(totalRecharge)} 元`} />
         <Metric label="最高战力" value={formatNumber(peakPower)} />
       </div>
       <div className="robot-workbench">
@@ -1350,6 +1757,183 @@ function RobotActivityScreen({ token }: { token: string }) {
   );
 }
 
+function RechargeScreen({ token }: { token: string }) {
+  const setScreen = useAppStore((state) => state.setScreen);
+  const queryClient = useQueryClient();
+  const [amount, setAmount] = useState('100');
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['recharge-dashboard', token],
+    queryFn: () => gameApi.rechargeDashboard(token),
+    refetchInterval: 5_000,
+  });
+  const rechargeMutation = useMutation({
+    mutationFn: (rmbAmount: number) => gameApi.recharge(token, rmbAmount),
+    onSuccess: async () => {
+      await invalidateGameQueries(queryClient, token);
+      await queryClient.invalidateQueries({ queryKey: ['recharge-dashboard', token] });
+      await queryClient.invalidateQueries({ queryKey: ['robot-activity', token] });
+      await queryClient.invalidateQueries({ queryKey: ['market', token] });
+    },
+  });
+
+  if (isLoading) {
+    return <LoadingScreen title="读取充值经济" />;
+  }
+  if (error || !data) {
+    return <ErrorScreen message={(error as Error)?.message ?? '充值后台加载失败'} />;
+  }
+
+  const rmbAmount = Math.max(0, Math.floor(Number(amount) || 0));
+  const canRecharge = rmbAmount > 0 && rmbAmount <= data.wallet.realMoney;
+  const quickAmounts = [1, 10, 100, 1000, 10000, 100000];
+  const robotRecharges = data.robotRecharges.slice(0, 80);
+  const incomeEvents = data.incomeEvents.slice(0, 60);
+
+  return (
+    <section className="screen recharge-screen">
+      <TopBar title="充值经济" onBack={() => setScreen('home')} />
+      <div className="stat-grid recharge-stats">
+        <Metric label="我的余额" value={`${formatNumber(data.wallet.realMoney)} 元`} />
+        <Metric label="我的金币" value={`${formatNumber(data.wallet.gold)} 金`} />
+        <Metric label="财富标签" value={`${data.wallet.wealthTierCode} ${data.wallet.wealthTier}`} />
+        <Metric label="兑换比例" value={`1:${formatNumber(data.wallet.exchangeRate)}`} />
+        <Metric label="总人民币" value={`${formatNumber(data.totals.totalRmb)} 元`} />
+        <Metric label="总兑换金币" value={`${formatNumber(data.totals.totalGold)} 金`} />
+        <Metric label="市场挂单金币" value={`${formatNumber(data.totals.marketListedGold)} 金`} />
+        <Metric label="机器人余额" value={`${formatNumber(data.totals.robotRealMoney)} 元`} />
+      </div>
+
+      <div className="recharge-workbench">
+        <section className="recharge-wallet-panel">
+          <SectionTitle icon={<Coins size={18} />} title="我的充值" />
+          <div className="recharge-wallet-hero">
+            <div>
+              <span className="eyebrow">{data.wallet.wealthTier}</span>
+              <h1>{formatNumber(data.wallet.realMoney)} 元</h1>
+              <p>每 3 分钟到账 {formatNumber(data.wallet.minIncome)}-{formatNumber(data.wallet.maxIncome)} 元</p>
+            </div>
+            <strong>{formatNumber(data.wallet.gold)} 金</strong>
+          </div>
+          <div className="recharge-form">
+            <input
+              inputMode="numeric"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value.replace(/[^\d]/g, ''))}
+            />
+            <button
+              className="primary-action"
+              disabled={!canRecharge || rechargeMutation.isPending}
+              onClick={() => rechargeMutation.mutate(rmbAmount)}
+            >
+              充值
+            </button>
+          </div>
+          <div className="recharge-quick-row">
+            {quickAmounts.map((value) => (
+              <button
+                key={value}
+                className={rmbAmount === value ? 'active' : ''}
+                disabled={value > data.wallet.realMoney}
+                onClick={() => setAmount(String(value))}
+              >
+                {formatNumber(value)}
+              </button>
+            ))}
+          </div>
+          <div className="recharge-preview">
+            <span>可兑换</span>
+            <strong>{formatNumber(rmbAmount * data.wallet.exchangeRate)} 金</strong>
+          </div>
+        </section>
+
+        <section className="recharge-tier-panel">
+          <SectionTitle icon={<Gauge size={18} />} title="财富金字塔" />
+          <div className="recharge-tier-list">
+            {data.tierStats.map((tier) => (
+              <WealthTierCard key={`${tier.wealthTierLevel}-${tier.wealthTier}`} tier={tier} />
+            ))}
+          </div>
+        </section>
+
+        <section className="recharge-ledger-panel">
+          <SectionTitle icon={<ScrollText size={18} />} title="机器人充值明细" />
+          <div className="recharge-ledger-list">
+            {robotRecharges.length === 0 && <EmptyState text="暂时没有机器人充值记录。" />}
+            {robotRecharges.map((row) => (
+              <RobotRechargeCard key={row.id} row={row} />
+            ))}
+          </div>
+        </section>
+
+        <aside className="recharge-income-panel">
+          <SectionTitle icon={<Clock3 size={18} />} title="发钱记录" />
+          <div className="recharge-income-list">
+            {incomeEvents.length === 0 && <EmptyState text="等待下一轮 3 分钟发钱。" />}
+            {incomeEvents.map((row) => (
+              <CashIncomeCard key={row.id} row={row} />
+            ))}
+          </div>
+        </aside>
+      </div>
+
+      {rechargeMutation.data && (
+        <FeedbackDialog
+          variant="success"
+          title="充值成功"
+          message={`花费 ${formatNumber(rechargeMutation.data.rmbAmount)} 元，获得 ${formatNumber(rechargeMutation.data.goldAmount)} 金。`}
+          onClose={() => rechargeMutation.reset()}
+        />
+      )}
+      {rechargeMutation.error && (
+        <FeedbackDialog
+          variant="error"
+          title="充值失败"
+          message={rechargeMutation.error.message}
+          onClose={() => rechargeMutation.reset()}
+        />
+      )}
+    </section>
+  );
+}
+
+function WealthTierCard({ tier }: { tier: WealthTierStat }) {
+  const averageRealMoney = Math.round(tier.realMoneyTotal / Math.max(1, tier.playerCount));
+  return (
+    <article className="wealth-tier-card">
+      <div>
+        <span>L{tier.wealthTierLevel.toString().padStart(2, '0')}</span>
+        <strong>{tier.wealthTier}</strong>
+      </div>
+      <p>每轮 {formatNumber(tier.minIncome)}-{formatNumber(tier.maxIncome)} 元</p>
+      <small>{tier.playerCount} 人 · 人均 {formatNumber(averageRealMoney)} 元 · 总 {formatNumber(tier.realMoneyTotal)} 元</small>
+      <small>金币总量 {formatNumber(tier.goldTotal)} 金</small>
+    </article>
+  );
+}
+
+function RobotRechargeCard({ row }: { row: RobotRechargeRow }) {
+  return (
+    <article className="robot-recharge-card">
+      <div>
+        <span>{formatRelativeTime(row.createdAt)} · L{row.wealthTierLevel.toString().padStart(2, '0')} {row.wealthTier}</span>
+        <strong>{row.playerName}</strong>
+      </div>
+      <p>{rechargeReasonName(row.sourceAction)} · {formatNumber(row.rmbAmount)} 元换 {formatNumber(row.goldAmount)} 金</p>
+      <small>余额 {formatNumber(row.currentRealMoney)} 元 · 金币 {formatNumber(row.currentGold)} 金</small>
+    </article>
+  );
+}
+
+function CashIncomeCard({ row }: { row: CashIncomeRow }) {
+  return (
+    <article className="cash-income-card">
+      <span>{formatRelativeTime(row.createdAt)} · L{row.wealthTierLevel.toString().padStart(2, '0')} {row.wealthTier}</span>
+      <strong>{row.playerName}</strong>
+      <p>到账 {formatNumber(row.rmbAmount)} 元</p>
+    </article>
+  );
+}
+
 function RobotRangeFilter({ label, minValue, maxValue, onMinChange, onMaxChange }: {
   label: string;
   minValue: string;
@@ -1370,7 +1954,7 @@ function RobotActivityCard({ robot, onSelect }: { robot: RobotActivityView; onSe
   return (
     <button type="button" className={`robot-card ${robot.currentActivityKind}`} onClick={onSelect}>
       <div>
-        <span className="eyebrow">{robot.title} · Lv.{robot.level} {professionName(robot.profession)}</span>
+        <span className="eyebrow">{robot.title} · L{robot.wealthTierLevel.toString().padStart(2, '0')} {robot.wealthTier}</span>
         <h2>{robot.name}</h2>
       </div>
       <p>{robot.currentActivityText}</p>
@@ -1378,12 +1962,13 @@ function RobotActivityCard({ robot, onSelect }: { robot: RobotActivityView; onSe
         <span>{robotActivityKindName(robot.currentActivityKind)}</span>
         <span>战力 {formatNumber(robot.power)}</span>
         <span>{formatNumber(robot.gold)} 金</span>
+        <span>{formatNumber(robot.realMoney)} 元</span>
         <span>{formatRelativeTime(robot.currentActivityAt)}</span>
       </div>
       <div className="robot-progress-row">
         <small>副本 {robot.dungeonClears}</small>
         <small>强化峰值 +{robot.peakEnhancement}</small>
-        <small>传说 {robot.legendaryLootCount}</small>
+        <small>累计充值 {formatNumber(robot.rechargeRmb)} 元</small>
       </div>
     </button>
   );
@@ -1429,7 +2014,7 @@ function RobotActivityDetailModal({ token, robot: fallbackRobot, onClose }: {
           <div>
             <span className="eyebrow">{robot.title} · {professionName(robot.profession)} · {robotActivityKindName(robot.currentActivityKind)}</span>
             <h2>{robot.name}</h2>
-            <p>Lv.{robot.level} · 战力 {formatNumber(robot.power)} · 金币 {formatNumber(robot.gold)} 金</p>
+            <p>Lv.{robot.level} · {robot.wealthTier} · 战力 {formatNumber(robot.power)} · 金币 {formatNumber(robot.gold)} 金</p>
           </div>
           <button className="text-button close-button" onClick={onClose}>关闭</button>
         </div>
@@ -1439,6 +2024,8 @@ function RobotActivityDetailModal({ token, robot: fallbackRobot, onClose }: {
               <Metric label="副本次数" value={formatNumber(robot.dungeonClears)} />
               <Metric label="强化峰值" value={`+${robot.peakEnhancement}`} />
               <Metric label="传说获得" value={formatNumber(robot.legendaryLootCount)} />
+              <Metric label="真实余额" value={`${formatNumber(robot.realMoney)} 元`} />
+              <Metric label="累计充值" value={`${formatNumber(robot.rechargeRmb)} 元`} />
               <Metric label="最后活动" value={formatRelativeTime(robot.currentActivityAt)} />
             </div>
             <div className={`robot-current-action ${robot.currentActivityKind}`}>
@@ -1686,22 +2273,27 @@ function LeaderboardScreen({ token }: { token: string }) {
   );
 }
 
-function DungeonCard({ dungeon, combatPower, loading, sweepLoading, onRun, onSweep }: {
+function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sweepLoading, special = false, onRun, onSweep }: {
   dungeon: Dungeon;
   combatPower: number;
+  playerLevel?: number;
   loading: boolean;
   sweepLoading: boolean;
+  special?: boolean;
   onRun: () => void;
   onSweep: () => void;
 }) {
-  const risk = dungeonRisk(combatPower, dungeon.recommendedPower);
+  const risk = dungeonRisk(combatPower, dungeon.recommendedPower, playerLevel, dungeon.recommendedLevel);
   const drops = dungeon.drops ?? [];
   const dropTypes = uniqueDropTypes(drops);
+  const specialDungeon = special || isSpecialDungeon(dungeon);
+  const highestQuality = drops.reduce((best, drop) => qualityRank(drop.quality) > qualityRank(best) ? drop.quality : best, 'common');
+  const highDropChance = combinedDropChance(drops.filter((drop) => drop.quality === 'legendary' || drop.quality === 'immortal'));
   return (
-    <article className={`dungeon-card ${risk.level}`}>
+    <article className={`dungeon-card ${risk.level} ${specialDungeon ? 'special' : ''}`}>
       <div className="dungeon-card-head">
         <div>
-          <span className="eyebrow">{dungeon.difficulty} · 推荐 Lv.{dungeon.recommendedLevel}</span>
+          <span className="eyebrow">{specialDungeon ? '特殊副本' : dungeon.difficulty} · 推荐 Lv.{dungeon.recommendedLevel}</span>
           <h2>{dungeon.name}</h2>
           <p>{dungeon.description}</p>
         </div>
@@ -1710,7 +2302,7 @@ function DungeonCard({ dungeon, combatPower, loading, sweepLoading, onRun, onSwe
       <div className="dungeon-meta">
         <span>推荐 {dungeon.recommendedPower}</span>
         <span className={dungeon.cleared ? 'clear-state cleared' : 'clear-state'}>{dungeon.cleared ? '已通过' : '未通过'}</span>
-        <strong>{drops.length} 件可掉落</strong>
+        <strong>{specialDungeon ? `${qualityName(highestQuality)}上限 · ${formatDropRate(highDropChance)}` : `${drops.length} 件可掉落`}</strong>
       </div>
       <div className="drop-preview-section">
         <span>当前副本可掉落</span>
@@ -1728,11 +2320,15 @@ function DungeonCard({ dungeon, combatPower, loading, sweepLoading, onRun, onSwe
       </div>
       <div className="dungeon-action-row">
         <button className="compact-action" disabled={loading} onClick={onRun}>
-          {loading ? '战斗中' : '进入'}
+          {loading ? '战斗中' : specialDungeon ? '挑战裂隙' : '进入'}
         </button>
-        <button className="compact-action sweep-compact" disabled={loading || sweepLoading || !dungeon.cleared} onClick={onSweep}>
-          {sweepLoading ? '扫荡中' : '扫荡 10 次'}
-        </button>
+        {specialDungeon ? (
+          <button className="compact-action sweep-compact locked" disabled>不可扫荡</button>
+        ) : (
+          <button className="compact-action sweep-compact" disabled={loading || sweepLoading || !dungeon.cleared} onClick={onSweep}>
+            {sweepLoading ? '扫荡中' : '扫荡 10 次'}
+          </button>
+        )}
       </div>
     </article>
   );
@@ -1895,6 +2491,24 @@ function ItemCard({ item, label, children, powerIncrease = false, onSelect }: { 
       </div>
       {children && <div className="inline-actions">{children}</div>}
     </article>
+  );
+}
+
+function TransferItemOption({ item, selected, disabled = false, onSelect }: {
+  item: Item;
+  selected: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button className={`transfer-item-option ${selected ? 'selected' : ''}`} disabled={disabled} onClick={onSelect}>
+      <div className="item-meta-line">
+        <span className="eyebrow">{qualityName(item.quality)} · {typeName(item.itemType)} · Lv.{item.requiredLevel}</span>
+        <EnhancementBadge level={item.enhancementLevel} />
+      </div>
+      <strong className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</strong>
+      <small>{bonusText(item)}</small>
+    </button>
   );
 }
 
@@ -2111,10 +2725,12 @@ function HpBar({ value, max }: { value: number; max: number }) {
   );
 }
 
-function ResultSummaryModal({ result, onClose, onReturn, onSelectLoot }: {
+function ResultSummaryModal({ result, onClose, onReturn, onRetry, retrying = false, onSelectLoot }: {
   result: DungeonRunResult;
   onClose: () => void;
   onReturn: () => void | Promise<void>;
+  onRetry?: () => void;
+  retrying?: boolean;
   onSelectLoot: (item: Item) => void;
 }) {
   return (
@@ -2147,6 +2763,7 @@ function ResultSummaryModal({ result, onClose, onReturn, onSelectLoot }: {
         </div>
         <div className="result-modal-actions">
           <button className="mini-action subtle" onClick={onClose}>继续看战报</button>
+          {onRetry && <button className="mini-action" disabled={retrying} onClick={onRetry}>{retrying ? '进入中...' : '重试'}</button>}
           <button className="primary-action" onClick={() => void onReturn()}>回到首页</button>
         </div>
       </section>
@@ -2414,6 +3031,7 @@ async function invalidateGameQueries(queryClient: ReturnType<typeof useQueryClie
     queryClient.invalidateQueries({ queryKey: ['inventory', token] }),
     queryClient.invalidateQueries({ queryKey: ['quests', token] }),
     queryClient.invalidateQueries({ queryKey: ['leaderboard', token] }),
+    queryClient.invalidateQueries({ queryKey: ['recharge-dashboard', token] }),
   ]);
 }
 
@@ -2544,6 +3162,10 @@ function uniqueDropTypes(drops: DropPreview[]) {
     .sort((left, right) => dropTypeRank(left) - dropTypeRank(right));
 }
 
+function combinedDropChance(drops: DropPreview[]) {
+  return 1 - drops.reduce((missChance, drop) => missChance * (1 - Math.max(0, Math.min(1, drop.dropRate))), 1);
+}
+
 function dropTypeRank(type: string) {
   const order = ['weapon', 'helmet', 'armor', 'legs', 'boots', 'gloves', 'necklace', 'ring'];
   const index = order.indexOf(type);
@@ -2599,11 +3221,18 @@ function screenForQuestTarget(target?: string) {
   return 'home';
 }
 
-function dungeonRisk(combatPower: number, recommendedPower: number) {
+function dungeonRisk(combatPower: number, recommendedPower: number, playerLevel = 0, recommendedLevel = 0) {
   if (!combatPower) {
     return { label: '读取中', level: 'unknown' };
   }
   const ratio = combatPower / Math.max(1, recommendedPower);
+  const levelGap = playerLevel > 0 && recommendedLevel > 0 ? recommendedLevel - playerLevel : 0;
+  if (levelGap >= 8) {
+    return { label: '极危', level: 'deadly' };
+  }
+  if (levelGap >= 4 && ratio < 1.2) {
+    return { label: '危险', level: 'risky' };
+  }
   if (ratio >= 1.2) {
     return { label: '碾压', level: 'safe' };
   }
@@ -2616,6 +3245,18 @@ function dungeonRisk(combatPower: number, recommendedPower: number) {
   return { label: '极危', level: 'deadly' };
 }
 
+function dungeonMatchesLevelFilter(dungeon: Dungeon, filter: DungeonLevelFilter) {
+  if (filter === 'all') {
+    return true;
+  }
+  const [minLevel, maxLevel] = filter.split('-').map(Number);
+  return dungeon.recommendedLevel >= minLevel && dungeon.recommendedLevel <= maxLevel;
+}
+
+function isSpecialDungeon(dungeon: Dungeon) {
+  return dungeon.id.startsWith('special_');
+}
+
 function qualityName(quality: string) {
   const names: Record<string, string> = {
     common: '普通',
@@ -2623,6 +3264,7 @@ function qualityName(quality: string) {
     rare: '稀有',
     epic: '史诗',
     legendary: '传说',
+    immortal: '不朽',
   };
   return names[quality] ?? quality;
 }
@@ -2631,7 +3273,10 @@ function battleLogTone(log: string) {
   if (log.includes('倒下') || log.includes('中止') || log.includes('危险')) {
     return 'danger';
   }
-  if (log.includes('获得装备')) {
+  if (log.includes('不朽')) {
+    return 'immortal-loot';
+  }
+  if (log.includes('传说') || log.includes('获得装备')) {
     return 'loot';
   }
   if (log.includes('击败') || log.includes('暴击')) {
@@ -2674,6 +3319,7 @@ function sortItems(items: Item[], sort: string) {
 
 function qualityRank(quality: string) {
   const ranks: Record<string, number> = {
+    immortal: 6,
     legendary: 5,
     epic: 4,
     rare: 3,
@@ -2688,10 +3334,15 @@ function formatNumber(value: number) {
 }
 
 function formatChatTime(value: string) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
+
+function pad2(value: number) {
+  return value.toString().padStart(2, '0');
 }
 
 function formatRelativeTime(value: string) {
@@ -2721,7 +3372,7 @@ function formatMarketActivityTime(activity: { createdAt?: string; minutesAgo?: n
 
 function announcementKindName(kind: string) {
   const names: Record<string, string> = {
-    loot: '传说掉落',
+    loot: '高阶掉落',
     enhance: '强化突破',
     level: '等级提升',
     system: '世界通告',
@@ -2733,7 +3384,7 @@ function robotActivityKindName(kind: string) {
   const names: Record<string, string> = {
     dungeon: '打副本',
     enhance: '强化装备',
-    legendary: '传说掉落',
+    legendary: '高阶掉落',
     market_watch: '逛商会',
     market_list: '上架装备',
     market_buy: '购买装备',
@@ -2742,6 +3393,15 @@ function robotActivityKindName(kind: string) {
     rest: '休息',
   };
   return names[kind] ?? '后台活动';
+}
+
+function rechargeReasonName(sourceAction: string) {
+  const names: Record<string, string> = {
+    player_wallet: '手动充值',
+    robot_enhance: '强化补金',
+    robot_market_buy: '市场补金',
+  };
+  return names[sourceAction] ?? '充值';
 }
 
 function emptyMarketFilters(): MarketFilters {
@@ -2831,6 +3491,11 @@ function targetEquipSlot(item: Item, equippedItems: Record<string, Item>) {
     return 'ring2';
   }
   return 'ring1';
+}
+
+function itemLocationLabel(item: Item, equippedItems: Record<string, Item>) {
+  const equippedSlot = Object.entries(equippedItems).find(([, equippedItem]) => equippedItem.id === item.id)?.[0];
+  return equippedSlot ? `已穿戴 · ${slotName(equippedSlot)}` : typeName(item.itemType);
 }
 
 function isEquipmentUpgrade(item: Item, equippedItems: Record<string, Item>) {
@@ -2970,18 +3635,47 @@ function originForItem(templateId: string) {
 }
 
 function itemPower(item: Pick<EquipmentDetailData, 'attackBonus' | 'defenseBonus' | 'hpBonus' | 'mpBonus' | 'critBonus' | 'enhancementLevel' | 'quality'>) {
+  const level = item.enhancementLevel ?? 0;
   return Math.max(
     1,
     Math.round(
-      item.attackBonus * 12
-      + item.defenseBonus * 8
-      + item.hpBonus / 2
-      + item.mpBonus / 2
-      + (item.critBonus ?? 0) * 900
-      + item.enhancementLevel * 18
+      enhancedStatValue(item.attackBonus, level) * 12
+      + enhancedStatValue(item.defenseBonus, level) * 8
+      + enhancedStatValue(item.hpBonus, level) / 2
+      + enhancedStatValue(item.mpBonus, level) / 2
+      + enhancedCritValue(item.critBonus ?? 0, level) * 900
+      + level * 18
       + qualityRank(item.quality) * 12,
     ),
   );
+}
+
+function enhancedStatValue(value: number, level: number) {
+  if (value <= 0) {
+    return 0;
+  }
+  let result = Math.round(value * (1 + level * 0.03));
+  if (level >= 5) {
+    result += Math.max(1, Math.floor(value / 10));
+  }
+  if (level >= 10) {
+    result += Math.max(1, Math.floor(value / 8));
+  }
+  if (level >= 15) {
+    result += Math.max(1, Math.floor(value / 5));
+  }
+  return result;
+}
+
+function enhancedCritValue(value: number, level: number) {
+  let result = value * (1 + level * 0.03);
+  if (level >= 10) {
+    result += 0.01;
+  }
+  if (level >= 15) {
+    result += 0.02;
+  }
+  return result;
 }
 
 function marketPriceEstimate(item: Pick<EquipmentDetailData, 'attackBonus' | 'defenseBonus' | 'hpBonus' | 'mpBonus' | 'critBonus' | 'enhancementLevel' | 'quality' | 'sellPrice' | 'requiredLevel'>) {
