@@ -24,6 +24,24 @@ iOS 单机 RPG 游戏 — 西方魔幻题材，2D 像素风，即时动作战斗
 - [商店 & 拍卖场](docs/specs/08-shop-auction.md)
 - [UI 设计规范](docs/specs/09-ui-design-guidelines.md)
 
+## Spec Kit 迁移上下文
+
+当前仓库已引入 GitHub Spec Kit 风格的长期维护文档：
+
+- [项目宪章](.specify/memory/constitution.md)
+- [项目上下文](.specify/memory/project-context.md)
+- [H5 + Java 后端迁移 Spec](specs/001-h5-java-backend-migration/spec.md)
+- [H5 + Java 后端迁移技术方案](specs/001-h5-java-backend-migration/plan.md)
+- [H5 + Java 后端迁移任务拆解](specs/001-h5-java-backend-migration/tasks.md)
+
+## H5 + Java 本地开发
+
+迁移实现已开始落在新目录：
+
+- `backend/`：Spring Boot 后端，使用本机 MySQL + Redis
+- `web/`：Vite + React + TypeScript 移动 H5 客户端
+- [本地启动说明](docs/dev/local-h5-java-setup.md)
+
 ## 进度
 
 - [路线图](docs/progress/ROADMAP.md)
