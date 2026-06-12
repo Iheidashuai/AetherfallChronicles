@@ -2647,10 +2647,14 @@ body {
 
 .transfer-panel {
   overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  gap: 12px;
 }
 
 .transfer-columns {
   min-height: 0;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
@@ -2658,6 +2662,8 @@ body {
 
 .transfer-column {
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2670,8 +2676,8 @@ body {
 }
 
 .transfer-list {
+  flex: 1 1 auto;
   min-height: 0;
-  max-height: 320px;
   overflow: auto;
   display: grid;
   align-content: start;
@@ -2708,9 +2714,15 @@ body {
 }
 
 .transfer-preview {
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.transfer-panel .modal-warning,
+.transfer-panel .result-modal-actions {
+  margin-top: 0;
 }
 
 .equipped-slot-card {

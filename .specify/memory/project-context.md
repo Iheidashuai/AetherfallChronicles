@@ -1,6 +1,23 @@
 # Project Context
 
-Last reviewed: 2026-06-07
+Last reviewed: 2026-06-08
+
+## Project Maintenance Mode
+
+This is a single-player learning game project. Keep the project in the latest
+playable state, and prefer simple direct changes over production-style
+compatibility work.
+
+- Destructive upgrades are acceptable. It is fine to stop the app, clean local
+  data, rewrite schema/config/seed logic, and restart.
+- Do not maintain long database migration chains or backward-compatible local
+  upgrade paths unless the user explicitly asks.
+- Do not optimize for production rollout concerns such as blue/green deploys,
+  historical save-data preservation, or rollback plans.
+- The active database schema is the latest mutable Flyway file:
+  `backend-ddd/mythic-realm-starter/src/main/resources/db/migration/V1__latest_schema.sql`.
+- Startup may clean and rebuild the local database when Flyway history does not
+  match the latest schema.
 
 ## Current Repository Shape
 
@@ -23,7 +40,7 @@ The repository now uses a complete DDD (Domain-Driven Design) architecture:
 **Backend** (`backend-ddd/`):
 - **架构**: DDD 四层架构 (Domain/Application/Infrastructure/Interface)
 - **技术**: Spring Boot 3.3.0, Java 21, Maven multi-module
-- **数据层**: JdbcTemplate (not JPA), Flyway migrations
+- **数据层**: JdbcTemplate (not JPA), single latest Flyway schema for local rebuilds
 - **事件驱动**: Spring Events for cross-domain communication
 - **模块数**: 15 个独立模块
   - `mythic-realm-common` - 公共模块 (领域事件、异常)
@@ -62,7 +79,7 @@ Implemented gameplay surface:
 - Quest progress and reward claims from dungeon, inventory, market, enhancement, chat, and leaderboard events.
 - Market listing, cancel, robot/player purchase.
 - World chat with durable robot/system/player messages.
-- Leaderboard with 100+ robot profiles and the current player inserted into rank order.
+- Leaderboard with 200 robot profiles and the current player inserted into rank order.
 
 ## Durable Product Decisions
 
@@ -71,7 +88,8 @@ Implemented gameplay surface:
 - Chat must open at the latest messages with the input visible and fixed at the bottom of the chat workspace. History is reached by scrolling upward.
 - Inventory must expose bulk sell by specific quality: common, uncommon, rare, epic, legendary. Category filters can scope which item types are affected.
 - Dungeon difficulty must respect combat power. Low-power players should fail or partially progress in high-power dungeons; rewards should reflect actual kills and success.
-- World activity should feel populated. Maintain at least 100 robot profiles for leaderboard/social surfaces unless the design explicitly changes.
+- World activity should feel populated. Maintain 200 robot profiles for leaderboard/social surfaces unless the design explicitly changes.
+- Future gameplay features should consider the robot decision engine. If a feature should affect robot leveling, dungeon runs, equipment, enhancement, market behavior, recharge simulation, or chat, update robot context/actions/logging as part of the feature.
 - Product Design direction: quiet, dense, game-operations web UI with clear panels, quality color coding, compact action controls, and horizontal comparison space.
 
 ## Long-Term Maintenance Rule

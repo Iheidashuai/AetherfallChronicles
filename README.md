@@ -38,6 +38,7 @@ H5 + Java 后端的西方魔幻题材菜单 RPG。
 
 - [项目宪章](.specify/memory/constitution.md)
 - [项目上下文](.specify/memory/project-context.md)
+- [AI 代理上下文](AGENTS.md)
 - [H5 + Java 后端迁移 Spec](specs/001-h5-java-backend-migration/spec.md)
 - [H5 + Java 后端迁移技术方案](specs/001-h5-java-backend-migration/plan.md)
 - [H5 + Java 后端迁移任务拆解](specs/001-h5-java-backend-migration/tasks.md)

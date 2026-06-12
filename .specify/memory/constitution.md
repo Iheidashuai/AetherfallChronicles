@@ -1,8 +1,9 @@
 # MythicRealm Constitution
 
-Version: 1.0.0
+Version: 1.1.0
 Ratified: 2026-06-06
-Scope: iOS-to-H5 migration, Java backend, game economy, long-term agent maintenance
+Amended: 2026-06-08
+Scope: single-player learning game, H5 client, Java backend, game economy, long-term agent maintenance
 
 ## Core Principles
 
@@ -12,7 +13,7 @@ Experience, gold, item generation, enhancement, market settlement, quest rewards
 
 ### 2. Config-Driven Game Domain
 
-Items, monsters, dungeons, quests, drop tables, bot profiles, economy constants, and UI-facing labels MUST be versioned configuration. Runtime code should consume typed config objects instead of embedding balance numbers in controllers or views. Every config change that can affect rewards or markets MUST carry a version and rollback path.
+Items, monsters, dungeons, quests, drop tables, bot profiles, economy constants, and UI-facing labels SHOULD be config-driven where that keeps iteration simple. Runtime code should consume typed config objects instead of embedding large balance tables in controllers or views. This is a single-player learning project, so config/schema changes do not need production rollback paths unless explicitly requested.
 
 ### 3. Incremental Vertical Migration
 
@@ -34,18 +35,27 @@ Core domain rules MUST have unit tests. API behavior MUST have integration tests
 
 Long-running decisions MUST be recorded in `.specify/memory` or the active `specs/NNN-*` folder. Agents and maintainers MUST read the constitution and active spec before implementation. If code diverges from specs, update the spec or file a task to fix the code.
 
+## Local Learning Project Rule
+
+This project prioritizes fast playable iteration over production migration
+discipline. Destructive local upgrades are acceptable: agents may rewrite the
+latest schema, clean local data, and rebuild on restart. Do not add migration
+compatibility layers, historical save-data preservation, or rollout machinery
+unless the user explicitly asks.
+
 ## Governance
 
 - New large features start with `spec.md`, then `plan.md`, then `tasks.md`.
 - Any stack change affecting Java version, Spring Boot major version, database version, frontend framework, or game authority boundary needs an ADR section in the active plan or a new spec.
 - Every implementation task must map back to a requirement or migration phase.
-- Tests may be intentionally deferred only when the task records the residual risk and a follow-up task.
+- Tests should scale with risk and blast radius. For narrow learning-project changes, compile/startup verification and focused manual checks are acceptable when full automated coverage would slow iteration more than it helps.
 
 ## Current Decision Baseline
 
 - H5 shell: TypeScript, React, Vite, desktop-first responsive workbench UI.
 - Optional action-combat renderer: Phaser, loaded only for battle scenes when needed.
 - Backend: Java + Spring Boot modular monolith.
-- Database: MySQL for durable state, Redis for cache, locks, sessions, ranked views, and recent message buffers.
+- Database: MySQL for local durable state, Redis for cache, locks, sessions, ranked views, and recent message buffers.
 - Local development services: use locally installed MySQL and Redis; do not use Docker for this project unless this constitution is amended.
 - Architecture style: server-authoritative, config-driven, transactional modular monolith before microservices.
+- Database evolution: keep one latest mutable Flyway schema (`V1__latest_schema.sql`) and allow local clean/rebuild on mismatch.
