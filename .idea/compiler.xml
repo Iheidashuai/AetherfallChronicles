@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="mythic-realm-domain-quest" />
+        <module name="mythic-realm-domain-player" />
+        <module name="mythic-realm-infrastructure" />
+        <module name="mythic-realm-domain-robot" />
+        <module name="mythic-realm-api" />
+        <module name="mythic-realm-domain-leaderboard" />
+        <module name="mythic-realm-domain-chat" />
+        <module name="mythic-realm-domain-dungeon" />
+        <module name="mythic-realm-domain-enhancement" />
+        <module name="mythic-realm-domain-inventory" />
+        <module name="mythic-realm-starter" />
+        <module name="mythic-realm-domain-announcement" />
+        <module name="mythic-realm-domain-equipment" />
+        <module name="mythic-realm-common" />
+        <module name="mythic-realm-domain-market" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="mythicrealm-backend" target="21" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="mythic-realm-api" options="-parameters" />
+      <module name="mythic-realm-common" options="-parameters" />
+      <module name="mythic-realm-domain-announcement" options="-parameters" />
+      <module name="mythic-realm-domain-chat" options="-parameters" />
+      <module name="mythic-realm-domain-dungeon" options="-parameters" />
+      <module name="mythic-realm-domain-enhancement" options="-parameters" />
+      <module name="mythic-realm-domain-equipment" options="-parameters" />
+      <module name="mythic-realm-domain-inventory" options="-parameters" />
+      <module name="mythic-realm-domain-leaderboard" options="-parameters" />
+      <module name="mythic-realm-domain-market" options="-parameters" />
+      <module name="mythic-realm-domain-player" options="-parameters" />
+      <module name="mythic-realm-domain-quest" options="-parameters" />
+      <module name="mythic-realm-domain-robot" options="-parameters" />
+      <module name="mythic-realm-infrastructure" options="-parameters" />
+      <module name="mythic-realm-starter" options="-parameters" />
+      <module name="mythicrealm-backend" options="-parameters" />
+    </option>
+  </component>
+</project>

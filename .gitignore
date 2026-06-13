@@ -15,3 +15,20 @@ xcuserdata/
 
 # Local assistant/session settings
 .claude/settings.local.json
+
+# Java backend
+backend/target/
+backend/.m2/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# H5 frontend
+web/node_modules/
+web/dist/
+web/.vite/
+web/*.tsbuildinfo
+
+# Local environment
+.env
+.env.*
+!.env.example
+.local/

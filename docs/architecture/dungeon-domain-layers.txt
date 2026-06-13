@@ -1,0 +1,144 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            INTERFACE LAYER                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  DungeonController                                                          │
+│    ├─ GET  /api/dungeons                  → getDungeonPreviews()           │
+│    ├─ POST /api/dungeons/{id}/run         → runDungeon()                   │
+│    └─ POST /api/dungeons/{id}/sweep       → sweepDungeon()                 │
+│                                                                             │
+│  DTOs                                                                       │
+│    ├─ DungeonResultDTO                                                     │
+│    ├─ DungeonSweepResultDTO                                                │
+│    └─ DungeonProgressPreviewDTO                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          APPLICATION LAYER                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  DungeonApplicationService                                                  │
+│    ├─ runDungeon(RunDungeonCommand)        → DungeonRun                    │
+│    └─ sweepDungeon(SweepDungeonCommand)    → SweepResult                   │
+│                                                                             │
+│  Commands                                                                   │
+│    ├─ RunDungeonCommand(playerId, dungeonId, requestId)                    │
+│    └─ SweepDungeonCommand(playerId, dungeonId, times, requestId)           │
+│                                                                             │
+│  Responsibilities:                                                          │
+│    ├─ Transaction management                                               │
+│    ├─ Orchestration of domain objects                                      │
+│    ├─ Event publishing                                                     │
+│    └─ Quest integration                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            DOMAIN LAYER                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  AGGREGATES & ENTITIES                                                      │
+│    ├─ Dungeon (Aggregate Root)                                             │
+│    │   ├─ startRun() → DungeonRun                                          │
+│    │   ├─ completeRun()                                                    │
+│    │   └─ Events: DungeonStartedEvent, DungeonCompletedEvent               │
+│    │                                                                        │
+│    └─ DungeonRun (Entity)                                                  │
+│        ├─ recordMonsterKill(exp, gold)                                     │
+│        ├─ addLoot(item)                                                    │
+│        ├─ addLog(log) / addFrame(frame)                                    │
+│        └─ complete(success, rating, hp)                                    │
+│                                                                             │
+│  VALUE OBJECTS                                                              │
+│    ├─ BattleFrame(index, text, tone, roomLabel, hp...)                     │
+│    └─ DungeonRating(S/A/B/C/F) + calculate()                               │
+│                                                                             │
+│  DOMAIN SERVICES                                                            │
+│    ├─ CombatEngine                                                         │
+│    │   └─ simulate() → CombatResult                                        │
+│    │       ├─ Turn-based combat (max 18 rounds)                            │
+│    │       ├─ Damage calculation (variance, crit)                          │
+│    │       ├─ Monster scaling by pressure                                  │
+│    │       └─ Recovery between rooms                                       │
+│    │                                                                        │
+│    ├─ LootCalculator                                                       │
+│    │   └─ calculateLoot() → void                                           │
+│    │       ├─ Process loot tables                                          │
+│    │       ├─ Apply drop rates                                             │
+│    │       └─ Add to DungeonRun                                            │
+│    │                                                                        │
+│    └─ PressureCalculator                                                   │
+│        └─ calculate(powerRatio) → pressure multiplier                      │
+│            ├─ 1.2x+  → 0.85 (easy)                                         │
+│            ├─ 1.0x  → 1.0  (normal)                                        │
+│            ├─ 0.8x  → 1.25 (hard)                                          │
+│            ├─ 0.6x  → 1.75 (very hard)                                     │
+│            └─ <0.6x → 2.55 (extreme)                                       │
+│                                                                             │
+│  DOMAIN EVENTS                                                              │
+│    ├─ DungeonStartedEvent(playerId, dungeonId, dungeonName, requestId)     │
+│    ├─ DungeonCompletedEvent(playerId, dungeonId, success, rating, rewards) │
+│    ├─ MonsterKilledEvent(playerId, dungeonId, count)                       │
+│    └─ ItemDroppedEvent(playerId, dungeonId, itemId, quality)               │
+│                                                                             │
+│  REPOSITORY INTERFACES                                                      │
+│    ├─ DungeonRepository                                                    │
+│    │   ├─ findById() / requireById()                                       │
+│    │   ├─ findAll()                                                        │
+│    │   ├─ hasCleared()                                                     │
+│    │   └─ getClearedDungeonIds()                                           │
+│    │                                                                        │
+│    └─ DungeonRunRepository                                                 │
+│        ├─ save()                                                           │
+│        ├─ findByPlayerAndRequest()                                         │
+│        └─ exists()                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        INFRASTRUCTURE LAYER                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  PERSISTENCE                                                                │
+│    ├─ DungeonRepositoryImpl (uses GameConfigService + JdbcTemplate)        │
+│    ├─ DungeonRunRepositoryImpl (uses JdbcTemplate + ObjectMapper)          │
+│    └─ DungeonRunPO (maps to dungeon_run table)                             │
+│                                                                             │
+│  CONFIGURATION                                                              │
+│    └─ DungeonDomainConfig                                                  │
+│        ├─ @Bean PressureCalculator                                         │
+│        ├─ @Bean LootCalculator                                             │
+│        └─ @Bean CombatEngine                                               │
+│                                                                             │
+│  DATABASE SCHEMA                                                            │
+│    └─ dungeon_run                                                          │
+│        ├─ id, player_id, dungeon_id                                        │
+│        ├─ config_version, request_id                                       │
+│        ├─ success, rating                                                  │
+│        ├─ monsters_killed, exp_gained, gold_gained                         │
+│        ├─ loot_json, result_json                                           │
+│        └─ created_at                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+EXTERNAL DEPENDENCIES (Anti-Corruption Layer via Application Service)
+├─ PlayerService        → Load player, apply rewards
+├─ InventoryService     → Load equipment, calculate combat power, add loot
+├─ GameConfigService    → Load dungeon/monster/item configs
+└─ QuestService         → Record quest events
+
+COMBAT FLOW
+1. Load player + equipment → Calculate combat power
+2. Calculate pressure based on power ratio
+3. For each room:
+   a. For each monster:
+      - Scale HP/attack by pressure
+      - Execute turn-based combat (max 18 rounds)
+      - Apply damage with variance + crits
+      - Check for player death
+      - Award exp/gold on victory
+      - Calculate loot drops
+   b. Recover HP between rooms
+4. Calculate rating (S/A/B/C/F)
+5. Fire domain events
+6. Record quest events
+
+IDEMPOTENCY
+- requestId used for duplicate detection
+- Returns cached result if found in DungeonRunRepository

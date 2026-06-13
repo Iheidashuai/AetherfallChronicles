@@ -1,0 +1,16 @@
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/application/PlayerApplicationService.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/application/command/CreatePlayerCommand.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/application/command/GainExpCommand.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/event/GoldChangedEvent.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/event/PlayerCreatedEvent.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/event/PlayerLeveledUpEvent.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/infrastructure/persistence/PlayerPO.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/infrastructure/persistence/PlayerRepositoryImpl.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/model/Experience.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/model/Gold.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/model/Level.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/model/Player.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/model/PlayerId.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/model/PlayerStats.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/model/Profession.java
+/Users/heidashuai/IdeaProjects/AetherfallChronicles/backend-ddd/mythic-realm-domain-player/src/main/java/com/mythicrealm/domain/player/repository/PlayerRepository.java
