@@ -43,6 +43,7 @@ public class MarketService {
     private final DungeonService dungeonService;
     private final RechargeService rechargeService;
     private final Map<String, String> originCache = new ConcurrentHashMap<>();
+    private final Object robotListingMonitor = new Object();
     private Instant nextMarketPulseAt = Instant.now().plusSeconds(5);
 
     public MarketService(
@@ -260,6 +261,12 @@ public class MarketService {
     }
 
     private void ensureRobotListings(int maxRequiredLevel) {
+        synchronized (robotListingMonitor) {
+            ensureRobotListingsLocked(maxRequiredLevel);
+        }
+    }
+
+    private void ensureRobotListingsLocked(int maxRequiredLevel) {
         Integer activeRobotListings = jdbcTemplate.queryForObject(
             """
             SELECT COUNT(*)

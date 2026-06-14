@@ -9332,30 +9332,30 @@ INSERT INTO dungeon_room_monster (room_id, monster_id, monster_count) VALUES
 
 INSERT INTO item_template
 (id, name, item_type, item_category, quality, required_level, attack_bonus, defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, random_range, description, sell_price, stackable, max_stack, effect_type, effect_value_json, enhance_bonus_rate, min_enhance_level, max_enhance_level) VALUES
-    ('mat_fragment_legendary', 'Legendary Gear Fragment', 'fragment', 'material', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, 'A red-gold shard used to craft legendary caches.', 20, TRUE, 999, 'fragment', NULL, 0, 1, 15),
-    ('mat_fragment_immortal', 'Immortal Gear Fragment', 'fragment', 'material', 'immortal', 1, 0, 0, 0, 0, 0, 0, 0, 'A pale shard used to craft immortal caches.', 60, TRUE, 999, 'fragment', NULL, 0, 1, 15),
-    ('stone_crude', 'Crude Enhancement Stone', 'enhancementStone', 'material', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, 'Adds 5% success chance from +1 to +6.', 12, TRUE, 999, 'enhancementStone', NULL, 0.0500, 1, 6),
-    ('stone_refined', 'Refined Enhancement Stone', 'enhancementStone', 'material', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, 'Adds 8% success chance from +1 to +10.', 24, TRUE, 999, 'enhancementStone', NULL, 0.0800, 1, 10),
-    ('stone_mithril', 'Mithril Enhancement Stone', 'enhancementStone', 'material', 'epic', 20, 0, 0, 0, 0, 0, 0, 0, 'Adds 12% success chance from +4 to +12.', 48, TRUE, 999, 'enhancementStone', NULL, 0.1200, 4, 12),
-    ('stone_starfire', 'Starfire Enhancement Stone', 'enhancementStone', 'material', 'legendary', 40, 0, 0, 0, 0, 0, 0, 0, 'Adds 16% success chance from +7 to +15.', 96, TRUE, 999, 'enhancementStone', NULL, 0.1600, 7, 15),
-    ('stone_dragonblood', 'Dragonblood Enhancement Stone', 'enhancementStone', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0, 0, 'Adds 22% success chance from +10 to +15.', 180, TRUE, 999, 'enhancementStone', NULL, 0.2200, 10, 15),
-    ('potion_stamina_small', 'Small Stamina Potion', 'staminaPotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, 'Restores 20 stamina, capped at 200.', 15, TRUE, 99, 'staminaPotion', '{"amount":20}', 0, 1, 15),
-    ('potion_stamina_medium', 'Medium Stamina Potion', 'staminaPotion', 'consumable', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, 'Restores 50 stamina, capped at 200.', 35, TRUE, 99, 'staminaPotion', '{"amount":50}', 0, 1, 15),
-    ('potion_stamina_large', 'Large Stamina Potion', 'staminaPotion', 'consumable', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, 'Restores 100 stamina, capped at 200.', 80, TRUE, 99, 'staminaPotion', '{"amount":100}', 0, 1, 15),
-    ('potion_strength_low', 'Minor Strength Potion', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 1 strength before high-level caps.', 18, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":1,"maxLevel":30}', 0, 1, 15),
-    ('potion_agility_low', 'Minor Agility Potion', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 1 agility before high-level caps.', 18, TRUE, 99, 'attributePotion', '{"attribute":"agility","amount":1,"maxLevel":30}', 0, 1, 15),
-    ('potion_constitution_low', 'Minor Constitution Potion', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 1 constitution before high-level caps.', 18, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":1,"maxLevel":30}', 0, 1, 15),
-    ('potion_intelligence_low', 'Minor Intelligence Potion', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 1 intelligence before high-level caps.', 18, TRUE, 99, 'attributePotion', '{"attribute":"intelligence","amount":1,"maxLevel":30}', 0, 1, 15),
-    ('potion_spirit_low', 'Minor Spirit Potion', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 1 spirit before high-level caps.', 18, TRUE, 99, 'attributePotion', '{"attribute":"spirit","amount":1,"maxLevel":30}', 0, 1, 15),
-    ('potion_strength_mid', 'Greater Strength Potion', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 2 strength before high-level caps.', 42, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":2,"maxLevel":60}', 0, 1, 15),
-    ('potion_constitution_mid', 'Greater Constitution Potion', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 2 constitution before high-level caps.', 42, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":2,"maxLevel":60}', 0, 1, 15),
-    ('potion_strength_high', 'Exalted Strength Potion', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 3 strength.', 90, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":3,"maxLevel":90}', 0, 1, 15),
-    ('potion_constitution_high', 'Exalted Constitution Potion', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, 'Permanently adds 3 constitution.', 90, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":3,"maxLevel":90}', 0, 1, 15),
-    ('chest_guild_supply', 'Guild Supply Chest', 'chest', 'chest', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, 'Contains stamina potions, low stones, and small fragments.', 45, TRUE, 99, 'chest', NULL, 0, 1, 15),
-    ('chest_forge_cache', 'Forge Cache', 'chest', 'chest', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, 'Contains enhancement stones and crafting fragments.', 90, TRUE, 99, 'chest', NULL, 0, 1, 15),
-    ('chest_spider_trove', 'Spiderwood Trove', 'chest', 'chest', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, 'A dungeon trove with supplies and early rare equipment.', 120, TRUE, 99, 'chest', NULL, 0, 1, 15),
-    ('chest_legendary_cache', 'Legendary Equipment Cache', 'chest', 'chest', 'legendary', 20, 0, 0, 0, 0, 0, 0, 0, 'Opens into legendary gear or high-grade enhancement supplies.', 250, TRUE, 99, 'chest', NULL, 0, 1, 15),
-    ('chest_immortal_cache', 'Immortal Equipment Cache', 'chest', 'chest', 'immortal', 60, 0, 0, 0, 0, 0, 0, 0, 'Opens into immortal gear or dragonblood materials.', 600, TRUE, 99, 'chest', NULL, 0, 1, 15)
+    ('mat_fragment_legendary', '传说装备碎片', 'fragment', 'material', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '可用于合成传说装备宝箱的赤金碎片。', 20, TRUE, 999, 'fragment', NULL, 0, 1, 15),
+    ('mat_fragment_immortal', '不朽装备碎片', 'fragment', 'material', 'immortal', 1, 0, 0, 0, 0, 0, 0, 0, '可用于合成不朽装备宝箱的苍白晶片。', 60, TRUE, 999, 'fragment', NULL, 0, 1, 15),
+    ('stone_crude', '粗制强化石', 'enhancementStone', 'material', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '强化 +1 至 +6 时可用，额外增加 5% 成功率。', 12, TRUE, 999, 'enhancementStone', NULL, 0.0500, 1, 6),
+    ('stone_refined', '精炼强化石', 'enhancementStone', 'material', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, '强化 +1 至 +10 时可用，额外增加 8% 成功率。', 24, TRUE, 999, 'enhancementStone', NULL, 0.0800, 1, 10),
+    ('stone_mithril', '秘银强化石', 'enhancementStone', 'material', 'epic', 20, 0, 0, 0, 0, 0, 0, 0, '强化 +4 至 +12 时可用，额外增加 12% 成功率。', 48, TRUE, 999, 'enhancementStone', NULL, 0.1200, 4, 12),
+    ('stone_starfire', '星火强化石', 'enhancementStone', 'material', 'legendary', 40, 0, 0, 0, 0, 0, 0, 0, '强化 +7 至 +15 时可用，额外增加 16% 成功率。', 96, TRUE, 999, 'enhancementStone', NULL, 0.1600, 7, 15),
+    ('stone_dragonblood', '龙血强化石', 'enhancementStone', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0, 0, '强化 +10 至 +15 时可用，额外增加 22% 成功率。', 180, TRUE, 999, 'enhancementStone', NULL, 0.2200, 10, 15),
+    ('potion_stamina_small', '小瓶疲劳药水', 'staminaPotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 20 点疲劳，疲劳值不会超过 200。', 15, TRUE, 99, 'staminaPotion', '{"amount":20}', 0, 1, 15),
+    ('potion_stamina_medium', '中瓶疲劳药水', 'staminaPotion', 'consumable', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 50 点疲劳，疲劳值不会超过 200。', 35, TRUE, 99, 'staminaPotion', '{"amount":50}', 0, 1, 15),
+    ('potion_stamina_large', '大瓶疲劳药水', 'staminaPotion', 'consumable', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 100 点疲劳，疲劳值不会超过 200。', 80, TRUE, 99, 'staminaPotion', '{"amount":100}', 0, 1, 15),
+    ('potion_strength_low', '初级力量药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点力量，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":1,"maxLevel":30}', 0, 1, 15),
+    ('potion_agility_low', '初级敏捷药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点敏捷，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"agility","amount":1,"maxLevel":30}', 0, 1, 15),
+    ('potion_constitution_low', '初级体质药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点体质，适合低等级阶段补强生存属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":1,"maxLevel":30}', 0, 1, 15),
+    ('potion_intelligence_low', '初级智力药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点智力，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"intelligence","amount":1,"maxLevel":30}', 0, 1, 15),
+    ('potion_spirit_low', '初级精神药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点精神，适合低等级阶段补强续航属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"spirit","amount":1,"maxLevel":30}', 0, 1, 15),
+    ('potion_strength_mid', '中级力量药水', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 2 点力量，适合中等级阶段继续补强主属性。', 42, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":2,"maxLevel":60}', 0, 1, 15),
+    ('potion_constitution_mid', '中级体质药水', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 2 点体质，适合中等级阶段继续补强生存属性。', 42, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":2,"maxLevel":60}', 0, 1, 15),
+    ('potion_strength_high', '高级力量药水', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 3 点力量，是高等级角色的重要属性补剂。', 90, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":3,"maxLevel":90}', 0, 1, 15),
+    ('potion_constitution_high', '高级体质药水', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 3 点体质，是高等级角色的重要生存补剂。', 90, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":3,"maxLevel":90}', 0, 1, 15),
+    ('chest_guild_supply', '公会补给宝箱', 'chest', 'chest', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, '开启后可获得疲劳药水、低阶强化石或少量装备碎片。', 45, TRUE, 99, 'chest', NULL, 0, 1, 15),
+    ('chest_forge_cache', '锻炉秘藏宝箱', 'chest', 'chest', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '开启后可获得强化石和装备碎片，是铁匠铺成长的重要补给。', 90, TRUE, 99, 'chest', NULL, 0, 1, 15),
+    ('chest_spider_trove', '蛛影秘宝箱', 'chest', 'chest', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '蛛影林地出产的副本宝箱，内含补给和早期稀有装备。', 120, TRUE, 99, 'chest', NULL, 0, 1, 15),
+    ('chest_legendary_cache', '传说装备宝箱', 'chest', 'chest', 'legendary', 20, 0, 0, 0, 0, 0, 0, 0, '开启后可获得传说装备或高阶强化补给。', 250, TRUE, 99, 'chest', NULL, 0, 1, 15),
+    ('chest_immortal_cache', '不朽装备宝箱', 'chest', 'chest', 'immortal', 60, 0, 0, 0, 0, 0, 0, 0, '开启后可获得不朽装备或龙血级强化材料。', 600, TRUE, 99, 'chest', NULL, 0, 1, 15)
 ON DUPLICATE KEY UPDATE name = VALUES(name), item_type = VALUES(item_type), item_category = VALUES(item_category), quality = VALUES(quality), required_level = VALUES(required_level), attack_bonus = VALUES(attack_bonus), defense_bonus = VALUES(defense_bonus), resistance_bonus = VALUES(resistance_bonus), hp_bonus = VALUES(hp_bonus), mp_bonus = VALUES(mp_bonus), crit_bonus = VALUES(crit_bonus), random_range = VALUES(random_range), description = VALUES(description), sell_price = VALUES(sell_price), stackable = VALUES(stackable), max_stack = VALUES(max_stack), effect_type = VALUES(effect_type), effect_value_json = VALUES(effect_value_json), enhance_bonus_rate = VALUES(enhance_bonus_rate), min_enhance_level = VALUES(min_enhance_level), max_enhance_level = VALUES(max_enhance_level);
 
 INSERT INTO chest_loot (chest_template_id, reward_template_id, min_quantity, max_quantity, weight) VALUES
@@ -9382,8 +9382,8 @@ INSERT INTO chest_loot (chest_template_id, reward_template_id, min_quantity, max
 ON DUPLICATE KEY UPDATE min_quantity = VALUES(min_quantity), max_quantity = VALUES(max_quantity), weight = VALUES(weight);
 
 INSERT INTO craft_recipe (id, name, result_template_id, result_quantity, required_level, description) VALUES
-    ('recipe_legendary_cache', 'Craft Legendary Equipment Cache', 'chest_legendary_cache', 1, 20, 'Bind 20 legendary fragments into a legendary equipment cache.'),
-    ('recipe_immortal_cache', 'Craft Immortal Equipment Cache', 'chest_immortal_cache', 1, 60, 'Bind 30 immortal fragments into an immortal equipment cache.')
+    ('recipe_legendary_cache', '合成传说装备宝箱', 'chest_legendary_cache', 1, 20, '消耗 20 个传说装备碎片，合成为 1 个传说装备宝箱。'),
+    ('recipe_immortal_cache', '合成不朽装备宝箱', 'chest_immortal_cache', 1, 60, '消耗 30 个不朽装备碎片，合成为 1 个不朽装备宝箱。')
 ON DUPLICATE KEY UPDATE name = VALUES(name), result_template_id = VALUES(result_template_id), result_quantity = VALUES(result_quantity), required_level = VALUES(required_level), description = VALUES(description);
 
 INSERT INTO craft_recipe_cost (recipe_id, item_template_id, quantity) VALUES

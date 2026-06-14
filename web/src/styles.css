@@ -3106,6 +3106,256 @@ body {
   overflow-wrap: anywhere;
 }
 
+.item-catalog-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.catalog-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.item-catalog-workbench {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(210px, 250px) minmax(440px, 1fr) minmax(330px, 390px);
+  gap: 12px;
+}
+
+.catalog-filter-panel,
+.catalog-list-panel,
+.catalog-detail-panel {
+  min-height: 0;
+  overflow: auto;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.095);
+}
+
+.catalog-filter-panel,
+.catalog-list-panel,
+.catalog-detail-panel {
+  padding: 12px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.catalog-filter-panel .section-title,
+.catalog-list-panel .section-title {
+  margin: 0;
+}
+
+.catalog-search {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #8bc7d0;
+}
+
+.catalog-search input {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.catalog-filter-group {
+  display: grid;
+  gap: 8px;
+}
+
+.catalog-filter-group > strong {
+  color: #fff5dc;
+  font-size: 12px;
+}
+
+.catalog-filter-group > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.catalog-filter-group button {
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: rgba(0, 0, 0, 0.16);
+  color: #d8d1c8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.catalog-filter-group button.active {
+  color: #11131a;
+  background: #d5c17a;
+  border-color: rgba(213, 193, 122, 0.75);
+}
+
+.catalog-item-grid {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  align-content: start;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.catalog-item-card {
+  min-height: 126px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 11px;
+  color: #f4f0e8;
+  background: rgba(255, 255, 255, 0.06);
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  gap: 4px 10px;
+  text-align: left;
+}
+
+.catalog-item-card:hover,
+.catalog-item-card.selected {
+  border-color: rgba(139, 199, 208, 0.55);
+  background: rgba(139, 199, 208, 0.1);
+}
+
+.catalog-item-card.selected {
+  box-shadow: inset 0 0 0 1px rgba(139, 199, 208, 0.35);
+}
+
+.catalog-item-card.legendary {
+  border-color: rgba(255, 189, 98, 0.44);
+}
+
+.catalog-item-card.immortal {
+  border-color: rgba(255, 45, 85, 0.5);
+}
+
+.catalog-item-icon {
+  grid-row: 1 / span 3;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #c8f7ff;
+  background: rgba(139, 199, 208, 0.14);
+  border: 1px solid rgba(139, 199, 208, 0.22);
+}
+
+.catalog-item-card .eyebrow,
+.catalog-item-card small {
+  min-width: 0;
+  color: #a8a39e;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.catalog-item-card strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.catalog-detail-panel {
+  position: relative;
+}
+
+.catalog-detail-panel.legendary {
+  border-color: rgba(255, 189, 98, 0.44);
+  background: linear-gradient(135deg, rgba(255, 189, 98, 0.11), rgba(255, 255, 255, 0.05));
+}
+
+.catalog-detail-panel.immortal {
+  border-color: rgba(255, 45, 85, 0.48);
+  background: linear-gradient(135deg, rgba(190, 18, 60, 0.14), rgba(255, 255, 255, 0.05));
+}
+
+.catalog-detail-head {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.catalog-detail-head h2 {
+  margin-top: 4px;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+.catalog-detail-head p {
+  margin-top: 8px;
+}
+
+.catalog-detail-metrics,
+.catalog-stat-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.catalog-detail-metrics .metric strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.catalog-effect-box,
+.catalog-source-box,
+.catalog-stat-list div {
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.catalog-effect-box,
+.catalog-source-box {
+  display: grid;
+  gap: 6px;
+  padding: 11px;
+}
+
+.catalog-effect-box span,
+.catalog-source-box span,
+.catalog-stat-list span,
+.catalog-effect-box small,
+.catalog-source-box small {
+  color: #a8a39e;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.catalog-effect-box strong,
+.catalog-source-box strong {
+  color: #fff5dc;
+  overflow-wrap: anywhere;
+}
+
+.catalog-stat-list div {
+  min-height: 46px;
+  padding: 9px;
+  display: grid;
+  gap: 4px;
+}
+
+.catalog-stat-list strong {
+  color: #d5c17a;
+}
+
 .profile-screen {
   gap: 14px;
 }
@@ -5316,6 +5566,7 @@ button.equipment-chip {
   .create-player-layout,
   .profile-overview,
   .profile-layout,
+  .item-catalog-workbench,
   .inventory-workbench,
   .blacksmith-workbench,
   .forge-status-strip,
@@ -5340,6 +5591,9 @@ button.equipment-chip {
   .forge-list-panel,
   .forge-detail-panel,
   .forge-transfer-preview,
+  .catalog-filter-panel,
+  .catalog-list-panel,
+  .catalog-detail-panel,
   .quest-category-panel,
   .quest-list-panel,
   .quest-detail-panel,
@@ -5363,10 +5617,19 @@ button.equipment-chip {
     overflow: visible;
   }
 
+  .catalog-summary-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .catalog-item-grid {
+    overflow: visible;
+  }
+
   .transfer-columns,
   .transfer-preview,
   .profile-metric-grid,
   .profile-metric-grid.combat,
+  .catalog-detail-metrics,
   .combat-stat-grid,
   .stat-contribution-grid,
   .forge-stat-grid {
@@ -5482,8 +5745,14 @@ button.equipment-chip {
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .catalog-summary-strip,
   .create-key-facts,
   .attribute-meter {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-filter-group > div,
+  .catalog-stat-list {
     grid-template-columns: 1fr;
   }
 

@@ -44,6 +44,31 @@ export type Item = {
   displayName?: string;
 };
 
+export type ItemCatalogItem = {
+  templateId: string;
+  name: string;
+  itemType: string;
+  itemCategory: string;
+  quality: string;
+  requiredLevel: number;
+  attackBonus: number;
+  defenseBonus: number;
+  resistanceBonus: number;
+  hpBonus: number;
+  mpBonus: number;
+  critBonus: number;
+  randomRange: number;
+  description: string;
+  sellPrice: number;
+  stackable: boolean;
+  maxStack: number;
+  effectType?: string | null;
+  effectValueJson?: string | null;
+  enhanceBonusRate: number;
+  minEnhanceLevel: number;
+  maxEnhanceLevel: number;
+};
+
 export type StaminaSnapshot = {
   current: number;
   max: number;
@@ -610,6 +635,7 @@ export const gameApi = {
       token,
     ),
   home: (token: string) => api<HomeSnapshot>('/api/game/home', {}, token),
+  itemCatalog: (token: string) => api<ItemCatalogItem[]>('/api/config/items', {}, token),
   dungeons: (token: string) => api<Dungeon[]>('/api/dungeons', {}, token),
   runDungeon: (token: string, dungeonId: string) =>
     api<DungeonRunResult>(

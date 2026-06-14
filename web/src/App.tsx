@@ -5,12 +5,14 @@ import {
   ArrowUp,
   Backpack,
   Bell,
+  Boxes,
   ChevronRight,
   CircleAlert,
   CircleCheck,
   Clock3,
   Coins,
   FastForward,
+  Filter,
   Gem,
   Gauge,
   Hammer,
@@ -22,6 +24,7 @@ import {
   ScrollText,
   Send,
   Shield,
+  Search,
   Skull,
   ShoppingBag,
   SkipForward,
@@ -43,6 +46,7 @@ import type {
   HomeSnapshot,
   InventorySnapshot,
   Item,
+  ItemCatalogItem,
   DerivedStats,
   LeaderboardEntry,
   LeaderboardEquipment,
@@ -68,6 +72,10 @@ type QuestCategoryFilter = 'all' | 'main' | 'daily' | 'achievement';
 type LeaderboardMetric = 'power' | 'gold' | 'level';
 type ProfessionFilter = 'all' | 'warrior' | 'mage' | 'ranger';
 type MarketSortKey = 'listedAt' | 'level' | 'quality';
+type CatalogCategoryFilter = 'all' | 'equipment' | 'consumable' | 'material' | 'chest';
+type CatalogQualityFilter = 'all' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'immortal';
+type CatalogLevelFilter = 'all' | '1-10' | '11-30' | '31-60' | '61-90';
+type CatalogSortKey = 'quality' | 'level' | 'type';
 type MarketItemTypeFilter = 'all' | 'weapon' | 'helmet' | 'armor' | 'legs' | 'boots' | 'gloves' | 'necklace' | 'ring';
 type MarketQualityFilter = 'all' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'immortal';
 type MarketLedgerTab = 'listed' | 'sold';
@@ -219,6 +227,7 @@ export function App() {
           {screen === 'home' && token && <HomeScreen token={token} />}
           {screen === 'character' && token && <CharacterScreen token={token} />}
           {screen === 'inventory' && token && <InventoryScreen token={token} />}
+          {screen === 'item-catalog' && token && <ItemCatalogScreen token={token} />}
           {screen === 'blacksmith' && token && <BlacksmithScreen token={token} />}
           {screen === 'quests' && token && <QuestScreen token={token} />}
           {screen === 'market' && token && <MarketScreen token={token} />}
@@ -633,6 +642,7 @@ function HomeScreen({ token }: { token: string }) {
           <div className="nav-grid">
             <NavTile icon={<Swords size={20} />} title="副本" detail={`${data.config.dungeonCount} 个副本`} onClick={() => setScreen('dungeons')} />
             <NavTile icon={<Backpack size={20} />} title="背包" detail="穿戴 · 出售 · 强化" onClick={() => setScreen('inventory')} />
+            <NavTile icon={<Boxes size={20} />} title="物品" detail={`${data.config.itemCount} 种图鉴`} onClick={() => setScreen('item-catalog')} />
             <NavTile icon={<Hammer size={20} />} title="铁匠铺" detail="强化 · 转移" onClick={() => setScreen('blacksmith')} />
             <NavTile icon={<ScrollText size={20} />} title="任务" detail="主线 · 日常 · 成就" onClick={() => setScreen('quests')} />
             <NavTile icon={<ShoppingBag size={20} />} title="市场" detail="寄售 · 购买" onClick={() => setScreen('market')} />
@@ -729,6 +739,151 @@ function CharacterScreen({ token }: { token: string }) {
 
       <EquipmentPanel home={data} onSelect={setSelectedEquipment} />
       {selectedEquipment && <ItemDetail item={toEquipmentDetail(selectedEquipment)} onClose={() => setSelectedEquipment(null)} />}
+    </section>
+  );
+}
+
+function ItemCatalogScreen({ token }: { token: string }) {
+  const setScreen = useAppStore((state) => state.setScreen);
+  const [category, setCategory] = useState<CatalogCategoryFilter>('all');
+  const [quality, setQuality] = useState<CatalogQualityFilter>('all');
+  const [level, setLevel] = useState<CatalogLevelFilter>('all');
+  const [sort, setSort] = useState<CatalogSortKey>('quality');
+  const [search, setSearch] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['item-catalog', token],
+    queryFn: () => gameApi.itemCatalog(token),
+  });
+
+  const items = data ?? [];
+  const filteredItems = useMemo(
+    () => filterCatalogItems(items, { category, quality, level, sort, search }),
+    [items, category, quality, level, sort, search],
+  );
+  const selectedItem = filteredItems.find((item) => item.templateId === selectedTemplateId) ?? filteredItems[0] ?? null;
+  const summary = useMemo(() => catalogSummary(items), [items]);
+
+  useEffect(() => {
+    if (filteredItems.length === 0) {
+      if (selectedTemplateId !== null) {
+        setSelectedTemplateId(null);
+      }
+      return;
+    }
+    if (!filteredItems.some((item) => item.templateId === selectedTemplateId)) {
+      setSelectedTemplateId(filteredItems[0].templateId);
+    }
+  }, [filteredItems, selectedTemplateId]);
+
+  if (isLoading) {
+    return <LoadingScreen title="整理物品图鉴" />;
+  }
+  if (error || !data) {
+    return <ErrorScreen message={(error as Error)?.message ?? '物品图鉴加载失败'} />;
+  }
+
+  return (
+    <section className="screen item-catalog-screen">
+      <TopBar title="物品图鉴" onBack={() => setScreen('home')} />
+      <div className="catalog-summary-strip">
+        <Metric label="全部" value={summary.total.toString()} />
+        <Metric label="装备" value={summary.equipment.toString()} />
+        <Metric label="消耗品" value={summary.consumable.toString()} />
+        <Metric label="材料" value={summary.material.toString()} />
+        <Metric label="宝箱" value={summary.chest.toString()} />
+        <Metric label="最高等级" value={`Lv.${summary.maxLevel}`} />
+      </div>
+
+      <div className="item-catalog-workbench">
+        <aside className="catalog-filter-panel">
+          <SectionTitle icon={<Filter size={18} />} title="筛选" />
+          <div className="catalog-search">
+            <Search size={16} />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="搜索名称 / 类型 / 效果"
+              aria-label="搜索物品"
+            />
+          </div>
+
+          <CatalogFilterGroup
+            title="类型"
+            value={category}
+            options={[
+              ['all', '全部'],
+              ['equipment', '装备'],
+              ['consumable', '消耗品'],
+              ['material', '材料'],
+              ['chest', '宝箱'],
+            ]}
+            onChange={(next) => setCategory(next as CatalogCategoryFilter)}
+          />
+          <CatalogFilterGroup
+            title="品质"
+            value={quality}
+            options={[
+              ['all', '全部'],
+              ['common', '普通'],
+              ['uncommon', '优秀'],
+              ['rare', '稀有'],
+              ['epic', '史诗'],
+              ['legendary', '传说'],
+              ['immortal', '不朽'],
+            ]}
+            onChange={(next) => setQuality(next as CatalogQualityFilter)}
+          />
+          <CatalogFilterGroup
+            title="等级段"
+            value={level}
+            options={[
+              ['all', '全部'],
+              ['1-10', 'Lv.1-10'],
+              ['11-30', 'Lv.11-30'],
+              ['31-60', 'Lv.31-60'],
+              ['61-90', 'Lv.61-90'],
+            ]}
+            onChange={(next) => setLevel(next as CatalogLevelFilter)}
+          />
+          <CatalogFilterGroup
+            title="排序"
+            value={sort}
+            options={[
+              ['quality', '品质'],
+              ['level', '等级'],
+              ['type', '类型'],
+            ]}
+            onChange={(next) => setSort(next as CatalogSortKey)}
+          />
+        </aside>
+
+        <section className="catalog-list-panel">
+          <div className="inventory-main-title">
+            <SectionTitle icon={<Boxes size={18} />} title={`${categoryNameForInventory(category)}列表`} />
+            <strong>{filteredItems.length} 种</strong>
+          </div>
+          <div className="catalog-item-grid">
+            {filteredItems.length === 0 && <EmptyState text="当前筛选下没有物品。" />}
+            {filteredItems.map((item) => (
+              <button
+                key={item.templateId}
+                className={`catalog-item-card ${item.quality} ${selectedItem?.templateId === item.templateId ? 'selected' : ''}`}
+                onClick={() => setSelectedTemplateId(item.templateId)}
+              >
+                <div className="catalog-item-icon">
+                  {catalogIconForItem(item)}
+                </div>
+                <span className="eyebrow">{qualityName(item.quality)} · {itemCategoryLabel(item)} · Lv.{item.requiredLevel}</span>
+                <strong className={`quality ${item.quality}`}>{item.name}</strong>
+                <small>{catalogCardText(item)}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <CatalogDetailPanel item={selectedItem} />
+      </div>
     </section>
   );
 }
@@ -3919,6 +4074,87 @@ function LeaderboardCard({ entry, metric, onSelectSpeaker }: { entry: Leaderboar
   );
 }
 
+function CatalogFilterGroup({ title, value, options, onChange }: {
+  title: string;
+  value: string;
+  options: [string, string][];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="catalog-filter-group">
+      <strong>{title}</strong>
+      <div>
+        {options.map(([optionValue, label]) => (
+          <button
+            key={optionValue}
+            className={value === optionValue ? 'active' : ''}
+            onClick={() => onChange(optionValue)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CatalogDetailPanel({ item }: { item: ItemCatalogItem | null }) {
+  if (!item) {
+    return (
+      <aside className="catalog-detail-panel">
+        <EmptyState text="选择一个物品查看详细属性。" />
+      </aside>
+    );
+  }
+
+  const detail = catalogItemToDetail(item);
+  const statRows = catalogStatRows(item);
+  return (
+    <aside className={`catalog-detail-panel ${item.quality}`}>
+      <div className="catalog-detail-head">
+        <div className="detail-gem">
+          <Gem size={28} />
+        </div>
+        <div>
+          <span className="eyebrow">{qualityName(item.quality)} · {itemCategoryLabel(item)} · {typeName(item.itemType)} · Lv.{item.requiredLevel}</span>
+          <h2 className={`quality ${item.quality}`}>{item.name}</h2>
+          <p>{item.description || itemEffectText(detail)}</p>
+        </div>
+      </div>
+
+      <div className="catalog-detail-metrics">
+        <Metric label="售卖价" value={formatNumber(item.sellPrice)} />
+        <Metric label="堆叠" value={item.stackable ? `最多 ${item.maxStack}` : '不可堆叠'} />
+        <Metric label="模板" value={item.templateId} />
+        <Metric label="战力估算" value={isEquipmentItem(item) ? formatNumber(catalogItemPower(item)) : '-'} />
+      </div>
+
+      <div className="catalog-effect-box">
+        <span>物品效果</span>
+        <strong>{itemEffectText(detail)}</strong>
+        {item.effectValueJson && <small>{catalogEffectDetail(item)}</small>}
+      </div>
+
+      {statRows.length > 0 && (
+        <div className="catalog-stat-list">
+          {statRows.map((row) => (
+            <div key={row.label}>
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="catalog-source-box">
+        <span>获取方向</span>
+        <strong>{catalogSourceHint(item)}</strong>
+        <small>{catalogUsageHint(item)}</small>
+      </div>
+    </aside>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="metric">
@@ -4599,6 +4835,209 @@ function categoryNameForInventory(category: string) {
     accessory: '饰品',
   };
   return names[category] ?? '全部';
+}
+
+function catalogSummary(items: ItemCatalogItem[]) {
+  return {
+    total: items.length,
+    equipment: items.filter((item) => isEquipmentItem(item)).length,
+    consumable: items.filter((item) => item.itemCategory === 'consumable').length,
+    material: items.filter((item) => item.itemCategory === 'material').length,
+    chest: items.filter((item) => item.itemCategory === 'chest').length,
+    maxLevel: items.reduce((max, item) => Math.max(max, item.requiredLevel), 1),
+  };
+}
+
+function filterCatalogItems(items: ItemCatalogItem[], filters: {
+  category: CatalogCategoryFilter;
+  quality: CatalogQualityFilter;
+  level: CatalogLevelFilter;
+  sort: CatalogSortKey;
+  search: string;
+}) {
+  const search = filters.search.trim().toLowerCase();
+  return [...items]
+    .filter((item) => filters.category === 'all' || (filters.category === 'equipment' ? isEquipmentItem(item) : item.itemCategory === filters.category))
+    .filter((item) => filters.quality === 'all' || item.quality === filters.quality)
+    .filter((item) => catalogMatchesLevel(item, filters.level))
+    .filter((item) => {
+      if (!search) {
+        return true;
+      }
+      return [
+        item.name,
+        item.templateId,
+        item.itemType,
+        item.itemCategory,
+        qualityName(item.quality),
+        typeName(item.itemType),
+        item.description,
+        catalogCardText(item),
+      ].join(' ').toLowerCase().includes(search);
+    })
+    .sort((left, right) => {
+      if (filters.sort === 'level') {
+        return right.requiredLevel - left.requiredLevel
+          || qualityRank(right.quality) - qualityRank(left.quality)
+          || left.itemType.localeCompare(right.itemType)
+          || left.name.localeCompare(right.name);
+      }
+      if (filters.sort === 'type') {
+        return left.itemCategory.localeCompare(right.itemCategory)
+          || left.itemType.localeCompare(right.itemType)
+          || right.requiredLevel - left.requiredLevel
+          || qualityRank(right.quality) - qualityRank(left.quality)
+          || left.name.localeCompare(right.name);
+      }
+      return qualityRank(right.quality) - qualityRank(left.quality)
+        || right.requiredLevel - left.requiredLevel
+        || left.itemType.localeCompare(right.itemType)
+        || left.name.localeCompare(right.name);
+    });
+}
+
+function catalogMatchesLevel(item: ItemCatalogItem, filter: CatalogLevelFilter) {
+  if (filter === 'all') {
+    return true;
+  }
+  const [minLevel, maxLevel] = filter.split('-').map(Number);
+  return item.requiredLevel >= minLevel && item.requiredLevel <= maxLevel;
+}
+
+function catalogItemToDetail(item: ItemCatalogItem): EquipmentDetailData {
+  return {
+    templateId: item.templateId,
+    name: item.name,
+    displayName: item.name,
+    itemType: item.itemType,
+    itemCategory: item.itemCategory,
+    quality: item.quality,
+    requiredLevel: item.requiredLevel,
+    attackBonus: item.attackBonus,
+    defenseBonus: item.defenseBonus,
+    resistanceBonus: item.resistanceBonus,
+    hpBonus: item.hpBonus,
+    mpBonus: item.mpBonus,
+    critBonus: item.critBonus ?? 0,
+    sellPrice: item.sellPrice,
+    quantity: item.stackable ? 1 : undefined,
+    stackable: item.stackable,
+    effectType: item.effectType ?? undefined,
+    effectValueJson: item.effectValueJson ?? undefined,
+    enhanceBonusRate: item.enhanceBonusRate,
+    minEnhanceLevel: item.minEnhanceLevel,
+    maxEnhanceLevel: item.maxEnhanceLevel,
+    enhancementLevel: 0,
+    enhancementLuck: 0,
+    origin: catalogSourceHint(item),
+    power: isEquipmentItem(item) ? catalogItemPower(item) : 0,
+  };
+}
+
+function catalogItemPower(item: ItemCatalogItem) {
+  return itemPower({
+    attackBonus: item.attackBonus,
+    defenseBonus: item.defenseBonus,
+    resistanceBonus: item.resistanceBonus,
+    hpBonus: item.hpBonus,
+    mpBonus: item.mpBonus,
+    critBonus: item.critBonus ?? 0,
+    enhancementLevel: 0,
+    quality: item.quality,
+    requiredLevel: item.requiredLevel,
+  });
+}
+
+function catalogCardText(item: ItemCatalogItem) {
+  if (isEquipmentItem(item)) {
+    return bonusText(catalogItemToDetail(item));
+  }
+  return itemEffectText(catalogItemToDetail(item));
+}
+
+function catalogIconForItem(item: ItemCatalogItem) {
+  if (isEquipmentItem(item)) {
+    return <Shield size={18} />;
+  }
+  if (item.itemCategory === 'consumable') {
+    return <HeartPulse size={18} />;
+  }
+  if (item.itemCategory === 'material') {
+    return <Gem size={18} />;
+  }
+  return <Package size={18} />;
+}
+
+function catalogStatRows(item: ItemCatalogItem) {
+  const rows = [
+    ['攻击', item.attackBonus],
+    ['防御', item.defenseBonus],
+    ['抗性', item.resistanceBonus],
+    ['生命', item.hpBonus],
+    ['法力', item.mpBonus],
+    ['暴击', item.critBonus ? `${Math.round(item.critBonus * 1000) / 10}%` : ''],
+    ['随机浮动', item.randomRange > 0 ? `±${item.randomRange}` : ''],
+  ] as const;
+  return rows
+    .filter(([, value]) => value !== 0 && value !== '')
+    .map(([label, value]) => ({ label, value: typeof value === 'number' ? `+${formatNumber(value)}` : value }));
+}
+
+function catalogEffectDetail(item: ItemCatalogItem) {
+  const effect = parseEffectValue(catalogItemToDetail(item));
+  const entries = Object.entries(effect);
+  if (entries.length === 0) {
+    return '';
+  }
+  return entries
+    .map(([key, value]) => {
+      if (key === 'attribute') {
+        return `属性：${attributeName(String(value))}`;
+      }
+      if (key === 'amount') {
+        return `数值：${value}`;
+      }
+      if (key === 'maxLevel') {
+        return `等级上限：Lv.${value}`;
+      }
+      return `${key}：${value}`;
+    })
+    .join(' · ');
+}
+
+function catalogSourceHint(item: ItemCatalogItem) {
+  if (item.itemCategory === 'chest') {
+    return item.quality === 'legendary' || item.quality === 'immortal' ? '碎片合成与高难任务' : '任务奖励与副本掉落';
+  }
+  if (item.effectType === 'enhancementStone') {
+    return '副本掉落、宝箱和任务奖励';
+  }
+  if (item.effectType === 'fragment') {
+    return '日常活跃、宝箱与高阶副本';
+  }
+  if (item.itemCategory === 'consumable') {
+    return '任务奖励、宝箱和冒险补给';
+  }
+  return item.quality === 'immortal' ? '血月裂隙等特殊副本' : '普通副本、宝箱和市场流转';
+}
+
+function catalogUsageHint(item: ItemCatalogItem) {
+  if (item.effectType === 'enhancementStone') {
+    return `强化 +${item.minEnhanceLevel} 至 +${item.maxEnhanceLevel} 时可用，成功率 +${formatPercent(item.enhanceBonusRate)}`;
+  }
+  if (item.effectType === 'staminaPotion') {
+    return '疲劳不足时使用，恢复值不会超过 200。';
+  }
+  if (item.effectType === 'attributePotion') {
+    return '使用后永久增加角色属性，适合优先补主属性。';
+  }
+  if (item.effectType === 'fragment') {
+    return '积攒到配方数量后可合成传说或不朽装备宝箱。';
+  }
+  if (item.itemCategory === 'chest') {
+    return '开启后按权重产出装备、材料或药水。';
+  }
+  return '用于提升角色战斗力，品质和等级越高基础价值越高。';
 }
 
 function sortItems(items: Item[], sort: string) {

@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
@@ -58,6 +59,7 @@ public class InventoryService {
     private final CombatPowerService combatPowerService;
     private final StaminaService staminaService;
     private final ObjectMapper objectMapper;
+    private final Object slotAllocationMonitor = new Object();
 
     public InventoryService(
         JdbcTemplate jdbcTemplate,
@@ -123,18 +125,51 @@ public class InventoryService {
         return keyHolder.getKey().longValue();
     }
 
-    public ItemRecord addLootToInventory(long playerId, ItemTemplate template, Random random) {
-        if (template.stackable()) {
-            return addStackableItem(playerId, template, 1);
+    private long createItemInInventory(long playerId, ItemTemplate template, Random random) {
+        synchronized (slotAllocationMonitor) {
+            int slot = nextFreeSlot(playerId);
+            long itemId = createItem(playerId, template, random);
+            insertInventorySlot(playerId, slot, itemId);
+            return itemId;
         }
-        int slot = nextFreeSlot(playerId);
-        long itemId = createItem(playerId, template, random);
+    }
+
+    private void addItemToNextFreeSlot(long playerId, long itemId) {
+        synchronized (slotAllocationMonitor) {
+            if (inventorySlot(playerId, itemId).isPresent()) {
+                return;
+            }
+            for (int attempt = 0; attempt < 3; attempt++) {
+                int slot = nextFreeSlot(playerId);
+                try {
+                    insertInventorySlot(playerId, slot, itemId);
+                    return;
+                } catch (DuplicateKeyException error) {
+                    if (inventorySlot(playerId, itemId).isPresent()) {
+                        return;
+                    }
+                    if (attempt == 2) {
+                        throw error;
+                    }
+                }
+            }
+        }
+    }
+
+    private void insertInventorySlot(long playerId, int slot, long itemId) {
         jdbcTemplate.update(
             "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
             playerId,
             slot,
             itemId
         );
+    }
+
+    public ItemRecord addLootToInventory(long playerId, ItemTemplate template, Random random) {
+        if (template.stackable()) {
+            return addStackableItem(playerId, template, 1);
+        }
+        long itemId = createItemInInventory(playerId, template, random);
         return requireItem(itemId);
     }
 
@@ -169,36 +204,33 @@ public class InventoryService {
             );
             return requireItem(stack.id());
         }
-        int slot = nextFreeSlot(playerId);
-        var keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(
-                """
-                INSERT INTO item_instance
-                (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
-                 defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity)
-                VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, ?)
-                """,
-                Statement.RETURN_GENERATED_KEYS
-            );
-            ps.setLong(1, playerId);
-            ps.setString(2, template.id());
-            ps.setString(3, template.name());
-            ps.setString(4, template.type());
-            ps.setString(5, template.quality());
-            ps.setInt(6, template.requiredLevel());
-            ps.setInt(7, template.sellPrice());
-            ps.setInt(8, Math.min(count, Math.max(1, template.maxStack())));
-            return ps;
-        }, keyHolder);
-        long itemId = keyHolder.getKey().longValue();
-        jdbcTemplate.update(
-            "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
-            playerId,
-            slot,
-            itemId
-        );
-        return requireItem(itemId);
+        synchronized (slotAllocationMonitor) {
+            int slot = nextFreeSlot(playerId);
+            var keyHolder = new GeneratedKeyHolder();
+            jdbcTemplate.update(connection -> {
+                PreparedStatement ps = connection.prepareStatement(
+                    """
+                    INSERT INTO item_instance
+                    (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
+                     defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity)
+                    VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, ?)
+                    """,
+                    Statement.RETURN_GENERATED_KEYS
+                );
+                ps.setLong(1, playerId);
+                ps.setString(2, template.id());
+                ps.setString(3, template.name());
+                ps.setString(4, template.type());
+                ps.setString(5, template.quality());
+                ps.setInt(6, template.requiredLevel());
+                ps.setInt(7, template.sellPrice());
+                ps.setInt(8, Math.min(count, Math.max(1, template.maxStack())));
+                return ps;
+            }, keyHolder);
+            long itemId = keyHolder.getKey().longValue();
+            insertInventorySlot(playerId, slot, itemId);
+            return requireItem(itemId);
+        }
     }
 
     private Optional<ItemRecord> findInventoryStack(long playerId, String templateId) {
@@ -236,43 +268,40 @@ public class InventoryService {
         int enhancementLevel,
         int enhancementLuck
     ) {
-        int slot = nextFreeSlot(playerId);
-        var keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(
-                """
-                INSERT INTO item_instance
-                (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
-                 defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity, enhancement_level, enhancement_luck)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-                """,
-                Statement.RETURN_GENERATED_KEYS
-            );
-            ps.setLong(1, playerId);
-            ps.setString(2, templateId);
-            ps.setString(3, name);
-            ps.setString(4, itemType);
-            ps.setString(5, quality);
-            ps.setInt(6, Math.max(1, requiredLevel));
-            ps.setInt(7, Math.max(0, attackBonus));
-            ps.setInt(8, Math.max(0, defenseBonus));
-            ps.setInt(9, Math.max(0, resistanceBonus));
-            ps.setInt(10, Math.max(0, hpBonus));
-            ps.setInt(11, Math.max(0, mpBonus));
-            ps.setBigDecimal(12, BigDecimal.valueOf(Math.max(0, critBonus)));
-            ps.setInt(13, Math.max(1, sellPrice));
-            ps.setInt(14, Math.max(0, enhancementLevel));
-            ps.setInt(15, Math.max(0, enhancementLuck));
-            return ps;
-        }, keyHolder);
-        long itemId = keyHolder.getKey().longValue();
-        jdbcTemplate.update(
-            "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
-            playerId,
-            slot,
-            itemId
-        );
-        return requireItem(itemId);
+        synchronized (slotAllocationMonitor) {
+            int slot = nextFreeSlot(playerId);
+            var keyHolder = new GeneratedKeyHolder();
+            jdbcTemplate.update(connection -> {
+                PreparedStatement ps = connection.prepareStatement(
+                    """
+                    INSERT INTO item_instance
+                    (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
+                     defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity, enhancement_level, enhancement_luck)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    """,
+                    Statement.RETURN_GENERATED_KEYS
+                );
+                ps.setLong(1, playerId);
+                ps.setString(2, templateId);
+                ps.setString(3, name);
+                ps.setString(4, itemType);
+                ps.setString(5, quality);
+                ps.setInt(6, Math.max(1, requiredLevel));
+                ps.setInt(7, Math.max(0, attackBonus));
+                ps.setInt(8, Math.max(0, defenseBonus));
+                ps.setInt(9, Math.max(0, resistanceBonus));
+                ps.setInt(10, Math.max(0, hpBonus));
+                ps.setInt(11, Math.max(0, mpBonus));
+                ps.setBigDecimal(12, BigDecimal.valueOf(Math.max(0, critBonus)));
+                ps.setInt(13, Math.max(1, sellPrice));
+                ps.setInt(14, Math.max(0, enhancementLevel));
+                ps.setInt(15, Math.max(0, enhancementLuck));
+                return ps;
+            }, keyHolder);
+            long itemId = keyHolder.getKey().longValue();
+            insertInventorySlot(playerId, slot, itemId);
+            return requireItem(itemId);
+        }
     }
 
     public List<ItemRecord> inventoryItems(long playerId) {
@@ -338,12 +367,7 @@ public class InventoryService {
         jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ? AND slot_index = ?", player.id(), sourceSlot);
         if (!oldEquipped.isEmpty()) {
             jdbcTemplate.update("DELETE FROM equipment_slot WHERE player_id = ? AND slot_name = ?", player.id(), targetSlot);
-            jdbcTemplate.update(
-                "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
-                player.id(),
-                nextFreeSlot(player.id()),
-                oldEquipped.get(0)
-            );
+            addItemToNextFreeSlot(player.id(), oldEquipped.get(0));
         }
         jdbcTemplate.update(
             "INSERT INTO equipment_slot (player_id, slot_name, item_id) VALUES (?, ?, ?)",
@@ -356,40 +380,37 @@ public class InventoryService {
 
     @Transactional
     public InventorySnapshot equipBest(PlayerRecord player) {
-        List<ItemRecord> candidates = new ArrayList<>(inventoryItems(player.id()).stream().filter(ItemRecord::equipment).toList());
-        candidates.addAll(equippedItems(player.id()).values());
-        if (candidates.isEmpty()) {
+        synchronized (slotAllocationMonitor) {
+            List<ItemRecord> candidates = new ArrayList<>(inventoryItems(player.id()).stream().filter(ItemRecord::equipment).toList());
+            candidates.addAll(equippedItems(player.id()).values());
+            if (candidates.isEmpty()) {
+                return snapshot(player);
+            }
+            Map<String, ItemRecord> bestBySlot = bestEquipmentSet(candidates);
+            Set<Long> equippedIds = bestBySlot.values().stream()
+                .map(ItemRecord::id)
+                .collect(Collectors.toSet());
+
+            jdbcTemplate.update("DELETE FROM equipment_slot WHERE player_id = ?", player.id());
+            jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ?", player.id());
+            for (var entry : bestBySlot.entrySet()) {
+                jdbcTemplate.update(
+                    "INSERT INTO equipment_slot (player_id, slot_name, item_id) VALUES (?, ?, ?)",
+                    player.id(),
+                    entry.getKey(),
+                    entry.getValue().id()
+                );
+            }
+
+            List<ItemRecord> remaining = candidates.stream()
+                .filter(item -> !equippedIds.contains(item.id()))
+                .sorted(sortComparator("quality"))
+                .toList();
+            for (int i = 0; i < remaining.size(); i++) {
+                insertInventorySlot(player.id(), i, remaining.get(i).id());
+            }
             return snapshot(player);
         }
-        Map<String, ItemRecord> bestBySlot = bestEquipmentSet(candidates);
-        Set<Long> equippedIds = bestBySlot.values().stream()
-            .map(ItemRecord::id)
-            .collect(Collectors.toSet());
-
-        jdbcTemplate.update("DELETE FROM equipment_slot WHERE player_id = ?", player.id());
-        jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ?", player.id());
-        for (var entry : bestBySlot.entrySet()) {
-            jdbcTemplate.update(
-                "INSERT INTO equipment_slot (player_id, slot_name, item_id) VALUES (?, ?, ?)",
-                player.id(),
-                entry.getKey(),
-                entry.getValue().id()
-            );
-        }
-
-        List<ItemRecord> remaining = candidates.stream()
-            .filter(item -> !equippedIds.contains(item.id()))
-            .sorted(sortComparator("quality"))
-            .toList();
-        for (int i = 0; i < remaining.size(); i++) {
-            jdbcTemplate.update(
-                "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
-                player.id(),
-                i,
-                remaining.get(i).id()
-            );
-        }
-        return snapshot(player);
     }
 
     @Transactional
@@ -404,14 +425,8 @@ public class InventoryService {
         if (equippedSlots.isEmpty()) {
             throw ApiException.badRequest("只能下架已穿戴的装备");
         }
-        int targetInventorySlot = nextFreeSlot(player.id());
         jdbcTemplate.update("DELETE FROM equipment_slot WHERE player_id = ? AND item_id = ?", player.id(), itemId);
-        jdbcTemplate.update(
-            "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
-            player.id(),
-            targetInventorySlot,
-            itemId
-        );
+        addItemToNextFreeSlot(player.id(), itemId);
         return snapshot(player);
     }
 
@@ -657,19 +672,16 @@ public class InventoryService {
 
     @Transactional
     public InventorySnapshot organize(PlayerRecord player, String sort) {
-        List<ItemRecord> sorted = inventoryItems(player.id()).stream()
-            .sorted(sortComparator(sort))
-            .toList();
-        jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ?", player.id());
-        for (int i = 0; i < sorted.size(); i++) {
-            jdbcTemplate.update(
-                "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
-                player.id(),
-                i,
-                sorted.get(i).id()
-            );
+        synchronized (slotAllocationMonitor) {
+            List<ItemRecord> sorted = inventoryItems(player.id()).stream()
+                .sorted(sortComparator(sort))
+                .toList();
+            jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ?", player.id());
+            for (int i = 0; i < sorted.size(); i++) {
+                insertInventorySlot(player.id(), i, sorted.get(i).id());
+            }
+            return snapshot(player);
         }
-        return snapshot(player);
     }
 
     public int combatPower(PlayerRecord player) {
@@ -749,12 +761,7 @@ public class InventoryService {
     }
 
     public void addExistingItemToInventory(long playerId, long itemId) {
-        jdbcTemplate.update(
-            "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
-            playerId,
-            nextFreeSlot(playerId),
-            itemId
-        );
+        addItemToNextFreeSlot(playerId, itemId);
     }
 
     public void transferItemOwner(long itemId, long playerId) {
