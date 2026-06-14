@@ -3,6 +3,8 @@ package com.mythicrealm.api.gameplay.robot;
 import com.mythicrealm.api.gameplay.dungeon.DungeonService;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
+import com.mythicrealm.api.gameplay.quest.QuestService;
+import com.mythicrealm.api.gameplay.stamina.StaminaService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -17,13 +19,17 @@ public class RobotBrainService {
     private final GameConfigService gameConfigService;
     private final RobotEquipmentService robotEquipmentService;
     private final RobotActionSupport actionSupport;
+    private final StaminaService staminaService;
+    private final QuestService questService;
 
     public RobotBrainService(
         List<RobotDecisionAction> actions,
         JdbcTemplate jdbcTemplate,
         GameConfigService gameConfigService,
         RobotEquipmentService robotEquipmentService,
-        RobotActionSupport actionSupport
+        RobotActionSupport actionSupport,
+        StaminaService staminaService,
+        QuestService questService
     ) {
         this.actions = actions.stream()
             .sorted(Comparator.comparingInt(RobotDecisionAction::priority).reversed())
@@ -32,6 +38,8 @@ public class RobotBrainService {
         this.gameConfigService = gameConfigService;
         this.robotEquipmentService = robotEquipmentService;
         this.actionSupport = actionSupport;
+        this.staminaService = staminaService;
+        this.questService = questService;
     }
 
     public RobotActionResult thinkAndAct(RobotAgent actor, RobotAgent target) {
@@ -62,37 +70,40 @@ public class RobotBrainService {
         DungeonConfig progressionDungeon = chooseProgressionDungeon(actor);
         RobotEquipmentService.EnhancementOpportunity enhancementOpportunity = robotEquipmentService.enhancementOpportunity(actor.player());
         long spendableGold = actor.player().gold() + actor.player().realMoney() * 1_000L;
+        long playerId = actor.id();
         return new RobotDecisionContext(
             actor,
             target,
             runnableDungeon,
             progressionDungeon,
             enhancementOpportunity,
-            inventoryCount(actor.id()),
-            activeListings(actor.id()),
-            marketOpportunities(actor.id(), spendableGold),
+            inventoryCount(playerId),
+            activeListings(playerId),
+            marketOpportunities(playerId, spendableGold),
+            staminaService.snapshot(playerId),
+            questService.claimableCount(playerId),
+            questService.firstClaimableQuestId(playerId),
+            effectQuantity(playerId, "staminaPotion"),
+            effectQuantity(playerId, "attributePotion"),
+            categoryQuantity(playerId, "chest"),
+            templateQuantity(playerId, "mat_fragment_legendary"),
+            templateQuantity(playerId, "mat_fragment_immortal"),
+            usableEnhancementStoneCount(playerId, enhancementOpportunity),
             random
         );
     }
 
     private DungeonConfig chooseRunnableDungeon(RobotAgent actor, Random random) {
         List<DungeonConfig> candidates = gameConfigService.dungeons().stream()
-            .filter(dungeon -> dungeon.recommendedLevel() <= Math.max(1, actor.player().level() + 3))
-            .filter(dungeon -> dungeon.recommendedPower() <= Math.max(1, (int) (actor.power() * 1.35)))
+            .filter(dungeon -> dungeon.minimumLevel() <= Math.max(1, actor.player().level()))
+            .filter(dungeon -> dungeon.minimumPower() <= Math.max(1, actor.power()))
             .sorted(Comparator
                 .comparing((DungeonConfig dungeon) -> !DungeonService.isSpecialDungeon(dungeon.id()))
-                .thenComparingInt((DungeonConfig dungeon) -> Math.abs(dungeon.recommendedLevel() - Math.max(1, actor.player().level())))
-                .thenComparingInt(dungeon -> Math.abs(dungeon.recommendedPower() - actor.power()))
+                .thenComparingInt((DungeonConfig dungeon) -> Math.abs(dungeon.minimumLevel() - Math.max(1, actor.player().level())))
+                .thenComparingInt(dungeon -> Math.abs(dungeon.minimumPower() - actor.power()))
                 .thenComparing(DungeonConfig::id))
             .limit(8)
             .toList();
-        if (candidates.isEmpty()) {
-            candidates = gameConfigService.dungeons().stream()
-                .filter(dungeon -> !DungeonService.isSpecialDungeon(dungeon.id()))
-                .sorted(Comparator.comparingInt(DungeonConfig::recommendedLevel).thenComparing(DungeonConfig::id))
-                .limit(3)
-                .toList();
-        }
         if (candidates.isEmpty()) {
             return null;
         }
@@ -101,12 +112,12 @@ public class RobotBrainService {
 
     private DungeonConfig chooseProgressionDungeon(RobotAgent actor) {
         return gameConfigService.dungeons().stream()
-            .filter(dungeon -> dungeon.recommendedLevel() <= Math.max(1, actor.player().level() + 8))
-            .filter(dungeon -> dungeon.recommendedPower() > actor.power() || dungeon.recommendedLevel() > actor.player().level())
+            .filter(dungeon -> dungeon.minimumLevel() <= Math.max(1, actor.player().level() + 8))
+            .filter(dungeon -> dungeon.minimumPower() > actor.power() || dungeon.minimumLevel() > actor.player().level())
             .sorted(Comparator
                 .comparing((DungeonConfig dungeon) -> !DungeonService.isSpecialDungeon(dungeon.id()))
-                .thenComparingInt(DungeonConfig::recommendedLevel)
-                .thenComparingInt(DungeonConfig::recommendedPower)
+                .thenComparingInt(DungeonConfig::minimumLevel)
+                .thenComparingInt(DungeonConfig::minimumPower)
                 .thenComparing(DungeonConfig::id))
             .findFirst()
             .orElse(null);
@@ -145,6 +156,79 @@ public class RobotBrainService {
             Integer.class,
             robotId,
             Math.max(0, spendableGold)
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int effectQuantity(long playerId, String effectType) {
+        Integer count = jdbcTemplate.queryForObject(
+            """
+            SELECT COALESCE(SUM(ii.quantity), 0)
+            FROM inventory_slot s
+            JOIN item_instance ii ON ii.id = s.item_id
+            JOIN item_template it ON it.id = ii.template_id
+            WHERE s.player_id = ? AND it.effect_type = ?
+            """,
+            Integer.class,
+            playerId,
+            effectType
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int categoryQuantity(long playerId, String itemCategory) {
+        Integer count = jdbcTemplate.queryForObject(
+            """
+            SELECT COALESCE(SUM(ii.quantity), 0)
+            FROM inventory_slot s
+            JOIN item_instance ii ON ii.id = s.item_id
+            JOIN item_template it ON it.id = ii.template_id
+            WHERE s.player_id = ? AND it.item_category = ?
+            """,
+            Integer.class,
+            playerId,
+            itemCategory
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int templateQuantity(long playerId, String templateId) {
+        Integer count = jdbcTemplate.queryForObject(
+            """
+            SELECT COALESCE(SUM(ii.quantity), 0)
+            FROM inventory_slot s
+            JOIN item_instance ii ON ii.id = s.item_id
+            WHERE s.player_id = ? AND ii.template_id = ?
+            """,
+            Integer.class,
+            playerId,
+            templateId
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int usableEnhancementStoneCount(
+        long playerId,
+        RobotEquipmentService.EnhancementOpportunity enhancementOpportunity
+    ) {
+        if (enhancementOpportunity == null) {
+            return effectQuantity(playerId, "enhancementStone");
+        }
+        Integer count = jdbcTemplate.queryForObject(
+            """
+            SELECT COALESCE(SUM(ii.quantity), 0)
+            FROM inventory_slot s
+            JOIN item_instance ii ON ii.id = s.item_id
+            JOIN item_template it ON it.id = ii.template_id
+            WHERE s.player_id = ?
+              AND it.effect_type = 'enhancementStone'
+              AND it.min_enhance_level <= ?
+              AND it.max_enhance_level >= ?
+            """,
+            Integer.class,
+            playerId,
+            enhancementOpportunity.nextLevel(),
+            enhancementOpportunity.nextLevel()
         );
         return count == null ? 0 : count;
     }

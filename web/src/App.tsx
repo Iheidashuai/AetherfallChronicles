@@ -43,6 +43,7 @@ import type {
   HomeSnapshot,
   InventorySnapshot,
   Item,
+  DerivedStats,
   LeaderboardEntry,
   LeaderboardEquipment,
   MarketListing,
@@ -63,6 +64,7 @@ type DungeonMode = 'normal' | 'special';
 type DungeonClearFilter = 'all' | 'uncleared' | 'cleared';
 type DungeonRiskFilter = 'all' | 'safe' | 'normal' | 'risky' | 'deadly';
 type DungeonLevelFilter = 'all' | '1-30' | '31-60' | '61-90';
+type QuestCategoryFilter = 'all' | 'main' | 'daily' | 'achievement';
 type LeaderboardMetric = 'power' | 'gold' | 'level';
 type ProfessionFilter = 'all' | 'warrior' | 'mage' | 'ranger';
 type MarketSortKey = 'listedAt' | 'level' | 'quality';
@@ -70,9 +72,19 @@ type MarketItemTypeFilter = 'all' | 'weapon' | 'helmet' | 'armor' | 'legs' | 'bo
 type MarketQualityFilter = 'all' | 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'immortal';
 type MarketLedgerTab = 'listed' | 'sold';
 type RobotFilterKey = 'name' | 'minGold' | 'maxGold' | 'minPower' | 'maxPower' | 'minLevel' | 'maxLevel';
+type ForgeView = 'enhance' | 'transfer' | 'socket' | 'refine' | 'craft';
 const ANNOUNCEMENT_SEEN_STORAGE_KEY = 'mythic.announcements.seen';
 
+type PowerBreakdownSlice = {
+  key: string;
+  label: string;
+  value: number;
+  detail: string;
+};
+
 type RobotFilters = Record<RobotFilterKey, string>;
+type PlayableProfession = 'warrior' | 'ranger' | 'mage';
+type AttributeKey = 'strength' | 'agility' | 'constitution' | 'intelligence' | 'spirit';
 
 type MarketFilters = {
   minLevel: string;
@@ -88,19 +100,102 @@ type EquipmentDetailData = {
   name: string;
   displayName?: string;
   itemType: string;
+  itemCategory?: string;
   quality: string;
   requiredLevel: number;
   attackBonus: number;
   defenseBonus: number;
+  resistanceBonus: number;
   hpBonus: number;
   mpBonus: number;
   critBonus?: number;
   sellPrice: number;
+  quantity?: number;
+  stackable?: boolean;
+  effectType?: string;
+  effectValueJson?: string;
+  enhanceBonusRate?: number;
+  minEnhanceLevel?: number;
+  maxEnhanceLevel?: number;
   enhancementLevel: number;
   enhancementLuck?: number;
   origin?: string;
   power?: number;
 };
+
+const ATTRIBUTE_LABELS: { key: AttributeKey; label: string; meaning: string }[] = [
+  { key: 'strength', label: '力量', meaning: '物理攻击' },
+  { key: 'agility', label: '敏捷', meaning: '暴击与速度' },
+  { key: 'constitution', label: '体质', meaning: '生命与防御' },
+  { key: 'intelligence', label: '智力', meaning: '法力与法伤' },
+  { key: 'spirit', label: '精神', meaning: '续航与技能' },
+];
+
+const CREATE_PROFESSIONS: {
+  id: PlayableProfession;
+  name: string;
+  title: string;
+  role: string;
+  difficulty: string;
+  tempo: string;
+  survival: string;
+  summary: string;
+  signature: string;
+  attributes: Record<AttributeKey, number>;
+  growth: string[];
+  combat: string[];
+  bestFor: string[];
+  caution: string;
+}[] = [
+  {
+    id: 'warrior',
+    name: '战士',
+    title: '近战守线者',
+    role: '近战 / 坦克',
+    difficulty: '稳健',
+    tempo: '稳步推进',
+    survival: '高',
+    summary: '抗压最强，容错高，适合先熟悉副本节奏。',
+    signature: '力量 + 体质成长',
+    attributes: { strength: 10, agility: 5, constitution: 8, intelligence: 3, spirit: 4 },
+    growth: ['升级额外获得力量与体质', '生命和防御成长更厚', '初期装备容错最高'],
+    combat: ['站得住，适合连续刷普通副本', '面对高压怪物时失误成本低', '输出节奏稳定，爆发不是最高'],
+    bestFor: ['第一次玩，想稳稳推进', '喜欢抗伤害和正面硬碰硬', '想少看攻略也能开荒'],
+    caution: '清怪速度不如爆发职业，需要靠武器和强化补输出。',
+  },
+  {
+    id: 'ranger',
+    name: '射手',
+    title: '远程游击手',
+    role: '远程物理 / 暴击',
+    difficulty: '灵活',
+    tempo: '快节奏',
+    survival: '中',
+    summary: '敏捷最高，暴击成长好，适合刷本和追求效率。',
+    signature: '敏捷 + 力量成长',
+    attributes: { strength: 6, agility: 10, constitution: 5, intelligence: 4, spirit: 5 },
+    growth: ['升级额外获得敏捷与力量', '暴击率随敏捷自然抬升', '更依赖武器和饰品收益'],
+    combat: ['打低风险副本效率好', '适合追求掉落和市场周转', '高压副本要留意推荐战力'],
+    bestFor: ['喜欢快节奏和暴击数字', '愿意比较装备收益', '想兼顾刷本和市场玩法'],
+    caution: '身板较薄，越级挑战时比战士更吃装备。',
+  },
+  {
+    id: 'mage',
+    name: '法师',
+    title: '奥术爆发者',
+    role: '远程魔法 / 爆发',
+    difficulty: '进阶',
+    tempo: '爆发窗口',
+    survival: '低-中',
+    summary: '智力和精神最高，伤害上限高，但前期容错最低。',
+    signature: '智力 + 精神成长',
+    attributes: { strength: 3, agility: 4, constitution: 4, intelligence: 10, spirit: 9 },
+    growth: ['升级额外获得智力与精神', '法力值和技能续航更强', '后期爆发和范围能力突出'],
+    combat: ['适合愿意经营资源的玩家', '装备成型后清场能力强', '前期需要避免硬吃伤害'],
+    bestFor: ['喜欢高爆发和技能流', '愿意研究装备与资源', '能接受前期更脆的开荒'],
+    caution: '生命和防御起点低，初期副本更需要看推荐战力。',
+  },
+];
 
 export function App() {
   const token = useAppStore((state) => state.token);
@@ -116,7 +211,7 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <div className="phone-frame">
+      <div className={`phone-frame${token && screen !== 'auth' ? ' has-global-ticker' : ''}`}>
         {token && screen !== 'auth' && <GlobalTicker announcements={announcementsQuery.data ?? []} />}
         <div className="screen-host">
           {screen === 'auth' && <AuthScreen />}
@@ -204,48 +299,79 @@ function AuthScreen() {
 
 function GlobalTicker({ announcements }: { announcements: GlobalAnnouncement[] }) {
   const [seenKeys, setSeenKeys] = useState<Set<string>>(() => readSeenAnnouncementKeys());
-  const uniqueAnnouncements = announcements.filter((announcement, index, list) =>
-    list.findIndex((item) => item.kind === announcement.kind && item.text === announcement.text) === index
+  const [displayItems, setDisplayItems] = useState<GlobalAnnouncement[]>([]);
+  const uniqueAnnouncements = useMemo(
+    () =>
+      announcements.filter((announcement, index, list) =>
+        list.findIndex((item) => item.kind === announcement.kind && item.text === announcement.text) === index
+      ),
+    [announcements]
   );
-  const items = uniqueAnnouncements.filter((announcement) => !seenKeys.has(announcementSeenKey(announcement)));
-  const itemKeys = items.map(announcementSeenKey).join('|');
-  const displayDuration = items.length <= 1 ? 8000 : Math.min(45000, Math.max(14000, items.length * 7000));
+  const uniqueAnnouncementKeys = uniqueAnnouncements.map(announcementSeenKey).join('|');
+  const displayItemKeys = displayItems.map(announcementSeenKey).join('|');
+  const tickerTextLength = displayItems.reduce(
+    (total, item) => total + announcementKindName(item.kind).length + item.text.length,
+    0
+  );
+  const displayDuration =
+    displayItems.length === 0 ? 8000 : Math.min(60000, Math.max(16000, tickerTextLength * 260));
 
   useEffect(() => {
-    if (!itemKeys) {
+    const activeKeys = new Set(displayItems.map(announcementSeenKey));
+    const nextItems = uniqueAnnouncements.filter((announcement) => {
+      const key = announcementSeenKey(announcement);
+      return !seenKeys.has(key) && !activeKeys.has(key);
+    });
+    if (nextItems.length === 0) {
       return;
     }
-    const keysToMark = itemKeys.split('|').filter(Boolean);
+    const keysToMark = nextItems.map(announcementSeenKey);
+    setDisplayItems((currentItems) => {
+      const currentKeys = new Set(currentItems.map(announcementSeenKey));
+      const itemsToAppend = nextItems.filter((announcement) => !currentKeys.has(announcementSeenKey(announcement)));
+      return [...currentItems, ...itemsToAppend];
+    });
+    setSeenKeys((currentSeenKeys) => {
+      const nextSeenKeys = new Set([...currentSeenKeys, ...keysToMark]);
+      writeSeenAnnouncementKeys(nextSeenKeys);
+      return nextSeenKeys;
+    });
+  }, [displayItemKeys, seenKeys, uniqueAnnouncementKeys, uniqueAnnouncements]);
+
+  useEffect(() => {
+    if (!displayItemKeys) {
+      return;
+    }
     const timeout = window.setTimeout(() => {
-      setSeenKeys((currentSeenKeys) => {
-        const nextSeenKeys = new Set([...currentSeenKeys, ...keysToMark]);
-        writeSeenAnnouncementKeys(nextSeenKeys);
-        return nextSeenKeys;
-      });
+      setDisplayItems([]);
     }, displayDuration);
     return () => window.clearTimeout(timeout);
-  }, [displayDuration, itemKeys]);
+  }, [displayDuration, displayItemKeys]);
 
-  if (items.length === 0) {
-    return null;
-  }
-  const trackClassName = `global-ticker-track${items.length > 1 ? ' is-animated' : ' is-static'}`;
+  const hasUnread = displayItems.length > 0;
+  const trackClassName = `global-ticker-track${displayItems.length > 0 ? ' is-animated' : ' is-static'}`;
   const trackStyle = { '--ticker-duration': `${displayDuration}ms` } as CSSProperties;
   return (
-    <div className="global-ticker">
+    <div className={`global-ticker${hasUnread ? ' has-new' : ''}${displayItems.length === 0 ? ' is-empty' : ''}`}>
       <div className="global-ticker-label">
         <Bell size={16} />
         <strong>全服通告</strong>
       </div>
       <div className="global-ticker-window">
-        <div className={trackClassName} style={trackStyle}>
-          {items.map((item) => (
-            <span key={announcementSeenKey(item)}>
-              <b>{announcementKindName(item.kind)}</b>
-              {item.text}
-            </span>
-          ))}
-        </div>
+        {displayItems.length > 0 ? (
+          <div className={trackClassName} style={trackStyle}>
+            {displayItems.map((item) => (
+              <span key={announcementSeenKey(item)}>
+                <b>{announcementKindName(item.kind)}</b>
+                {item.text}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="global-ticker-track is-static">
+            <span>暂无新通告，世界正在安静地冒险。</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -276,42 +402,187 @@ function writeSeenAnnouncementKeys(keys: Set<string>) {
 function CreatePlayerScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const [name, setName] = useState('灰烬行者');
-  const [profession, setProfession] = useState('warrior');
+  const [profession, setProfession] = useState<PlayableProfession>('warrior');
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const selectedProfession = CREATE_PROFESSIONS.find((option) => option.id === profession) ?? CREATE_PROFESSIONS[0];
 
   const mutation = useMutation({
-    mutationFn: () => gameApi.createPlayer(token, name, profession),
+    mutationFn: () => gameApi.createPlayer(token, name.trim(), profession),
     onSuccess: async () => {
+      window.localStorage.setItem('mythic.hasPlayer', 'true');
       await queryClient.invalidateQueries({ queryKey: ['home', token] });
       setScreen('home');
     },
     onError: (err: Error) => setError(err.message),
   });
+  const canCreate = name.trim().length > 0 && !mutation.isPending;
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (name.trim().length === 0 || mutation.isPending) {
+      return;
+    }
+    mutation.mutate();
+  };
 
   return (
-    <section className="screen result-screen">
+    <section className="screen create-player-screen">
       <TopBar title="创建角色" />
-      <div className="panel lead-panel">
-        <UserRound size={28} />
-        <h2>{professionName(profession)}</h2>
-        <p>角色会立即写入 MySQL，并由服务端发放初始装备。</p>
+      <div className="create-player-layout">
+        <aside className={`create-hero-panel ${selectedProfession.id}`}>
+          <div className="create-hero-head">
+            <span className="profession-emblem">
+              <ProfessionGlyph profession={selectedProfession.id} size={30} />
+            </span>
+            <div>
+              <span className="eyebrow">职业档案</span>
+              <h1>{selectedProfession.name}</h1>
+              <p>{selectedProfession.title}</p>
+            </div>
+          </div>
+
+          <p className="create-hero-summary">{selectedProfession.summary}</p>
+
+          <div className="create-key-facts">
+            <Metric label="定位" value={selectedProfession.role} />
+            <Metric label="难度" value={selectedProfession.difficulty} />
+            <Metric label="生存" value={selectedProfession.survival} />
+            <Metric label="节奏" value={selectedProfession.tempo} />
+          </div>
+
+          <div className="attribute-board">
+            <div className="section-title">
+              <div>
+                <span className="eyebrow">初始属性</span>
+                <h2>创建后真实写入角色档案</h2>
+              </div>
+              <strong>{selectedProfession.signature}</strong>
+            </div>
+            <div className="attribute-meter-list">
+              {ATTRIBUTE_LABELS.map((attribute) => {
+                const value = selectedProfession.attributes[attribute.key];
+                const meterStyle = { '--attribute-value': `${value * 10}%` } as CSSProperties;
+                return (
+                  <div className="attribute-meter" key={attribute.key}>
+                    <div>
+                      <strong>{attribute.label}</strong>
+                      <span>{attribute.meaning}</span>
+                    </div>
+                    <div className="attribute-meter-track" aria-hidden="true">
+                      <span style={meterStyle} />
+                    </div>
+                    <b>{value}</b>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="growth-note">
+            <Sparkles size={18} />
+            <span>{selectedProfession.growth[0]}；每级还会获得 3 点自由属性。</span>
+          </div>
+        </aside>
+
+        <section className="create-choice-panel">
+          <div className="create-choice-head">
+            <div>
+              <span className="eyebrow">选择战斗风格</span>
+              <h2>先决定你想怎样开荒</h2>
+            </div>
+            <p>三种职业都能完整体验副本、装备、强化和市场，只是成长曲线与容错空间不同。</p>
+          </div>
+
+          <div className="profession-card-grid">
+            {CREATE_PROFESSIONS.map((option) => (
+              <button
+                type="button"
+                key={option.id}
+                className={`create-profession-card ${option.id}${option.id === profession ? ' active' : ''}`}
+                aria-pressed={option.id === profession}
+                onClick={() => {
+                  setProfession(option.id);
+                  setError(null);
+                }}
+              >
+                <span className="profession-card-icon">
+                  <ProfessionGlyph profession={option.id} size={24} />
+                </span>
+                <span>
+                  <strong>{option.name}</strong>
+                  <small>{option.role}</small>
+                </span>
+                <b>{option.difficulty}</b>
+              </button>
+            ))}
+          </div>
+
+          <div className="create-detail-grid">
+            <InfoPanel title="战斗方式" items={selectedProfession.combat} />
+            <InfoPanel title="适合你如果" items={selectedProfession.bestFor} />
+            <InfoPanel title="成长重点" items={selectedProfession.growth} />
+            <div className="create-warning-panel">
+              <CircleAlert size={18} />
+              <div>
+                <strong>开荒提醒</strong>
+                <p>{selectedProfession.caution}</p>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-      <div className="segmented three">
-        <button className={profession === 'warrior' ? 'active' : ''} onClick={() => setProfession('warrior')}>战士</button>
-        <button className={profession === 'ranger' ? 'active' : ''} onClick={() => setProfession('ranger')}>射手</button>
-        <button className={profession === 'mage' ? 'active' : ''} onClick={() => setProfession('mage')}>法师</button>
-      </div>
-      <label>
-        角色名
-        <input value={name} onChange={(event) => setName(event.target.value)} />
-      </label>
+
+      <form className="create-footer" onSubmit={handleSubmit}>
+        <label className="create-name-field">
+          角色名
+          <input
+            value={name}
+            maxLength={16}
+            placeholder="输入 2-16 个字符"
+            onChange={(event) => {
+              setName(event.target.value);
+              setError(null);
+            }}
+          />
+        </label>
+        <div className="create-submit-copy">
+          <strong>{selectedProfession.name} · {selectedProfession.role}</strong>
+          <span>创建后写入 MySQL，服务端自动发放初始装备。</span>
+        </div>
+        <button className="primary-action" disabled={!canCreate} type="submit">
+          {mutation.isPending ? '创建中...' : '开始冒险'}
+          <ChevronRight size={18} />
+        </button>
+      </form>
       {error && <FeedbackDialog variant="error" title="创建失败" message={error} onClose={() => setError(null)} />}
-      <button className="primary-action" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
-        {mutation.isPending ? '创建中...' : '开始冒险'}
-        <ChevronRight size={18} />
-      </button>
     </section>
+  );
+}
+
+function ProfessionGlyph({ profession, size = 24 }: { profession: PlayableProfession; size?: number }) {
+  if (profession === 'warrior') {
+    return <Swords size={size} />;
+  }
+  if (profession === 'ranger') {
+    return <Gauge size={size} />;
+  }
+  return <Sparkles size={size} />;
+}
+
+function InfoPanel({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="create-info-panel">
+      <strong>{title}</strong>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>
+            <CircleCheck size={14} />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -350,11 +621,13 @@ function HomeScreen({ token }: { token: string }) {
           <Metric label="余额" value={`${formatNumber(data.player.realMoney)} 元`} />
           <Metric label="背包" value={`${data.inventoryCount}/${data.inventoryCapacity}`} />
         </div>
+        <StaminaPanel stamina={data.stamina} />
       </div>
 
       <div className="home-workbench">
         <aside className="home-column">
-          <EquipmentPanel home={data} onSelect={setSelectedEquipment} />
+          <CombatStatsPanel stats={data.derivedStats} equipmentStats={data.equipmentStats} compact />
+          <EquipmentPanel home={data} onSelect={setSelectedEquipment} compact />
         </aside>
         <section className="home-column">
           <div className="nav-grid">
@@ -392,30 +665,68 @@ function CharacterScreen({ token }: { token: string }) {
   }
 
   const player = data.player;
+  const equippedItems = Object.values(data.equippedItems).filter(Boolean);
+  const powerBreakdown = powerBreakdownForHome(data);
+  const topEquipment = [...equippedItems]
+    .sort((left, right) => itemPower(right) - itemPower(left))
+    .slice(0, 3);
+
   return (
-    <section className="screen character-screen">
+    <section className="screen character-screen profile-screen">
       <TopBar title="角色档案" onBack={() => setScreen('home')} />
-      <div className="profile-header">
-        <UserRound size={34} />
-        <div>
-          <span className="eyebrow">Lv.{player.level} {professionName(player.profession)}</span>
-          <h1>{player.name}</h1>
+      <div className="profile-overview">
+        <div className="profile-identity">
+          <div className="profile-avatar">
+            <ProfessionGlyph profession={player.profession as PlayableProfession} size={30} />
+          </div>
+          <div>
+            <span className="eyebrow">Lv.{player.level} · {professionName(player.profession)}</span>
+            <h1>{player.name}</h1>
+            <p>已穿戴 {equippedItems.length}/{equipmentSlotOrder().length} · 金币 {formatNumber(player.gold)}</p>
+          </div>
+        </div>
+        <div className="profile-power-total">
+          <span>总战力</span>
+          <strong>{formatNumber(data.combatPower)}</strong>
         </div>
       </div>
-      <div className="stat-grid">
-        <Metric label="经验" value={player.experience.toString()} />
-        <Metric label="自由点" value={player.freePoints.toString()} />
-        <Metric label="生命" value={formatNumber(data.maxHp)} />
-        <Metric label="法力" value={formatNumber(data.maxMp)} />
+
+      <div className="profile-layout">
+        <section className="profile-stat-panel">
+          <div className="profile-panel-head">
+            <SectionTitle icon={<UserRound size={18} />} title="基础属性" />
+            <span>{player.freePoints} 自由点</span>
+          </div>
+          <div className="profile-metric-grid">
+            <Metric label="经验" value={formatNumber(player.experience)} />
+            <Metric label="生命" value={formatNumber(data.maxHp)} />
+            <Metric label="法力" value={formatNumber(data.maxMp)} />
+            <Metric label="力量" value={player.strength.toString()} />
+            <Metric label="敏捷" value={player.agility.toString()} />
+            <Metric label="体质" value={player.constitution.toString()} />
+            <Metric label="智力" value={player.intelligence.toString()} />
+            <Metric label="精神" value={player.spirit.toString()} />
+          </div>
+          <div className="profile-panel-head compact">
+            <SectionTitle icon={<Gauge size={18} />} title="战斗属性" />
+          </div>
+          <StatContributionGrid stats={data.derivedStats} baseStats={data.baseStats} equipmentStats={data.equipmentStats} />
+        </section>
+
+        <aside className="profile-power-panel">
+          <div className="profile-panel-head">
+            <SectionTitle icon={<Gauge size={18} />} title="战力来源" />
+            <span>{formatNumber(data.combatPower)}</span>
+          </div>
+          <PowerBreakdownPanel slices={powerBreakdown} total={data.combatPower} />
+          <div className="profile-equipment-source">
+            <span>装备估值</span>
+            <strong>{formatNumber(data.equipmentPower)}</strong>
+            <small>{topEquipment.map((item) => `${typeName(item.itemType)} ${formatNumber(itemPower(item))}`).join(' · ') || '暂无装备'}</small>
+          </div>
+        </aside>
       </div>
-      <div className="attribute-grid">
-        <Metric label="力量" value={player.strength.toString()} />
-        <Metric label="敏捷" value={player.agility.toString()} />
-        <Metric label="体质" value={player.constitution.toString()} />
-        <Metric label="智力" value={player.intelligence.toString()} />
-        <Metric label="精神" value={player.spirit.toString()} />
-        <Metric label="战力" value={data.combatPower.toString()} />
-      </div>
+
       <EquipmentPanel home={data} onSelect={setSelectedEquipment} />
       {selectedEquipment && <ItemDetail item={toEquipmentDetail(selectedEquipment)} onClose={() => setSelectedEquipment(null)} />}
     </section>
@@ -435,10 +746,14 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
   const { data, isLoading, error } = useQuery({
     queryKey: ['dungeons', token],
     queryFn: () => gameApi.dungeons(token),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const homeQuery = useQuery({
     queryKey: ['home', token],
     queryFn: () => gameApi.home(token),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const mutation = useMutation({
     mutationFn: (dungeonId: string) => gameApi.runDungeon(token, dungeonId),
@@ -455,6 +770,16 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
     },
   });
 
+  function refreshDungeonLobby() {
+    void queryClient.invalidateQueries({ queryKey: ['dungeons', token] });
+    void queryClient.invalidateQueries({ queryKey: ['home', token] });
+  }
+
+  function switchDungeonMode(nextMode: DungeonMode) {
+    setMode(nextMode);
+    refreshDungeonLobby();
+  }
+
   if (isLoading) {
     return <LoadingScreen title="读取副本情报" />;
   }
@@ -463,11 +788,12 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
   }
   const combatPower = homeQuery.data?.combatPower ?? 0;
   const playerLevel = homeQuery.data?.player.level ?? 0;
+  const stamina = homeQuery.data?.stamina ?? data.find((dungeon) => dungeon.stamina)?.stamina;
   const normalDungeons = data.filter((dungeon) => !isSpecialDungeon(dungeon));
   const specialDungeons = data.filter(isSpecialDungeon);
   const selectedSpecialDungeon = specialDungeons.find((dungeon) => dungeon.id === selectedSpecialId) ?? specialDungeons[0] ?? null;
   const visibleDungeons = normalDungeons.filter((dungeon) => {
-    const risk = dungeonRisk(combatPower, dungeon.recommendedPower, playerLevel, dungeon.recommendedLevel).level as DungeonRiskFilter;
+    const risk = dungeonRisk(combatPower, dungeon.minimumPower, playerLevel, dungeon.minimumLevel, dungeon.gate).level as DungeonRiskFilter;
     const matchesClear = clearFilter === 'all' || (clearFilter === 'cleared' ? dungeon.cleared : !dungeon.cleared);
     const matchesRisk = riskFilter === 'all' || risk === riskFilter;
     const matchesLevel = dungeonMatchesLevelFilter(dungeon, levelFilter);
@@ -486,13 +812,14 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
           </div>
         </div>
       )}
+      <StaminaPanel stamina={stamina} />
       <div className="dungeon-mode-tabs">
-        <button className={mode === 'normal' ? 'active' : ''} onClick={() => setMode('normal')}>
+        <button className={mode === 'normal' ? 'active' : ''} onClick={() => switchDungeonMode('normal')}>
           <Swords size={16} />
           正常副本
           <small>{normalDungeons.length}</small>
         </button>
-        <button className={mode === 'special' ? 'active bloodmoon' : 'bloodmoon'} onClick={() => setMode('special')}>
+        <button className={mode === 'special' ? 'active bloodmoon' : 'bloodmoon'} onClick={() => switchDungeonMode('special')}>
           <Sparkles size={16} />
           特殊副本
           <small>{specialDungeons.length}</small>
@@ -507,7 +834,10 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
                 ['uncleared', '未通过'],
                 ['cleared', '已通过'],
               ].map(([value, label]) => (
-                <button key={value} className={clearFilter === value ? 'active' : ''} onClick={() => setClearFilter(value as DungeonClearFilter)}>
+                <button key={value} className={clearFilter === value ? 'active' : ''} onClick={() => {
+                  setClearFilter(value as DungeonClearFilter);
+                  refreshDungeonLobby();
+                }}>
                   {label}
                 </button>
               ))}
@@ -520,7 +850,10 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
                 ['risky', '危险'],
                 ['deadly', '极危'],
               ].map(([value, label]) => (
-                <button key={value} className={riskFilter === value ? `active ${value}` : value} onClick={() => setRiskFilter(value as DungeonRiskFilter)}>
+                <button key={value} className={riskFilter === value ? `active ${value}` : value} onClick={() => {
+                  setRiskFilter(value as DungeonRiskFilter);
+                  refreshDungeonLobby();
+                }}>
                   {label}
                 </button>
               ))}
@@ -532,7 +865,10 @@ function DungeonScreen({ token, onResult }: { token: string; onResult: (result: 
                 ['31-60', 'Lv.31-60'],
                 ['61-90', 'Lv.61-90'],
               ].map(([value, label]) => (
-                <button key={value} className={levelFilter === value ? 'active' : ''} onClick={() => setLevelFilter(value as DungeonLevelFilter)}>
+                <button key={value} className={levelFilter === value ? 'active' : ''} onClick={() => {
+                  setLevelFilter(value as DungeonLevelFilter);
+                  refreshDungeonLobby();
+                }}>
                   {label}
                 </button>
               ))}
@@ -604,7 +940,7 @@ function SpecialDungeonPanel({ dungeons, selectedDungeon, combatPower, playerLev
   const highDrops = selectedDungeon.drops.filter((drop) => drop.quality === 'legendary' || drop.quality === 'immortal');
   const legendaryChance = combinedDropChance(highDrops.filter((drop) => drop.quality === 'legendary'));
   const immortalChance = combinedDropChance(highDrops.filter((drop) => drop.quality === 'immortal'));
-  const risk = dungeonRisk(combatPower, selectedDungeon.recommendedPower, playerLevel, selectedDungeon.recommendedLevel);
+  const risk = dungeonRisk(combatPower, selectedDungeon.minimumPower, playerLevel, selectedDungeon.minimumLevel, selectedDungeon.gate);
 
   return (
     <div className="special-dungeon-panel">
@@ -624,13 +960,13 @@ function SpecialDungeonPanel({ dungeons, selectedDungeon, combatPower, playerLev
             onClick={() => onSelect(dungeon.id)}
           >
             <span>阶位 {index + 1}</span>
-            <strong>Lv.{dungeon.recommendedLevel}</strong>
-            <small>{dungeon.recommendedPower}</small>
+            <strong>Lv.{dungeon.minimumLevel}</strong>
+            <small>{dungeon.minimumPower}</small>
           </button>
         ))}
       </div>
       <div className="bloodmoon-stats">
-        <Metric label="推荐战力" value={formatNumber(selectedDungeon.recommendedPower)} />
+        <Metric label="门槛战力" value={formatNumber(selectedDungeon.minimumPower)} />
         <Metric label="传说期望" value={formatDropRate(legendaryChance)} />
         <Metric label="不朽期望" value={formatDropRate(immortalChance)} />
       </div>
@@ -657,12 +993,14 @@ function ResultScreen({ result, onResult }: { result: DungeonRunResult; onResult
   const [visibleFrames, setVisibleFrames] = useState(1);
   const [selectedLoot, setSelectedLoot] = useState<Item | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const battleStageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setVisibleFrames(1);
     setSelectedLoot(null);
     setShowSummary(false);
+    setShowLeaveConfirm(false);
   }, [result]);
 
   useEffect(() => {
@@ -689,11 +1027,21 @@ function ResultScreen({ result, onResult }: { result: DungeonRunResult; onResult
     }
   }, [frames.length, visibleFrames]);
 
-  async function returnHome() {
+  const battlePlaying = visibleFrames < frames.length;
+
+  async function returnToDungeons() {
     if (token) {
       await invalidateGameQueries(queryClient, token);
     }
-    setScreen('home');
+    setScreen('dungeons');
+  }
+
+  function handleBack() {
+    if (battlePlaying) {
+      setShowLeaveConfirm(true);
+      return;
+    }
+    void returnToDungeons();
   }
 
   const retryMutation = useMutation({
@@ -716,7 +1064,7 @@ function ResultScreen({ result, onResult }: { result: DungeonRunResult; onResult
 
   return (
     <section className="screen result-screen combat-screen">
-      <TopBar title="副本战报" onBack={returnHome} />
+      <TopBar title="副本战报" onBack={handleBack} />
 
       <aside className="combat-side">
         <div className={`result-banner ${result.success ? 'win' : 'lose'}`}>
@@ -776,8 +1124,9 @@ function ResultScreen({ result, onResult }: { result: DungeonRunResult; onResult
           <strong>{currentEnemy}</strong>
         </div>
         {frames.slice(0, visibleFrames).map((frame) => (
-          <div key={`${frame.index}-${frame.text}`} className={`battle-line ${frame.tone || battleLogTone(frame.text)}`}>
+          <div key={`${frame.index}-${frame.text}`} className={`battle-line ${frame.tone || battleLogTone(frame.text)} ${frame.eventType ?? ''}`}>
             <span>#{frame.index}</span>
+            <small>{battleEventName(frame)}</small>
             <p>{frame.text}</p>
           </div>
         ))}
@@ -786,10 +1135,24 @@ function ResultScreen({ result, onResult }: { result: DungeonRunResult; onResult
         <ResultSummaryModal
           result={result}
           onClose={() => setShowSummary(false)}
-          onReturn={returnHome}
+          onReturn={returnToDungeons}
           onRetry={!result.success ? () => retryMutation.mutate() : undefined}
           retrying={retryMutation.isPending}
           onSelectLoot={setSelectedLoot}
+        />
+      )}
+      {showLeaveConfirm && (
+        <ConfirmDialog
+          title="战斗仍在展示"
+          message="现在返回会跳过剩余战报和掉落复盘，确定回到副本大厅吗？"
+          confirmLabel="返回大厅"
+          cancelLabel="继续查看"
+          danger
+          onCancel={() => setShowLeaveConfirm(false)}
+          onConfirm={() => {
+            setShowLeaveConfirm(false);
+            void returnToDungeons();
+          }}
         />
       )}
       {selectedLoot && <ItemDetail item={toEquipmentDetail(selectedLoot)} onClose={() => setSelectedLoot(null)} />}
@@ -816,6 +1179,7 @@ function InventoryScreen({ token }: { token: string }) {
   const [enhanceItem, setEnhanceItem] = useState<Item | null>(null);
   const [sellItem, setSellItem] = useState<Item | null>(null);
   const [enhanceMessage, setEnhanceMessage] = useState<string | null>(null);
+  const [selectedStoneIds, setSelectedStoneIds] = useState<number[]>([]);
   const { data, isLoading, error } = useQuery({
     queryKey: ['inventory', token],
     queryFn: () => gameApi.inventory(token),
@@ -872,7 +1236,7 @@ function InventoryScreen({ token }: { token: string }) {
     },
   });
   const enhanceMutation = useMutation({
-    mutationFn: (itemId: number) => gameApi.enhance(token, itemId),
+    mutationFn: ({ itemId, stoneItemIds }: { itemId: number; stoneItemIds: number[] }) => gameApi.enhance(token, itemId, stoneItemIds),
     onMutate: () => {
       setNotice(null);
     },
@@ -883,6 +1247,33 @@ function InventoryScreen({ token }: { token: string }) {
       if (refreshed) {
         setEnhanceItem(refreshed);
       }
+      await invalidateGameQueries(queryClient, token);
+    },
+  });
+  const useItemMutation = useMutation({
+    mutationFn: (item: Item) => gameApi.useItem(token, item.id),
+    onMutate: () => {
+      setNotice(null);
+    },
+    onSuccess: async (result) => {
+      queryClient.setQueryData(['inventory', token], result.inventory);
+      setSelectedStoneIds([]);
+      const rewardText = result.rewards.length > 0
+        ? `，获得 ${result.rewards.map((item) => equipmentDisplayName(item)).join('、')}`
+        : '';
+      const staminaText = result.stamina ? `，疲劳 ${result.stamina.current}/${result.stamina.max}` : '';
+      setNotice(`已使用 ${result.itemName}${rewardText}${staminaText}`);
+      await invalidateGameQueries(queryClient, token);
+    },
+  });
+  const craftMutation = useMutation({
+    mutationFn: (recipeId: string) => gameApi.craftRecipe(token, recipeId),
+    onMutate: () => {
+      setNotice(null);
+    },
+    onSuccess: async (result) => {
+      queryClient.setQueryData(['inventory', token], result.inventory);
+      setNotice(`已合成 ${result.recipeName}`);
       await invalidateGameQueries(queryClient, token);
     },
   });
@@ -917,14 +1308,18 @@ function InventoryScreen({ token }: { token: string }) {
 
   const equipped = equipmentSlotPairs(data.equippedItems);
   const equippedCount = equipped.filter(([, item]) => Boolean(item)).length;
-  const activeTypes = itemTypesForCategory(category);
-  const busy = equipMutation.isPending || equipBestMutation.isPending || unequipMutation.isPending || sellMutation.isPending || enhanceMutation.isPending || bulkSellMutation.isPending || organizeMutation.isPending;
+  const activeTypes = itemTypesForCategory(category === 'all' ? 'equipment' : category);
+  const legendaryFragments = inventoryTemplateQuantity(data.inventory, 'mat_fragment_legendary');
+  const immortalFragments = inventoryTemplateQuantity(data.inventory, 'mat_fragment_immortal');
+  const busy = equipMutation.isPending || equipBestMutation.isPending || unequipMutation.isPending || sellMutation.isPending || enhanceMutation.isPending || useItemMutation.isPending || craftMutation.isPending || bulkSellMutation.isPending || organizeMutation.isPending;
   const inventoryActionError =
     equipMutation.error?.message ??
     equipBestMutation.error?.message ??
     unequipMutation.error?.message ??
     sellMutation.error?.message ??
     enhanceMutation.error?.message ??
+    useItemMutation.error?.message ??
+    craftMutation.error?.message ??
     bulkSellMutation.error?.message ??
     organizeMutation.error?.message;
   const inventoryFeedback = inventoryActionError
@@ -940,6 +1335,8 @@ function InventoryScreen({ token }: { token: string }) {
     unequipMutation.reset();
     sellMutation.reset();
     enhanceMutation.reset();
+    useItemMutation.reset();
+    craftMutation.reset();
     bulkSellMutation.reset();
     organizeMutation.reset();
   }
@@ -1012,6 +1409,7 @@ function InventoryScreen({ token }: { token: string }) {
                       onClick={(event) => {
                         event.stopPropagation();
                         setEnhanceMessage(null);
+                        setSelectedStoneIds([]);
                         setEnhanceItem(item);
                       }}
                     >
@@ -1026,7 +1424,7 @@ function InventoryScreen({ token }: { token: string }) {
 
         <section className="inventory-main">
           <div className="inventory-main-title">
-            <SectionTitle icon={<Sparkles size={18} />} title={`${categoryNameForInventory(category)}装备`} />
+            <SectionTitle icon={<Sparkles size={18} />} title={`${categoryNameForInventory(category)}物品`} />
             <strong>{visibleInventory.length} 件</strong>
           </div>
           <div className="item-grid">
@@ -1035,18 +1433,34 @@ function InventoryScreen({ token }: { token: string }) {
               <ItemCard
                 key={item.id}
                 item={item}
-                powerIncrease={isEquipmentUpgrade(item, data.equippedItems)}
+                powerIncrease={isEquipmentItem(item) && isEquipmentUpgrade(item, data.equippedItems)}
                 onSelect={() => setSelectedItem(item)}
               >
-                <button className="mini-action" disabled={busy} onClick={(event) => {
-                  event.stopPropagation();
-                  setEquipCandidate(item);
-                }}>穿戴</button>
-                <button className="mini-action" disabled={busy} onClick={(event) => {
-                  event.stopPropagation();
-                  setEnhanceMessage(null);
-                  setEnhanceItem(item);
-                }}>强化</button>
+                {isEquipmentItem(item) ? (
+                  <>
+                    <button className="mini-action" disabled={busy} onClick={(event) => {
+                      event.stopPropagation();
+                      setEquipCandidate(item);
+                    }}>穿戴</button>
+                    <button className="mini-action" disabled={busy} onClick={(event) => {
+                      event.stopPropagation();
+                      setEnhanceMessage(null);
+                      setSelectedStoneIds([]);
+                      setEnhanceItem(item);
+                    }}>强化</button>
+                  </>
+                ) : (
+                  <button
+                    className="mini-action"
+                    disabled={busy || !['staminaPotion', 'attributePotion', 'chest'].includes(item.effectType ?? '')}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      useItemMutation.mutate(item);
+                    }}
+                  >
+                    {item.effectType === 'chest' ? '开启' : '使用'}
+                  </button>
+                )}
                 <button className="mini-action danger" disabled={busy} onClick={(event) => {
                   event.stopPropagation();
                   setSellItem(item);
@@ -1065,6 +1479,10 @@ function InventoryScreen({ token }: { token: string }) {
           <div className="segmented filter-tabs">
             {[
               ['all', '全部'],
+              ['equipment', '装备'],
+              ['consumable', '消耗品'],
+              ['material', '材料'],
+              ['chest', '宝箱'],
               ['weapon', '武器'],
               ['armor', '防具'],
               ['accessory', '饰品'],
@@ -1088,6 +1506,17 @@ function InventoryScreen({ token }: { token: string }) {
               organizeMutation.mutate('type');
             }}>类型整理</button>
           </div>
+          <SectionTitle icon={<Package size={18} />} title="碎片合成" />
+          <div className="craft-recipe-list">
+            <button className="recipe-button" disabled={busy || legendaryFragments < 20} onClick={() => craftMutation.mutate('recipe_legendary_cache')}>
+              <strong>传说装备宝箱</strong>
+              <span>{legendaryFragments}/20 传说碎片</span>
+            </button>
+            <button className="recipe-button" disabled={busy || immortalFragments < 30} onClick={() => craftMutation.mutate('recipe_immortal_cache')}>
+              <strong>不朽装备宝箱</strong>
+              <span>{immortalFragments}/30 不朽碎片</span>
+            </button>
+          </div>
           <SectionTitle icon={<Coins size={18} />} title="按品质卖出" />
           <div className="quality-sell-grid">
             {[
@@ -1101,7 +1530,7 @@ function InventoryScreen({ token }: { token: string }) {
               <button
                 key={quality}
                 className={`quality-sell ${quality}`}
-                disabled={busy}
+                disabled={busy || activeTypes.length === 0}
                 onClick={() => bulkSellMutation.mutate({ qualities: [quality], itemTypes: activeTypes })}
               >
                 卖{label}
@@ -1131,8 +1560,13 @@ function InventoryScreen({ token }: { token: string }) {
           onClose={() => {
             setEnhanceItem(null);
             setEnhanceMessage(null);
+            setSelectedStoneIds([]);
           }}
-          onEnhance={() => enhanceMutation.mutate(enhanceItem.id)}
+          stones={enhancementStonesForItem(data.inventory, enhanceItem)}
+          selectedStoneIds={selectedStoneIds}
+          onAddStone={(stoneId) => setSelectedStoneIds((current) => current.length >= 3 ? current : [...current, stoneId])}
+          onRemoveStone={(index) => setSelectedStoneIds((current) => current.filter((_, currentIndex) => currentIndex !== index))}
+          onEnhance={() => enhanceMutation.mutate({ itemId: enhanceItem.id, stoneItemIds: selectedStoneIds })}
         />
       )}
       {sellItem && (
@@ -1158,9 +1592,12 @@ function InventoryScreen({ token }: { token: string }) {
 function BlacksmithScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [activeView, setActiveView] = useState<ForgeView>('enhance');
+  const [focusedItemId, setFocusedItemId] = useState<number | null>(null);
+  const [detailItem, setDetailItem] = useState<Item | null>(null);
   const [enhanceItem, setEnhanceItem] = useState<Item | null>(null);
   const [enhanceMessage, setEnhanceMessage] = useState<string | null>(null);
+  const [selectedStoneIds, setSelectedStoneIds] = useState<number[]>([]);
   const [sourceItemId, setSourceItemId] = useState<number | null>(null);
   const [targetItemId, setTargetItemId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1172,12 +1609,19 @@ function BlacksmithScreen({ token }: { token: string }) {
     if (!data) {
       return [];
     }
-    return sortItems([...Object.values(data.equippedItems), ...data.inventory], 'quality');
+    return sortItems([...Object.values(data.equippedItems), ...data.inventory].filter(isEquipmentItem), 'quality');
   }, [data]);
   const sourceItems = useMemo(() => allEquipment.filter((item) => item.enhancementLevel > 0), [allEquipment]);
+  const targetItems = useMemo(() => allEquipment.filter((item) => item.id !== sourceItemId), [allEquipment, sourceItemId]);
   const selectedSource = allEquipment.find((item) => item.id === sourceItemId) ?? null;
-  const selectedTarget = allEquipment.find((item) => item.id === targetItemId) ?? null;
-  const canTransfer = Boolean(selectedSource && selectedTarget && selectedSource.enhancementLevel > selectedTarget.enhancementLevel);
+  const selectedTarget = targetItems.find((item) => item.id === targetItemId) ?? null;
+  const focusedItem = focusedItemId ? allEquipment.find((item) => item.id === focusedItemId) ?? null : null;
+  const canTransfer = Boolean(
+    selectedSource
+    && selectedTarget
+    && selectedSource.id !== selectedTarget.id
+    && selectedSource.enhancementLevel > selectedTarget.enhancementLevel,
+  );
 
   useEffect(() => {
     if (!data) {
@@ -1186,30 +1630,50 @@ function BlacksmithScreen({ token }: { token: string }) {
     if (sourceItemId && !sourceItems.some((item) => item.id === sourceItemId)) {
       setSourceItemId(null);
     }
-    if (targetItemId && (!allEquipment.some((item) => item.id === targetItemId) || targetItemId === sourceItemId)) {
+    if (targetItemId && !targetItems.some((item) => item.id === targetItemId)) {
       setTargetItemId(null);
     }
-  }, [allEquipment, data, sourceItemId, sourceItems, targetItemId]);
+    if (focusedItemId && !allEquipment.some((item) => item.id === focusedItemId)) {
+      setFocusedItemId(null);
+    }
+    if (detailItem && !allEquipment.some((item) => item.id === detailItem.id)) {
+      setDetailItem(null);
+    }
+  }, [allEquipment, data, detailItem, focusedItemId, sourceItemId, sourceItems, targetItemId, targetItems]);
 
   const enhanceMutation = useMutation({
-    mutationFn: (itemId: number) => gameApi.enhance(token, itemId),
+    mutationFn: ({ itemId, stoneItemIds }: { itemId: number; stoneItemIds: number[] }) => gameApi.enhance(token, itemId, stoneItemIds),
     onMutate: () => {
       setNotice(null);
     },
     onSuccess: async (result) => {
       queryClient.setQueryData(['inventory', token], result.inventory);
+      setSelectedStoneIds([]);
       setEnhanceMessage(result.success ? '强化成功，装备属性已提升。' : '强化失败，幸运值提升，下次成功率提高。');
       const refreshed = [...result.inventory.inventory, ...Object.values(result.inventory.equippedItems)].find((item) => item.id === enhanceItem?.id);
       if (refreshed) {
         setEnhanceItem(refreshed);
+        setFocusedItemId(refreshed.id);
+        if (detailItem?.id === refreshed.id) {
+          setDetailItem(refreshed);
+        }
       }
       await invalidateGameQueries(queryClient, token);
     },
   });
   const transferMutation = useMutation({
     mutationFn: () => {
-      if (!sourceItemId || !targetItemId) {
+      if (sourceItemId == null || targetItemId == null) {
         throw new Error('请选择来源装备和目标装备');
+      }
+      if (sourceItemId === targetItemId) {
+        throw new Error('来源装备和目标装备不能相同');
+      }
+      if (!selectedSource || !selectedTarget) {
+        throw new Error('请选择有效的来源装备和目标装备');
+      }
+      if (selectedTarget.enhancementLevel >= selectedSource.enhancementLevel) {
+        throw new Error('目标装备强化等级必须低于来源装备');
       }
       return gameApi.transferEnhancement(token, sourceItemId, targetItemId);
     },
@@ -1246,90 +1710,234 @@ function BlacksmithScreen({ token }: { token: string }) {
     transferMutation.reset();
   }
 
-  return (
-    <section className="screen blacksmith-screen">
-      <TopBar title="铁匠铺" onBack={() => setScreen('home')} />
-      <div className="blacksmith-workbench">
-        <section className="blacksmith-panel">
-          <div className="inventory-main-title">
-            <SectionTitle icon={<Hammer size={18} />} title="装备强化" />
-            <strong>{data.gold} 金</strong>
-          </div>
-          <div className="item-grid blacksmith-item-grid">
-            {allEquipment.length === 0 && <EmptyState text="当前没有可强化装备。" />}
-            {allEquipment.map((item) => (
-              <ItemCard
-                key={item.id}
-                item={item}
-                label={itemLocationLabel(item, data.equippedItems)}
-                onSelect={() => setSelectedItem(item)}
-              >
-                <button className="mini-action" disabled={busy || item.enhancementLevel >= 15} onClick={(event) => {
-                  event.stopPropagation();
-                  setEnhanceMessage(null);
-                  setEnhanceItem(item);
-                }}>
-                  {item.enhancementLevel >= 15 ? '满级' : '强化'}
-                </button>
-              </ItemCard>
-            ))}
-          </div>
-        </section>
+  function selectTransferSource(item: Item) {
+    setSourceItemId(item.id);
+    setNotice(null);
+    const currentTarget = allEquipment.find((equipment) => equipment.id === targetItemId);
+    if (!currentTarget || currentTarget.id === item.id || currentTarget.enhancementLevel >= item.enhancementLevel) {
+      setTargetItemId(null);
+    }
+  }
 
-        <section className="blacksmith-panel transfer-panel">
-          <div className="inventory-main-title">
-            <SectionTitle icon={<Repeat2 size={18} />} title="强化转移" />
-            <strong>{sourceItems.length} 件可转移</strong>
+  const enhanceableCount = allEquipment.filter((item) => item.enhancementLevel < 15).length;
+  const transferTargetCount = selectedSource
+    ? targetItems.filter((item) => item.enhancementLevel < selectedSource.enhancementLevel).length
+    : targetItems.length;
+  const forgeViews: Array<{ id: ForgeView; title: string; detail: string; icon: ReactNode; badge: string }> = [
+    { id: 'enhance', title: '装备强化', detail: '提升基础属性与战力', icon: <Hammer size={18} />, badge: `${enhanceableCount}` },
+    { id: 'transfer', title: '强化转移', detail: '把高强化继承到低强化装备', icon: <Repeat2 size={18} />, badge: `${sourceItems.length}` },
+    { id: 'socket', title: '宝石镶嵌', detail: '预留功能位', icon: <Gem size={18} />, badge: 'soon' },
+    { id: 'refine', title: '属性洗练', detail: '预留功能位', icon: <Sparkles size={18} />, badge: 'soon' },
+    { id: 'craft', title: '装备打造', detail: '预留功能位', icon: <Package size={18} />, badge: 'soon' },
+  ];
+  const activeForge = forgeViews.find((view) => view.id === activeView) ?? forgeViews[0];
+
+  return (
+    <section className="screen blacksmith-screen forge-screen">
+      <TopBar title="铁匠铺" onBack={() => setScreen('home')} />
+      <div className="forge-status-strip">
+        <div className="forge-status-main">
+          <div className="forge-emblem">
+            <Hammer size={24} />
           </div>
-          <div className="transfer-columns">
-            <div className="transfer-column">
-              <h3>来源装备</h3>
-              <div className="transfer-list">
-                {sourceItems.length === 0 && <EmptyState text="暂无带强化等级的装备。" />}
-                {sourceItems.map((item) => (
-                  <TransferItemOption
-                    key={item.id}
-                    item={item}
-                    selected={item.id === sourceItemId}
-                    onSelect={() => {
-                      setSourceItemId(item.id);
-                      if (targetItemId === item.id) {
-                        setTargetItemId(null);
-                      }
-                    }}
-                  />
-                ))}
-              </div>
+          <div>
+            <span className="eyebrow">工坊状态</span>
+            <h1>装备工坊</h1>
+          </div>
+        </div>
+        <Metric label="金币" value={formatNumber(data.gold)} />
+        <Metric label="装备" value={allEquipment.length.toString()} />
+        <Metric label="可转移" value={sourceItems.length.toString()} />
+      </div>
+
+      <div className="blacksmith-workbench forge-workbench">
+        <aside className="forge-sidebar">
+          <div className="forge-master">
+            <span className="eyebrow">功能台</span>
+            <strong>{activeForge.title}</strong>
+          </div>
+          <nav className="forge-nav">
+            {forgeViews.map((view) => (
+              <button
+                key={view.id}
+                className={`forge-nav-button ${activeView === view.id ? 'active' : ''}`}
+                onClick={() => setActiveView(view.id)}
+              >
+                <span className="forge-nav-icon">{view.icon}</span>
+                <span>
+                  <strong>{view.title}</strong>
+                  <small>{view.detail}</small>
+                </span>
+                <em>{view.badge}</em>
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <section className="forge-workspace">
+          <div className="forge-workspace-head">
+            <div>
+              <span className="eyebrow">当前界面</span>
+              <h2>{activeForge.title}</h2>
             </div>
-            <div className="transfer-column">
-              <h3>目标装备</h3>
-              <div className="transfer-list">
-                {allEquipment.filter((item) => item.id !== sourceItemId).length === 0 && <EmptyState text="暂无可继承的目标装备。" />}
-                {allEquipment.filter((item) => item.id !== sourceItemId).map((item) => (
-                  <TransferItemOption
-                    key={item.id}
-                    item={item}
-                    selected={item.id === targetItemId}
-                    disabled={Boolean(selectedSource && item.enhancementLevel >= selectedSource.enhancementLevel)}
-                    onSelect={() => setTargetItemId(item.id)}
-                  />
-                ))}
-              </div>
+            <div className="forge-pill-row">
+              <span>{formatNumber(data.gold)} 金</span>
+              {activeView === 'transfer' && <span>{transferTargetCount} 个目标</span>}
             </div>
           </div>
-          <div className="transfer-preview">
-            <CompareCard title="来源装备" item={selectedSource} />
-            <CompareCard title="继承目标" item={selectedTarget} highlight />
-          </div>
-          {selectedSource && selectedTarget && !canTransfer && <div className="modal-warning">目标装备强化等级需低于来源装备。</div>}
-          <div className="result-modal-actions">
-            <button className="primary-action" disabled={busy || !canTransfer} onClick={() => transferMutation.mutate()}>
-              {transferMutation.isPending ? '转移中...' : '开始转移'}
-            </button>
-          </div>
+
+          {activeView === 'enhance' && (
+            <div className="forge-enhance-view">
+              <section className="forge-list-panel">
+                <div className="inventory-main-title">
+                  <SectionTitle icon={<Hammer size={18} />} title="强化清单" />
+                  <strong>{enhanceableCount} 件可强化</strong>
+                </div>
+                <div className="item-grid blacksmith-item-grid forge-equipment-grid">
+                  {allEquipment.length === 0 && <EmptyState text="当前没有可强化装备。" />}
+                  {allEquipment.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      label={itemLocationLabel(item, data.equippedItems)}
+                      onSelect={() => setFocusedItemId(item.id)}
+                    >
+                      <button className="mini-action" disabled={busy || item.enhancementLevel >= 15} onClick={(event) => {
+                        event.stopPropagation();
+                        setFocusedItemId(item.id);
+                        setEnhanceMessage(null);
+                        setSelectedStoneIds([]);
+                        setEnhanceItem(item);
+                      }}>
+                        {item.enhancementLevel >= 15 ? '满级' : '强化'}
+                      </button>
+                    </ItemCard>
+                  ))}
+                </div>
+              </section>
+              <aside className="forge-detail-panel">
+                <CompareCard
+                  title="当前选择"
+                  item={focusedItem}
+                  highlight
+                  emptyTitle="未选择"
+                  emptyText="从左侧装备清单选择一件装备。"
+                  emptyMeta="等待选择"
+                />
+                {focusedItem ? (
+                  <>
+                    <div className="forge-stat-grid">
+                      <Metric label="强化等级" value={`+${focusedItem.enhancementLevel}`} />
+                      <Metric label="成功率" value={`${Math.round(enhanceChance(focusedItem) * 100)}%`} />
+                      <Metric label="强化费用" value={`${formatNumber(enhanceCost(focusedItem))} 金`} />
+                      <Metric label="幸运值" value={(focusedItem.enhancementLuck ?? 0).toString()} />
+                    </div>
+                    <div className="forge-detail-actions">
+                      <button
+                        className="mini-action subtle"
+                        onClick={() => setDetailItem(focusedItem)}
+                      >
+                        查看详情
+                      </button>
+                      <button
+                        className="primary-action"
+                        disabled={busy || focusedItem.enhancementLevel >= 15}
+                        onClick={() => {
+                          setEnhanceMessage(null);
+                          setSelectedStoneIds([]);
+                          setEnhanceItem(focusedItem);
+                        }}
+                      >
+                        {focusedItem.enhancementLevel >= 15 ? '已达上限' : '开始强化'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <EmptyState text="未选择装备。" />
+                )}
+              </aside>
+            </div>
+          )}
+
+          {activeView === 'transfer' && (
+            <div className="forge-transfer-view">
+              <section className="transfer-column">
+                <div className="transfer-column-head">
+                  <h3>来源装备</h3>
+                  <strong>{sourceItems.length}</strong>
+                </div>
+                <div className="transfer-list">
+                  {sourceItems.length === 0 && <EmptyState text="暂无带强化等级的装备。" />}
+                  {sourceItems.map((item) => (
+                    <TransferItemOption
+                      key={item.id}
+                      item={item}
+                      selected={item.id === sourceItemId}
+                      onSelect={() => selectTransferSource(item)}
+                    />
+                  ))}
+                </div>
+              </section>
+              <section className="transfer-column">
+                <div className="transfer-column-head">
+                  <h3>目标装备</h3>
+                  <strong>{transferTargetCount}</strong>
+                </div>
+                <div className="transfer-list">
+                  {!selectedSource && <EmptyState text="先选择来源装备。" />}
+                  {selectedSource && targetItems.length === 0 && <EmptyState text="暂无可继承的目标装备。" />}
+                  {selectedSource && targetItems.map((item) => (
+                    <TransferItemOption
+                      key={item.id}
+                      item={item}
+                      selected={item.id === targetItemId}
+                      disabled={item.id === sourceItemId || item.enhancementLevel >= selectedSource.enhancementLevel}
+                      onSelect={() => setTargetItemId(item.id)}
+                    />
+                  ))}
+                </div>
+              </section>
+              <aside className="forge-transfer-preview">
+                <div className="transfer-preview">
+                  <CompareCard
+                    title="来源装备"
+                    item={selectedSource}
+                    emptyTitle="未选择"
+                    emptyText="选择带强化等级的装备作为来源。"
+                    emptyMeta="无来源"
+                  />
+                  <CompareCard
+                    title="继承目标"
+                    item={selectedTarget}
+                    highlight
+                    emptyTitle="未选择"
+                    emptyText="目标装备不能与来源装备相同。"
+                    emptyMeta="无目标"
+                  />
+                </div>
+                {selectedSource && selectedTarget && !canTransfer && <div className="modal-warning">目标装备强化等级必须低于来源装备。</div>}
+                {sourceItemId != null && targetItemId != null && sourceItemId === targetItemId && <div className="modal-warning">来源装备和目标装备不能相同。</div>}
+                <div className="result-modal-actions">
+                  <button className="primary-action" disabled={busy || !canTransfer} onClick={() => transferMutation.mutate()}>
+                    {transferMutation.isPending ? '转移中...' : '开始转移'}
+                  </button>
+                </div>
+              </aside>
+            </div>
+          )}
+
+          {activeView !== 'enhance' && activeView !== 'transfer' && (
+            <div className="forge-coming-soon">
+              <div className="forge-emblem large">
+                {activeForge.icon}
+              </div>
+              <h2>{activeForge.title}</h2>
+              <p>即将开放</p>
+            </div>
+          )}
         </section>
       </div>
-      {selectedItem && <ItemDetail item={toEquipmentDetail(selectedItem)} onClose={() => setSelectedItem(null)} />}
+      {detailItem && <ItemDetail item={toEquipmentDetail(detailItem)} onClose={() => setDetailItem(null)} />}
       {enhanceItem && (
         <EnhanceModal
           item={enhanceItem}
@@ -1339,8 +1947,13 @@ function BlacksmithScreen({ token }: { token: string }) {
           onClose={() => {
             setEnhanceItem(null);
             setEnhanceMessage(null);
+            setSelectedStoneIds([]);
           }}
-          onEnhance={() => enhanceMutation.mutate(enhanceItem.id)}
+          stones={enhancementStonesForItem(data.inventory, enhanceItem)}
+          selectedStoneIds={selectedStoneIds}
+          onAddStone={(stoneId) => setSelectedStoneIds((current) => current.length >= 3 ? current : [...current, stoneId])}
+          onRemoveStone={(index) => setSelectedStoneIds((current) => current.filter((_, currentIndex) => currentIndex !== index))}
+          onEnhance={() => enhanceMutation.mutate({ itemId: enhanceItem.id, stoneItemIds: selectedStoneIds })}
         />
       )}
       {feedback && (
@@ -1358,6 +1971,8 @@ function BlacksmithScreen({ token }: { token: string }) {
 function QuestScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
+  const [category, setCategory] = useState<QuestCategoryFilter>('all');
+  const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ['quests', token],
     queryFn: () => gameApi.quests(token),
@@ -1368,6 +1983,17 @@ function QuestScreen({ token }: { token: string }) {
       await invalidateGameQueries(queryClient, token);
     },
   });
+  const sortedQuests = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+    return [...data].sort((left, right) => questSortScore(right) - questSortScore(left));
+  }, [data]);
+  const filteredQuests = useMemo(
+    () => sortedQuests.filter((quest) => category === 'all' || quest.category === category),
+    [category, sortedQuests],
+  );
+  const selectedQuest = filteredQuests.find((quest) => quest.id === selectedQuestId) ?? filteredQuests[0] ?? null;
 
   if (isLoading) {
     return <LoadingScreen title="读取任务档案" />;
@@ -1377,23 +2003,51 @@ function QuestScreen({ token }: { token: string }) {
   }
 
   return (
-    <section className="screen market-screen">
+    <section className="screen quest-screen">
       <TopBar title="任务" onBack={() => setScreen('home')} />
       <div className="quest-tabs">
         <Metric label="可领取" value={data.filter((quest) => quest.status === 'completed').length.toString()} />
         <Metric label="进行中" value={data.filter((quest) => quest.status === 'active').length.toString()} />
         <Metric label="已领取" value={data.filter((quest) => quest.status === 'claimed').length.toString()} />
       </div>
-      <div className="quest-list">
-        {data.map((quest) => (
-          <QuestCard
-            key={quest.id}
-            quest={quest}
-            loading={claimMutation.isPending}
-            onClaim={() => claimMutation.mutate(quest.id)}
-            onNavigate={() => setScreen(screenForQuestTarget(quest.navigationTarget))}
-          />
-        ))}
+      <div className="quest-workbench">
+        <aside className="quest-category-panel">
+          {(['all', 'main', 'daily', 'achievement'] as QuestCategoryFilter[]).map((value) => {
+            const count = value === 'all' ? data.length : data.filter((quest) => quest.category === value).length;
+            return (
+              <button key={value} className={category === value ? 'active' : ''} onClick={() => setCategory(value)}>
+                <span>{value === 'all' ? '全部' : categoryName(value)}</span>
+                <strong>{count}</strong>
+              </button>
+            );
+          })}
+        </aside>
+        <section className="quest-list-panel">
+          <div className="inventory-main-title">
+            <SectionTitle icon={<ScrollText size={18} />} title={`${category === 'all' ? '全部' : categoryName(category)}任务`} />
+            <strong>{filteredQuests.length}</strong>
+          </div>
+          <div className="quest-list">
+            {filteredQuests.length === 0 && <EmptyState text="当前分类没有任务。" />}
+            {filteredQuests.map((quest) => (
+              <QuestCard
+                key={quest.id}
+                quest={quest}
+                selected={selectedQuest?.id === quest.id}
+                loading={claimMutation.isPending}
+                onSelect={() => setSelectedQuestId(quest.id)}
+                onClaim={() => claimMutation.mutate(quest.id)}
+                onNavigate={() => setScreen(screenForQuestTarget(quest.navigationTarget))}
+              />
+            ))}
+          </div>
+        </section>
+        <QuestDetailPanel
+          quest={selectedQuest}
+          loading={claimMutation.isPending}
+          onClaim={(questId) => claimMutation.mutate(questId)}
+          onNavigate={(target) => setScreen(screenForQuestTarget(target))}
+        />
       </div>
       {claimMutation.error && (
         <FeedbackDialog
@@ -1467,7 +2121,7 @@ function MarketScreen({ token }: { token: string }) {
   const playerActiveListings = market.listings
     .filter((listing) => listing.playerListing && listing.sellerName === playerName)
     .sort((left, right) => Date.parse(right.listedAt) - Date.parse(left.listedAt) || right.id - left.id);
-  const inventoryItems = inventoryQuery.data.inventory.slice(0, 10);
+  const inventoryItems = inventoryQuery.data.inventory.filter(isEquipmentItem).slice(0, 10);
   const marketActionError = listMutation.error?.message ?? buyMutation.error?.message ?? cancelMutation.error?.message;
   const hasMarketFilters = marketFilters.minLevel.trim().length > 0
     || marketFilters.maxLevel.trim().length > 0
@@ -1991,6 +2645,7 @@ function RobotActivityDetailModal({ token, robot: fallbackRobot, onClose }: {
   onClose: () => void;
 }) {
   const historyRef = useRef<HTMLDivElement | null>(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<LeaderboardEquipment | null>(null);
   const { data, isLoading, error } = useQuery<RobotActivityDetail>({
     queryKey: ['robot-activity-detail', token, fallbackRobot.id],
     queryFn: () => gameApi.robotActivityDetail(token, fallbackRobot.id),
@@ -2038,15 +2693,19 @@ function RobotActivityDetailModal({ token, robot: fallbackRobot, onClose }: {
               {error && <EmptyState text="机器人详情加载失败，稍后会自动重试。" />}
               {!isLoading && !error && equipment.length === 0 && <EmptyState text="暂无装备记录。" />}
               {equipment.map((item) => (
-                <article key={`${robot.id}-${item.slot}`} className={`robot-equipment-card ${item.quality} ${enhancementEffectClass(item)}`}>
+                <button
+                  key={`${robot.id}-${item.slot}`}
+                  className={`robot-equipment-card ${item.quality} ${enhancementEffectClass(item)}`}
+                  onClick={() => setSelectedEquipment(item)}
+                >
                   <div className="item-meta-line">
                     <span>{item.slotName} · Lv.{item.level} · +{item.enhancementLevel}</span>
                     <EnhancementBadge level={item.enhancementLevel} />
                   </div>
                   <strong className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</strong>
                   <p>{leaderboardEquipmentBonusText(item)}</p>
-                  <small>战力 {formatNumber(item.power)} · {item.origin}</small>
-                </article>
+                  <small>战力 {formatNumber(item.power)} · {equipmentOriginText(item)}</small>
+                </button>
               ))}
             </div>
           </div>
@@ -2060,6 +2719,9 @@ function RobotActivityDetailModal({ token, robot: fallbackRobot, onClose }: {
             </div>
           </aside>
         </div>
+        {selectedEquipment && (
+          <ItemDetail item={leaderboardEquipmentToDetail(selectedEquipment)} onClose={() => setSelectedEquipment(null)} />
+        )}
       </section>
     </div>
   );
@@ -2070,18 +2732,20 @@ function ChatScreen({ token }: { token: string }) {
   const queryClient = useQueryClient();
   const [text, setText] = useState('');
   const [selectedSpeaker, setSelectedSpeaker] = useState<ChatSpeaker | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [streamConnected, setStreamConnected] = useState(false);
   const chatListRef = useRef<HTMLDivElement | null>(null);
+  const lastMessageIdRef = useRef(0);
   const { data, isLoading, error } = useQuery({
     queryKey: ['chat', token],
     queryFn: () => gameApi.chatMessages(token),
-    refetchInterval: 3000,
   });
   const sendMutation = useMutation({
-    mutationFn: () => gameApi.sendChat(token, text),
-    onSuccess: async () => {
+    mutationFn: (messageText: string) => gameApi.sendChat(token, messageText),
+    onSuccess: async (message) => {
+      appendIncomingMessage(message);
       setText('');
       await invalidateGameQueries(queryClient, token);
-      await queryClient.invalidateQueries({ queryKey: ['chat', token] });
     },
   });
 
@@ -2090,16 +2754,69 @@ function ChatScreen({ token }: { token: string }) {
     if (!text.trim()) {
       return;
     }
-    sendMutation.mutate();
+    sendMutation.mutate(text.trim());
+  }
+
+  function appendIncomingMessage(message: ChatMessage) {
+    if (!message || !Number.isFinite(message.id)) {
+      return;
+    }
+    setMessages((previous) => {
+      if (previous.some((item) => item.id === message.id)) {
+        return previous;
+      }
+      const next = [...previous, message].sort((left, right) => left.id - right.id).slice(-120);
+      lastMessageIdRef.current = next.at(-1)?.id ?? lastMessageIdRef.current;
+      return next;
+    });
   }
 
   useEffect(() => {
+    if (!data) {
+      return;
+    }
+    const initialMessages = [...data].sort((left, right) => left.id - right.id);
+    setMessages(initialMessages);
+    lastMessageIdRef.current = initialMessages.at(-1)?.id ?? 0;
+  }, [data]);
+
+  useEffect(() => {
+    if (!data) {
+      return undefined;
+    }
+    let closed = false;
+    const source = new EventSource(gameApi.chatStreamUrl(token, lastMessageIdRef.current));
+    source.onopen = () => {
+      if (!closed) {
+        setStreamConnected(true);
+      }
+    };
+    source.onerror = () => {
+      if (!closed) {
+        setStreamConnected(false);
+      }
+    };
+    source.addEventListener('message', (event: MessageEvent) => {
+      try {
+        appendIncomingMessage(JSON.parse(event.data) as ChatMessage);
+      } catch {
+        // Ignore malformed stream chunks.
+      }
+    });
+    return () => {
+      closed = true;
+      source.close();
+      setStreamConnected(false);
+    };
+  }, [token, Boolean(data)]);
+
+  useEffect(() => {
     const node = chatListRef.current;
-    if (!node || !data) {
+    if (!node || !messages.length) {
       return;
     }
     node.scrollTop = node.scrollHeight;
-  }, [data]);
+  }, [messages]);
 
   if (isLoading) {
     return <LoadingScreen title="接入传讯水晶" />;
@@ -2111,12 +2828,13 @@ function ChatScreen({ token }: { token: string }) {
   return (
     <section className="screen chat-screen">
       <TopBar title="世界聊天" onBack={() => setScreen('home')} />
-      <div className="channel-strip">
+      <div className="channel-strip chat-channel-strip">
         <span>世界</span>
-        <strong>{data.filter((message) => message.kind === 'robot').length}+ 在线发言</strong>
+        <strong>{messages.filter((message) => message.kind === 'robot').length}+ 在线发言</strong>
+        <i className={`stream-indicator ${streamConnected ? 'online' : ''}`} />
       </div>
       <div className="chat-list" ref={chatListRef}>
-        {data.map((message) => (
+        {messages.map((message) => (
           <ChatMessageBubble key={message.id} message={message} onSelectSpeaker={setSelectedSpeaker} />
         ))}
       </div>
@@ -2142,26 +2860,54 @@ function ChatScreen({ token }: { token: string }) {
 function ChatMessageBubble({ message, onSelectSpeaker }: { message: ChatMessage; onSelectSpeaker: (speaker: ChatSpeaker) => void }) {
   const speaker = message.speaker;
   const isSystem = message.kind === 'system' || speaker.kind === 'system';
+  const isMine = message.kind === 'player' && speaker.kind === 'player';
+  const displayName = speaker.name || message.senderName;
+  if (isSystem) {
+    return (
+      <article className="chat-message-row system">
+        <div className="chat-system-pill">
+          <span>{message.text}</span>
+          <time dateTime={message.createdAt}>{formatChatTime(message.createdAt)}</time>
+        </div>
+      </article>
+    );
+  }
   return (
-    <article className={`chat-message ${message.kind}`}>
-      <div className="chat-message-head">
-        <button className="speaker-button" disabled={isSystem} onClick={() => onSelectSpeaker(speaker)}>
-          {speaker.name || message.senderName}
+    <article className={`chat-message-row ${isMine ? 'mine' : 'other'} ${message.kind}`}>
+      {!isMine && (
+        <button className="chat-avatar" onClick={() => onSelectSpeaker(speaker)} aria-label={displayName}>
+          {chatAvatarLabel(displayName)}
         </button>
-        <span>{speaker.title}</span>
-        {!isSystem && <small>Lv.{speaker.level} · 战力 {speaker.power}</small>}
-        <time dateTime={message.createdAt}>
-          <Clock3 size={12} />
-          {formatChatTime(message.createdAt)}
-        </time>
+      )}
+      <div className="chat-bubble-stack">
+        <div className="chat-message-head">
+          <button className="speaker-button" onClick={() => onSelectSpeaker(speaker)}>
+            {isMine ? '你' : displayName}
+          </button>
+          <span>{speaker.title}</span>
+          <small>Lv.{speaker.level} · 战力 {formatNumber(speaker.power)}</small>
+          <time dateTime={message.createdAt}>
+            <Clock3 size={12} />
+            {formatChatTime(message.createdAt)}
+          </time>
+        </div>
+        <div className="chat-bubble">
+          <p>{message.text}</p>
+        </div>
       </div>
-      <p>{message.text}</p>
     </article>
   );
 }
 
+function chatAvatarLabel(value: string) {
+  const trimmed = value.trim();
+  return (trimmed[0] ?? '?').toUpperCase();
+}
+
 function SpeakerDetailModal({ speaker, onClose }: { speaker: ChatSpeaker; onClose: () => void }) {
   const equippedCount = speaker.equipment.length;
+  const equipmentPower = speaker.equipmentPower ?? speaker.equipment.reduce((sum, item) => sum + item.power, 0);
+  const [selectedEquipment, setSelectedEquipment] = useState<LeaderboardEquipment | null>(null);
   return (
     <div className="detail-backdrop result-modal-backdrop" onClick={onClose}>
       <section className="speaker-modal" onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
@@ -2183,22 +2929,33 @@ function SpeakerDetailModal({ speaker, onClose }: { speaker: ChatSpeaker; onClos
           <Metric label="智力" value={formatNumber(speaker.intelligence)} />
           <Metric label="精神" value={formatNumber(speaker.spirit)} />
           <Metric label="战力" value={formatNumber(speaker.power)} />
+          <Metric label="装备贡献" value={formatNumber(equipmentPower)} />
         </div>
+        {speaker.derivedStats && (
+          <CombatStatsPanel stats={speaker.derivedStats} compact />
+        )}
         <SectionTitle icon={<Shield size={18} />} title="装备栏" />
         <div className="speaker-equipment-grid">
           {speaker.equipment.length === 0 && <EmptyState text="暂无可查看装备。" />}
           {speaker.equipment.map((item) => (
-            <article key={`${speaker.name}-${item.slot}`} className={`speaker-equipment-card ${item.quality} ${enhancementEffectClass(item)}`}>
+            <button
+              key={`${speaker.name}-${item.slot}`}
+              className={`speaker-equipment-card ${item.quality} ${enhancementEffectClass(item)}`}
+              onClick={() => setSelectedEquipment(item)}
+            >
               <div className="item-meta-line">
                 <span>{item.slotName} · Lv.{item.level} · +{item.enhancementLevel}</span>
                 <EnhancementBadge level={item.enhancementLevel} />
               </div>
               <strong className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</strong>
               <p>{leaderboardEquipmentBonusText(item)}</p>
-              <small>战力 {item.power} · {item.origin}</small>
-            </article>
+              <small>战力 {formatNumber(item.power)} · {equipmentOriginText(item)}</small>
+            </button>
           ))}
         </div>
+        {selectedEquipment && (
+          <ItemDetail item={leaderboardEquipmentToDetail(selectedEquipment)} onClose={() => setSelectedEquipment(null)} />
+        )}
       </section>
     </div>
   );
@@ -2283,27 +3040,36 @@ function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sweepLoad
   onRun: () => void;
   onSweep: () => void;
 }) {
-  const risk = dungeonRisk(combatPower, dungeon.recommendedPower, playerLevel, dungeon.recommendedLevel);
+  const risk = dungeonRisk(combatPower, dungeon.minimumPower, playerLevel, dungeon.minimumLevel, dungeon.gate);
   const drops = dungeon.drops ?? [];
   const dropTypes = uniqueDropTypes(drops);
   const specialDungeon = special || isSpecialDungeon(dungeon);
   const highestQuality = drops.reduce((best, drop) => qualityRank(drop.quality) > qualityRank(best) ? drop.quality : best, 'common');
   const highDropChance = combinedDropChance(drops.filter((drop) => drop.quality === 'legendary' || drop.quality === 'immortal'));
+  const eligible = dungeon.gate?.eligible ?? true;
+  const stamina = dungeon.stamina;
+  const canRunWithStamina = !stamina || stamina.current >= 1;
+  const canSweepWithStamina = !stamina || stamina.current >= 10;
   return (
-    <article className={`dungeon-card ${risk.level} ${specialDungeon ? 'special' : ''}`}>
+    <article className={`dungeon-card ${risk.level} ${specialDungeon ? 'special' : ''} ${eligible ? '' : 'locked'}`}>
       <div className="dungeon-card-head">
         <div>
-          <span className="eyebrow">{specialDungeon ? '特殊副本' : dungeon.difficulty} · 推荐 Lv.{dungeon.recommendedLevel}</span>
+          <span className="eyebrow">{specialDungeon ? '特殊副本' : dungeon.difficulty} · 门槛 Lv.{dungeon.minimumLevel}</span>
           <h2>{dungeon.name}</h2>
           <p>{dungeon.description}</p>
         </div>
         <strong className={`risk-pill ${risk.level}`}>{risk.label}</strong>
       </div>
       <div className="dungeon-meta">
-        <span>推荐 {dungeon.recommendedPower}</span>
+        <span>门槛 {formatNumber(dungeon.minimumPower)}</span>
+        <span>推荐 {formatNumber(dungeon.recommendedPower)}</span>
+        <span>Boss {bossArchetypeName(dungeon.bossArchetype)}</span>
+        <span>预计 {dungeon.expectedRounds} 回合</span>
         <span className={dungeon.cleared ? 'clear-state cleared' : 'clear-state'}>{dungeon.cleared ? '已通过' : '未通过'}</span>
         <strong>{specialDungeon ? `${qualityName(highestQuality)}上限 · ${formatDropRate(highDropChance)}` : `${drops.length} 件可掉落`}</strong>
       </div>
+      {!eligible && <p className="gate-warning">{dungeon.gate.label}</p>}
+      {stamina && stamina.current <= 0 && <p className="gate-warning">疲劳不足，可在背包使用疲劳药水。</p>}
       <div className="drop-preview-section">
         <span>当前副本可掉落</span>
         {dropTypes.length > 0 && (
@@ -2319,14 +3085,14 @@ function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sweepLoad
         </div>
       </div>
       <div className="dungeon-action-row">
-        <button className="compact-action" disabled={loading} onClick={onRun}>
-          {loading ? '战斗中' : specialDungeon ? '挑战裂隙' : '进入'}
+        <button className="compact-action" disabled={loading || !eligible || !canRunWithStamina} onClick={onRun}>
+          {loading ? '战斗中' : !canRunWithStamina ? '疲劳不足' : eligible ? specialDungeon ? '挑战裂隙' : '进入' : '未达标'}
         </button>
         {specialDungeon ? (
           <button className="compact-action sweep-compact locked" disabled>不可扫荡</button>
         ) : (
-          <button className="compact-action sweep-compact" disabled={loading || sweepLoading || !dungeon.cleared} onClick={onSweep}>
-            {sweepLoading ? '扫荡中' : '扫荡 10 次'}
+          <button className="compact-action sweep-compact" disabled={loading || sweepLoading || !dungeon.cleared || !eligible || !canSweepWithStamina} onClick={onSweep}>
+            {sweepLoading ? '扫荡中' : !canSweepWithStamina ? '疲劳不足' : '扫荡 10 次'}
           </button>
         )}
       </div>
@@ -2349,11 +3115,11 @@ function DropPreviewCard({ drop }: { drop: DropPreview }) {
   );
 }
 
-function EquipmentPanel({ home, onSelect }: { home: HomeSnapshot; onSelect?: (item: Item) => void }) {
+function EquipmentPanel({ home, onSelect, compact = false }: { home: HomeSnapshot; onSelect?: (item: Item) => void; compact?: boolean }) {
   const slots = useMemo(() => equipmentSlotOrder().map((slot) => [slot, home.equippedItems[slot] ?? null] as const), [home.equippedItems]);
   const equippedCount = slots.filter(([, item]) => Boolean(item)).length;
   return (
-    <div className="panel equipment-panel">
+    <div className={`panel equipment-panel${compact ? ' compact' : ''}`}>
       <div className="equipment-panel-head">
         <div>
           <span className="eyebrow">装备栏</span>
@@ -2376,7 +3142,7 @@ function EquipmentPanel({ home, onSelect }: { home: HomeSnapshot; onSelect?: (it
             {item ? (
               <>
                 <strong className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</strong>
-                <small>{bonusText(item)}</small>
+                <small>{compact ? equipmentCompactText(item) : bonusText(item)}</small>
               </>
             ) : (
               <>
@@ -2391,15 +3157,102 @@ function EquipmentPanel({ home, onSelect }: { home: HomeSnapshot; onSelect?: (it
   );
 }
 
-function QuestCard({ quest, loading, onClaim, onNavigate }: {
+function PowerBreakdownPanel({ slices, total }: { slices: PowerBreakdownSlice[]; total: number }) {
+  return (
+    <div className="power-breakdown-list">
+      {slices.map((slice) => {
+        const percent = total > 0 ? Math.max(3, Math.min(100, Math.round((slice.value / total) * 100))) : 0;
+        return (
+          <div key={slice.key} className="power-breakdown-row">
+            <div>
+              <span>{slice.label}</span>
+              <strong>{formatNumber(slice.value)}</strong>
+            </div>
+            <div className="power-breakdown-bar">
+              <span style={{ width: `${percent}%` }} />
+            </div>
+            <small>{slice.detail}</small>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CombatStatsPanel({ stats, equipmentStats, compact = false }: { stats: DerivedStats; equipmentStats?: DerivedStats; compact?: boolean }) {
+  return (
+    <section className={`combat-stats-panel ${compact ? 'compact' : ''}`}>
+      <div className="equipment-panel-head">
+        <div>
+          <span className="eyebrow">最终战斗属性</span>
+          <h2>装备已计入</h2>
+        </div>
+        <Gauge size={18} />
+      </div>
+      <div className="combat-stat-grid">
+        <CombatStatCell label="生命" value={formatNumber(stats.maxHp)} bonus={equipmentStats?.maxHp} />
+        <CombatStatCell label="法力" value={formatNumber(stats.maxMp)} bonus={equipmentStats?.maxMp} />
+        <CombatStatCell label="攻击" value={formatNumber(stats.attackPower)} bonus={equipmentStats?.attackPower} />
+        <CombatStatCell label="护甲" value={formatNumber(stats.armor)} bonus={equipmentStats?.armor} />
+        <CombatStatCell label="抗性" value={formatNumber(stats.resistance)} bonus={equipmentStats?.resistance} />
+        <CombatStatCell label="速度" value={formatNumber(stats.speed)} />
+        <CombatStatCell label="命中" value={formatPercent(stats.accuracy)} bonus={equipmentStats ? equipmentStats.accuracy : undefined} percent />
+        <CombatStatCell label="闪避" value={formatPercent(stats.evasion)} bonus={equipmentStats ? equipmentStats.evasion : undefined} percent />
+        <CombatStatCell label="暴击" value={formatPercent(stats.critChance)} bonus={equipmentStats ? equipmentStats.critChance : undefined} percent />
+      </div>
+    </section>
+  );
+}
+
+function StatContributionGrid({ stats, baseStats, equipmentStats }: { stats: DerivedStats; baseStats: DerivedStats; equipmentStats: DerivedStats }) {
+  return (
+    <div className="stat-contribution-grid">
+      <StatContributionCell label="生命" total={formatNumber(stats.maxHp)} base={formatNumber(baseStats.maxHp)} equipment={formatNumber(equipmentStats.maxHp)} />
+      <StatContributionCell label="法力" total={formatNumber(stats.maxMp)} base={formatNumber(baseStats.maxMp)} equipment={formatNumber(equipmentStats.maxMp)} />
+      <StatContributionCell label="攻击" total={formatNumber(stats.attackPower)} base={formatNumber(baseStats.attackPower)} equipment={formatNumber(equipmentStats.attackPower)} />
+      <StatContributionCell label="护甲" total={formatNumber(stats.armor)} base={formatNumber(baseStats.armor)} equipment={formatNumber(equipmentStats.armor)} />
+      <StatContributionCell label="抗性" total={formatNumber(stats.resistance)} base={formatNumber(baseStats.resistance)} equipment={formatNumber(equipmentStats.resistance)} />
+      <StatContributionCell label="速度" total={formatNumber(stats.speed)} base={formatNumber(baseStats.speed)} equipment="0" />
+      <StatContributionCell label="命中" total={formatPercent(stats.accuracy)} base={formatPercent(baseStats.accuracy)} equipment={formatPercent(equipmentStats.accuracy)} />
+      <StatContributionCell label="闪避" total={formatPercent(stats.evasion)} base={formatPercent(baseStats.evasion)} equipment={formatPercent(equipmentStats.evasion)} />
+      <StatContributionCell label="暴击" total={formatPercent(stats.critChance)} base={formatPercent(baseStats.critChance)} equipment={formatPercent(equipmentStats.critChance)} />
+    </div>
+  );
+}
+
+function CombatStatCell({ label, value, bonus, percent = false }: { label: string; value: string; bonus?: number; percent?: boolean }) {
+  const hasBonus = typeof bonus === 'number' && bonus > 0;
+  const bonusText = hasBonus ? (percent ? `装备 +${formatPercent(bonus)}` : `装备 +${formatNumber(bonus)}`) : '基础';
+  return (
+    <div className="combat-stat-cell">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{bonusText}</small>
+    </div>
+  );
+}
+
+function StatContributionCell({ label, total, base, equipment }: { label: string; total: string; base: string; equipment: string }) {
+  return (
+    <div className="stat-contribution-cell">
+      <span>{label}</span>
+      <strong>{total}</strong>
+      <small>基础 {base} · 装备 +{equipment}</small>
+    </div>
+  );
+}
+
+function QuestCard({ quest, selected = false, loading, onSelect, onClaim, onNavigate }: {
   quest: QuestRow;
+  selected?: boolean;
   loading: boolean;
+  onSelect: () => void;
   onClaim: () => void;
   onNavigate: () => void;
 }) {
-  const progress = Math.min(100, Math.round((quest.currentValue / Math.max(1, quest.targetValue)) * 100));
+  const progress = Math.min(100, quest.progressPercent ?? Math.round((quest.currentValue / Math.max(1, quest.targetValue)) * 100));
   return (
-    <article className={`quest-card ${quest.status}`}>
+    <article className={`quest-card ${quest.status} ${selected ? 'selected' : ''}`} onClick={onSelect}>
       <div className="quest-heading">
         <div>
           <span className="eyebrow">{categoryName(quest.category)} · {statusName(quest.status)}</span>
@@ -2408,19 +3261,87 @@ function QuestCard({ quest, loading, onClaim, onNavigate }: {
         <strong>{quest.currentValue}/{quest.targetValue}</strong>
       </div>
       <p>{quest.description}</p>
+      {quest.conditions?.length > 1 && (
+        <div className="quest-condition-mini">
+          {quest.conditions.slice(0, 2).map((condition) => (
+            <span key={condition.conditionId}>{condition.currentValue}/{condition.targetValue}</span>
+          ))}
+        </div>
+      )}
       <div className="progress-bar" aria-label="任务进度">
         <span style={{ width: `${progress}%` }} />
       </div>
       <div className="reward-row">
         {quest.rewards.map((reward, index) => (
-          <span key={`${reward.type}-${reward.targetId ?? index}`}>{rewardName(reward.type, reward.amount)}</span>
+          <span key={`${reward.type}-${reward.targetId ?? index}`} className={reward.quality ?? ''}>{rewardName(reward)}</span>
         ))}
       </div>
       <div className="action-row">
-        {quest.status === 'completed' && <button className="mini-action" disabled={loading} onClick={onClaim}>领取</button>}
-        {quest.status === 'active' && <button className="mini-action subtle" onClick={onNavigate}>前往</button>}
+        {quest.claimable && <button className="mini-action" disabled={loading} onClick={(event) => {
+          event.stopPropagation();
+          onClaim();
+        }}>领取</button>}
+        {quest.status === 'active' && <button className="mini-action subtle" onClick={(event) => {
+          event.stopPropagation();
+          onNavigate();
+        }}>前往</button>}
       </div>
     </article>
+  );
+}
+
+function QuestDetailPanel({ quest, loading, onClaim, onNavigate }: {
+  quest: QuestRow | null;
+  loading: boolean;
+  onClaim: (questId: string) => void;
+  onNavigate: (target?: string) => void;
+}) {
+  if (!quest) {
+    return (
+      <aside className="quest-detail-panel">
+        <EmptyState text="选择一个任务查看详情。" />
+      </aside>
+    );
+  }
+  const progress = Math.min(100, quest.progressPercent ?? 0);
+  return (
+    <aside className={`quest-detail-panel ${quest.status}`}>
+      <div>
+        <span className="eyebrow">{categoryName(quest.category)} · {statusName(quest.status)} · {quest.resetPeriod}</span>
+        <h2>{quest.title}</h2>
+        <p>{quest.lore || quest.description}</p>
+      </div>
+      <div className="progress-bar" aria-label="任务详情进度">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <div className="quest-condition-list">
+        {(quest.conditions?.length ? quest.conditions : [{
+          conditionId: quest.id,
+          conditionType: quest.navigationTarget ?? 'progress',
+          currentValue: quest.currentValue,
+          targetValue: quest.targetValue,
+          completed: quest.status === 'completed' || quest.status === 'claimed',
+        }]).map((condition) => (
+          <div key={condition.conditionId} className={condition.completed ? 'complete' : ''}>
+            <span>{conditionName(condition.conditionType)}</span>
+            <strong>{condition.currentValue}/{condition.targetValue}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="quest-reward-grid">
+        {quest.rewards.map((reward, index) => (
+          <div key={`${reward.type}-${reward.targetId ?? index}`} className={`reward-tile ${reward.quality ?? ''}`}>
+            <span>{reward.itemCategory ? itemCategoryLabel({ itemCategory: reward.itemCategory, itemType: reward.itemCategory }) : reward.type}</span>
+            <strong>{reward.itemName ?? rewardName(reward)}</strong>
+            <small>x{reward.amount}</small>
+          </div>
+        ))}
+      </div>
+      <div className="result-modal-actions">
+        {quest.claimable && <button className="primary-action" disabled={loading} onClick={() => onClaim(quest.id)}>领取奖励</button>}
+        {quest.status === 'active' && <button className="mini-action subtle" onClick={() => onNavigate(quest.navigationTarget)}>前往</button>}
+      </div>
+    </aside>
   );
 }
 
@@ -2428,6 +3349,10 @@ function equipmentDisplayName(item: { name: string; displayName?: string; enhanc
   const baseName = (item.displayName?.trim() || item.name).replace(/\s\+\d+$/, '');
   const level = item.enhancementLevel ?? 0;
   return level > 0 ? `${baseName} +${level}` : baseName;
+}
+
+function equipmentCompactText(item: Item) {
+  return `Lv.${item.requiredLevel} · 战力 ${formatNumber(itemPower(item))}`;
 }
 
 function enhancementStage(level = 0) {
@@ -2472,7 +3397,7 @@ function EnhancementBadge({ level }: { level?: number }) {
 
 function ItemCard({ item, label, children, powerIncrease = false, onSelect }: { item: Item; label?: string; children?: ReactNode; powerIncrease?: boolean; onSelect?: () => void }) {
   return (
-    <article className={`item-card ${enhancementEffectClass(item)} ${onSelect ? 'selectable' : ''}`} onClick={onSelect}>
+    <article className={`item-card ${enhancementEffectClass(item)} item-category-${item.itemCategory ?? 'equipment'} ${onSelect ? 'selectable' : ''}`} onClick={onSelect}>
       {powerIncrease && (
         <span className="power-up-indicator" aria-label="穿戴后战力提升" title="穿戴后战力提升">
           <ArrowUp size={16} strokeWidth={3} />
@@ -2482,11 +3407,14 @@ function ItemCard({ item, label, children, powerIncrease = false, onSelect }: { 
         <Package size={18} />
         <div>
           <div className="item-meta-line">
-            <span className="eyebrow">{label ?? typeName(item.itemType)} · Lv.{item.requiredLevel}</span>
+            <span className="eyebrow">
+              {label ?? `${itemCategoryLabel(item)} · ${typeName(item.itemType)}`} · Lv.{item.requiredLevel}
+              {item.stackable && item.quantity > 1 ? ` · x${item.quantity}` : ''}
+            </span>
             <EnhancementBadge level={item.enhancementLevel} />
           </div>
           <h2 className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</h2>
-          <p>{bonusText(item)}</p>
+          <p>{itemEffectText(item)}</p>
         </div>
       </div>
       {children && <div className="inline-actions">{children}</div>}
@@ -2521,13 +3449,15 @@ function ItemDetail({ item, onClose }: { item: EquipmentDetailData; onClose: () 
           <Gem size={30} />
         </div>
         <div className="item-meta-line detail-meta-line">
-          <span className="eyebrow">{qualityName(item.quality)} · {typeName(item.itemType)} · Lv.{item.requiredLevel}</span>
+          <span className="eyebrow">{qualityName(item.quality)} · {itemCategoryLabel(item)} · {typeName(item.itemType)} · Lv.{item.requiredLevel}</span>
           <EnhancementBadge level={item.enhancementLevel} />
         </div>
         <h2 className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</h2>
+        <p>{itemEffectText(item)}</p>
         <div className="detail-stat-grid">
           <Metric label="攻击" value={formatNumber(item.attackBonus)} />
           <Metric label="防御" value={formatNumber(item.defenseBonus)} />
+          <Metric label="抗性" value={formatNumber(item.resistanceBonus)} />
           <Metric label="生命" value={formatNumber(item.hpBonus)} />
           <Metric label="法力" value={formatNumber(item.mpBonus)} />
           <Metric label="暴击" value={`${Math.round((item.critBonus ?? 0) * 1000) / 10}%`} />
@@ -2539,7 +3469,7 @@ function ItemDetail({ item, onClose }: { item: EquipmentDetailData; onClose: () 
         <div className="detail-source">
           <span>装备出处</span>
           <strong>{item.origin ?? originForItem(item.templateId)}</strong>
-          <small>模板 {item.templateId}</small>
+          <small>{typeName(item.itemType)}</small>
         </div>
       </section>
     </div>
@@ -2585,7 +3515,14 @@ function EquipConfirmModal({ item, currentItem, targetSlot, currentPower, loadin
   );
 }
 
-function CompareCard({ title, item, highlight = false }: { title: string; item: Item | null; highlight?: boolean }) {
+function CompareCard({ title, item, highlight = false, emptyTitle = '空槽位', emptyText = '穿戴后将直接补齐该部位。', emptyMeta = '无来源' }: {
+  title: string;
+  item: Item | null;
+  highlight?: boolean;
+  emptyTitle?: string;
+  emptyText?: string;
+  emptyMeta?: string;
+}) {
   return (
     <article className={`compare-card ${enhancementEffectClass(item)} ${highlight ? 'highlight' : ''}`}>
       <div className="item-meta-line">
@@ -2600,26 +3537,32 @@ function CompareCard({ title, item, highlight = false }: { title: string; item: 
         </>
       ) : (
         <>
-          <h2>空槽位</h2>
-          <p>穿戴后将直接补齐该部位。</p>
-          <small>无来源</small>
+          <h2>{emptyTitle}</h2>
+          <p>{emptyText}</p>
+          <small>{emptyMeta}</small>
         </>
       )}
     </article>
   );
 }
 
-function EnhanceModal({ item, gold, message, loading, onClose, onEnhance }: {
+function EnhanceModal({ item, gold, message, loading, stones = [], selectedStoneIds = [], onAddStone, onRemoveStone, onClose, onEnhance }: {
   item: Item;
   gold: number;
   message: string | null;
   loading: boolean;
+  stones?: Item[];
+  selectedStoneIds?: number[];
+  onAddStone?: (stoneId: number) => void;
+  onRemoveStone?: (index: number) => void;
   onClose: () => void;
   onEnhance: () => void;
 }) {
   const nextLevel = item.enhancementLevel + 1;
   const cost = enhanceCost(item);
-  const chance = enhanceChance(item);
+  const stoneBonus = selectedStoneBonus(stones, selectedStoneIds);
+  const chance = Math.min(0.95, enhanceChance(item) + stoneBonus);
+  const selectedStones = selectedStoneIds.map((stoneId) => stones.find((stone) => stone.id === stoneId) ?? null);
   return (
     <div className="detail-backdrop result-modal-backdrop" onClick={onClose}>
       <section className={`decision-modal ${item.quality} ${enhancementEffectClass(item)}`} onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
@@ -2638,8 +3581,55 @@ function EnhanceModal({ item, gold, message, loading, onClose, onEnhance }: {
           <Metric label="强化费用" value={`${cost} 金`} />
           <Metric label="成功率" value={`${Math.round(chance * 100)}%`} />
           <Metric label="当前金币" value={`${gold} 金`} />
+          <Metric label="强化石" value={`${selectedStoneIds.length}/3`} />
+          <Metric label="石头加成" value={`+${formatPercent(stoneBonus)}`} />
         </div>
         {message && <div className="modal-notice">{message}</div>}
+        <div className="enhance-stone-panel">
+          <div className="stone-slot-row">
+            {[0, 1, 2].map((slotIndex) => {
+              const stone = selectedStones[slotIndex];
+              return (
+                <button
+                  key={slotIndex}
+                  className={`stone-slot ${stone ? stone.quality : ''}`}
+                  disabled={!stone}
+                  onClick={() => onRemoveStone?.(slotIndex)}
+                >
+                  {stone ? (
+                    <>
+                      <strong>{equipmentDisplayName(stone)}</strong>
+                      <span>+{formatPercent(stone.enhanceBonusRate)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>空槽</strong>
+                      <span>可放强化石</span>
+                    </>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <div className="stone-option-list">
+            {stones.length === 0 && <EmptyState text="当前背包没有适用于下一强化等级的强化石。" />}
+            {stones.map((stone) => {
+              const selectedCount = selectedStoneCount(selectedStoneIds, stone.id);
+              const stock = Math.max(1, stone.quantity);
+              return (
+                <button
+                  key={stone.id}
+                  className={`stone-option ${stone.quality}`}
+                  disabled={loading || selectedStoneIds.length >= 3 || selectedCount >= stock}
+                  onClick={() => onAddStone?.(stone.id)}
+                >
+                  <strong>{equipmentDisplayName(stone)}</strong>
+                  <span>+{formatPercent(stone.enhanceBonusRate)} · {selectedCount}/{stock}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="detail-source">
           <span>失败规则</span>
           <strong>+7 后失败可能降级，幸运值会提高下一次成功率。</strong>
@@ -2747,16 +3737,17 @@ function ResultSummaryModal({ result, onClose, onReturn, onRetry, retrying = fal
         <div className="result-modal-metrics">
           <Metric label="最终生命" value={`${Math.max(0, result.playerFinalHp)}/${result.playerMaxHp}`} />
           <Metric label="当前战力" value={result.combatPower.toString()} />
-          <Metric label="掉落装备" value={result.loot.length.toString()} />
+          <Metric label="掉落物品" value={result.loot.length.toString()} />
+          <Metric label="剩余疲劳" value={`${result.stamina.current}/${result.stamina.max}`} />
         </div>
         <SectionTitle icon={<Gem size={18} />} title="掉落明细" />
         <div className="result-loot-detail-grid">
-          {result.loot.length === 0 && <EmptyState text="这次没有装备掉落，可以换高掉率副本继续刷。" />}
-          {result.loot.map((item) => (
-            <button key={item.id} className={`loot-detail-card ${item.quality}`} onClick={() => onSelectLoot(item)}>
+          {result.loot.length === 0 && <EmptyState text="这次没有物品掉落，可以换高掉率副本继续刷。" />}
+          {result.loot.map((item, index) => (
+            <button key={`${item.id}-${index}`} className={`loot-detail-card ${item.quality}`} onClick={() => onSelectLoot(item)}>
               <span>{qualityName(item.quality)} · {typeName(item.itemType)} · Lv.{item.requiredLevel}</span>
               <strong className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</strong>
-              <p>{bonusText(item)}</p>
+              <p>{itemEffectText(item)}</p>
               <small>售价 {item.sellPrice} 金</small>
             </button>
           ))}
@@ -2764,7 +3755,7 @@ function ResultSummaryModal({ result, onClose, onReturn, onRetry, retrying = fal
         <div className="result-modal-actions">
           <button className="mini-action subtle" onClick={onClose}>继续看战报</button>
           {onRetry && <button className="mini-action" disabled={retrying} onClick={onRetry}>{retrying ? '进入中...' : '重试'}</button>}
-          <button className="primary-action" onClick={() => void onReturn()}>回到首页</button>
+          <button className="primary-action" onClick={() => void onReturn()}>回到副本大厅</button>
         </div>
       </section>
     </div>
@@ -2790,19 +3781,20 @@ function SweepSummaryModal({ result, onClose, onSelectLoot }: {
         <div className="result-modal-metrics">
           <Metric label="扫荡次数" value={result.times.toString()} />
           <Metric label="当前战力" value={result.combatPower.toString()} />
-          <Metric label="掉落装备" value={result.loot.length.toString()} />
+          <Metric label="掉落物品" value={result.loot.length.toString()} />
+          <Metric label="剩余疲劳" value={`${result.stamina.current}/${result.stamina.max}`} />
         </div>
         <div className="sweep-log">
           {result.logs.map((log) => <p key={log}>{log}</p>)}
         </div>
         <SectionTitle icon={<Gem size={18} />} title="扫荡掉落" />
         <div className="result-loot-detail-grid">
-          {result.loot.length === 0 && <EmptyState text="十次扫荡没有装备掉落，下一轮可能会转运。" />}
-          {result.loot.map((item) => (
-            <button key={item.id} className={`loot-detail-card ${item.quality}`} onClick={() => onSelectLoot(item)}>
+          {result.loot.length === 0 && <EmptyState text="十次扫荡没有物品掉落，下一轮可能会转运。" />}
+          {result.loot.map((item, index) => (
+            <button key={`${item.id}-${index}`} className={`loot-detail-card ${item.quality}`} onClick={() => onSelectLoot(item)}>
               <span>{qualityName(item.quality)} · {typeName(item.itemType)} · Lv.{item.requiredLevel}</span>
               <strong className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</strong>
-              <p>{bonusText(item)}</p>
+              <p>{itemEffectText(item)}</p>
               <small>售价 {item.sellPrice} 金</small>
             </button>
           ))}
@@ -2865,7 +3857,7 @@ function ListingCard({ listing, own, loading, onBuy, onCancel, onInspect }: {
             <EnhancementBadge level={listing.item.enhancementLevel} />
           </div>
           <h2 className={`quality ${listing.item.quality}`}>{equipmentDisplayName(listing.item)}</h2>
-          <p>{listing.item.attackBonus > 0 ? `攻击 +${listing.item.attackBonus}` : ''} {listing.item.defenseBonus > 0 ? `防御 +${listing.item.defenseBonus}` : ''} {listing.item.hpBonus > 0 ? `生命 +${listing.item.hpBonus}` : ''}</p>
+                <p>{listing.item.attackBonus > 0 ? `攻击 +${listing.item.attackBonus}` : ''} {listing.item.defenseBonus > 0 ? `防御 +${listing.item.defenseBonus}` : ''} {listing.item.resistanceBonus > 0 ? `抗性 +${listing.item.resistanceBonus}` : ''} {listing.item.hpBonus > 0 ? `生命 +${listing.item.hpBonus}` : ''}</p>
           <div className="market-tags">
             <span>{listing.marketTag}</span>
             <span>估值 {listing.recommendedPrice}</span>
@@ -2936,6 +3928,25 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function StaminaPanel({ stamina, compact = false }: { stamina?: HomeSnapshot['stamina'] | Dungeon['stamina']; compact?: boolean }) {
+  if (!stamina) {
+    return null;
+  }
+  const percent = Math.max(0, Math.min(100, Math.round((stamina.current / Math.max(1, stamina.max)) * 100)));
+  return (
+    <div className={`stamina-panel ${compact ? 'compact' : ''}`}>
+      <div className="stamina-panel-head">
+        <span>疲劳</span>
+        <strong>{stamina.current}/{stamina.max}</strong>
+      </div>
+      <div className="progress-bar stamina-bar" aria-label="疲劳值">
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <small>{stamina.current >= stamina.max ? '已满' : `下次恢复 ${formatStaminaTime(stamina.secondsUntilNext)} · 回满 ${formatStaminaTime(stamina.secondsUntilFull)}`}</small>
+    </div>
+  );
+}
+
 function NavTile({ icon, title, detail, onClick }: {
   icon: ReactNode;
   title: string;
@@ -2996,6 +4007,38 @@ function FeedbackDialog({ variant, title, message, onClose }: {
   );
 }
 
+function ConfirmDialog({ title, message, confirmLabel, cancelLabel, danger = false, onConfirm, onCancel }: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="detail-backdrop result-modal-backdrop" onClick={onCancel}>
+      <section className="feedback-modal warning" onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
+        <div className="feedback-modal-head">
+          <div className="feedback-icon">
+            <CircleAlert size={24} />
+          </div>
+          <div>
+            <span className="eyebrow">需要确认</span>
+            <h2>{title}</h2>
+            <p>{message}</p>
+          </div>
+          <button className="text-button" onClick={onCancel}>关闭</button>
+        </div>
+        <div className="result-modal-actions">
+          <button className="mini-action subtle" onClick={onCancel}>{cancelLabel}</button>
+          <button className={danger ? 'mini-action danger' : 'primary-action'} onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function TopBar({ title, onBack }: { title: string; onBack?: () => void }) {
   return (
     <header className="top-bar">
@@ -3028,6 +4071,7 @@ function ErrorScreen({ message }: { message: string }) {
 async function invalidateGameQueries(queryClient: ReturnType<typeof useQueryClient>, token: string) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['home', token] }),
+    queryClient.invalidateQueries({ queryKey: ['dungeons', token] }),
     queryClient.invalidateQueries({ queryKey: ['inventory', token] }),
     queryClient.invalidateQueries({ queryKey: ['quests', token] }),
     queryClient.invalidateQueries({ queryKey: ['leaderboard', token] }),
@@ -3054,17 +4098,25 @@ function battleFramesForResult(result: DungeonRunResult): BattleFrame[] {
     return result.frames;
   }
   const maxHp = result.playerMaxHp || result.playerFinalHp || 1;
-  return (result.logs?.length ? result.logs : ['没有战斗记录']).map((log, index) => ({
-    index: index + 1,
-    text: log,
-    tone: battleLogTone(log),
-    roomLabel: '战斗记录',
-    enemyName: undefined,
-    playerHp: result.playerFinalHp || maxHp,
-    playerMaxHp: maxHp,
-    enemyHp: 0,
-    enemyMaxHp: 0,
-  }));
+  return (result.logs?.length ? result.logs : ['没有战斗记录']).map((log, index) => {
+    const tone = battleLogTone(log);
+    return {
+      index: index + 1,
+      text: log,
+      tone,
+      roomLabel: '战斗记录',
+      enemyName: undefined,
+      playerHp: result.playerFinalHp || maxHp,
+      playerMaxHp: maxHp,
+      enemyHp: 0,
+      enemyMaxHp: 0,
+      actor: 'system' as const,
+      eventType: log.includes('恢复') ? 'heal' as const : tone === 'hit' ? 'hit' as const : 'phase' as const,
+      damage: 0,
+      critical: log.includes('暴击'),
+      missed: log.includes('闪避') || log.includes('落空'),
+    };
+  });
 }
 
 function professionName(profession: string) {
@@ -3154,7 +4206,138 @@ function slotName(slot: string) {
 }
 
 function typeName(type: string) {
+  if (type === 'enhancementStone') {
+    return '强化石';
+  }
+  if (type === 'staminaPotion') {
+    return '疲劳药水';
+  }
+  if (type === 'attributePotion') {
+    return '属性药水';
+  }
+  if (type === 'fragment') {
+    return '碎片';
+  }
+  if (type === 'chest') {
+    return '宝箱';
+  }
   return slotName(type === 'ring' ? 'ring1' : type);
+}
+
+function isEquipmentItem(item: { itemCategory?: string; itemType: string }) {
+  return (item.itemCategory ?? 'equipment') === 'equipment'
+    || ['weapon', 'helmet', 'armor', 'legs', 'boots', 'gloves', 'necklace', 'ring'].includes(item.itemType);
+}
+
+function itemCategoryLabel(item: { itemCategory?: string; itemType: string }) {
+  const category = item.itemCategory ?? (isEquipmentItem(item) ? 'equipment' : 'material');
+  const names: Record<string, string> = {
+    equipment: '装备',
+    consumable: '消耗品',
+    material: '材料',
+    chest: '宝箱',
+  };
+  return names[category] ?? typeName(item.itemType);
+}
+
+function itemEffectText(item: Item | EquipmentDetailData) {
+  if (item.effectType === 'staminaPotion') {
+    return `恢复疲劳 +${effectNumber(item, 'amount')}`;
+  }
+  if (item.effectType === 'attributePotion') {
+    const effect = parseEffectValue(item);
+    return `${attributeName(String(effect.attribute ?? ''))} +${Number(effect.amount ?? 0)}`;
+  }
+  if (item.effectType === 'enhancementStone') {
+    return `成功率 +${formatPercent(item.enhanceBonusRate ?? 0)} · +${item.minEnhanceLevel ?? 1}-${item.maxEnhanceLevel ?? 15}`;
+  }
+  if (item.effectType === 'fragment') {
+    return '合成装备宝箱材料';
+  }
+  if (item.effectType === 'chest' || item.itemCategory === 'chest') {
+    return '开启后随机获得奖励';
+  }
+  return bonusText(item);
+}
+
+function parseEffectValue(item: Item | EquipmentDetailData) {
+  if (!item.effectValueJson) {
+    return {} as Record<string, string | number>;
+  }
+  try {
+    return JSON.parse(item.effectValueJson) as Record<string, string | number>;
+  } catch {
+    return {} as Record<string, string | number>;
+  }
+}
+
+function effectNumber(item: Item | EquipmentDetailData, key: string) {
+  const value = parseEffectValue(item)[key];
+  return typeof value === 'number' ? value : Number(value ?? 0);
+}
+
+function inventoryTemplateQuantity(items: Item[], templateId: string) {
+  return items
+    .filter((item) => item.templateId === templateId)
+    .reduce((total, item) => total + Math.max(1, item.quantity ?? 1), 0);
+}
+
+function enhancementStonesForItem(items: Item[], item: Item | null) {
+  if (!item) {
+    return [];
+  }
+  const nextLevel = item.enhancementLevel + 1;
+  return items
+    .filter((stone) => stone.effectType === 'enhancementStone')
+    .filter((stone) => stone.minEnhanceLevel <= nextLevel && stone.maxEnhanceLevel >= nextLevel)
+    .sort((left, right) => right.enhanceBonusRate - left.enhanceBonusRate || qualityRank(right.quality) - qualityRank(left.quality) || left.id - right.id);
+}
+
+function selectedStoneBonus(stones: Item[], selectedStoneIds: number[]) {
+  return selectedStoneIds.reduce((total, stoneId) => {
+    const stone = stones.find((candidate) => candidate.id === stoneId);
+    return total + (stone?.enhanceBonusRate ?? 0);
+  }, 0);
+}
+
+function selectedStoneCount(selectedStoneIds: number[], stoneId: number) {
+  return selectedStoneIds.filter((id) => id === stoneId).length;
+}
+
+function attributeName(attribute: string) {
+  const names: Record<string, string> = {
+    strength: '力量',
+    agility: '敏捷',
+    constitution: '体质',
+    intelligence: '智力',
+    spirit: '精神',
+  };
+  return names[attribute] ?? attribute;
+}
+
+function formatStaminaTime(seconds: number) {
+  if (seconds <= 0) {
+    return '已满';
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remain = seconds % 60;
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const extraMinutes = minutes % 60;
+    return `${hours}h ${extraMinutes}m`;
+  }
+  return `${minutes}:${remain.toString().padStart(2, '0')}`;
+}
+
+function bossArchetypeName(archetype: string) {
+  const names: Record<string, string> = {
+    boss: '首领',
+    brute: '重击',
+    skirmisher: '迅捷',
+    caster: '施法',
+    guardian: '守卫',
+  };
+  return names[archetype] ?? archetype;
 }
 
 function uniqueDropTypes(drops: DropPreview[]) {
@@ -3180,6 +4363,33 @@ function formatDropRate(rate: number) {
   return `${Math.round(percent)}%`;
 }
 
+function formatPercent(rate: number) {
+  return `${Math.round(rate * 1000) / 10}%`;
+}
+
+function powerBreakdownForHome(home: HomeSnapshot): PowerBreakdownSlice[] {
+  return [
+    {
+      key: 'base',
+      label: '角色基础',
+      value: home.powerBreakdown.basePower,
+      detail: `Lv.${home.player.level} · 基础属性转化`,
+    },
+    {
+      key: 'equipment',
+      label: '装备贡献',
+      value: home.powerBreakdown.equipmentPower,
+      detail: `${Object.values(home.equippedItems).filter(Boolean).length}/9 件已穿戴`,
+    },
+    {
+      key: 'synergy',
+      label: '属性协同',
+      value: home.powerBreakdown.synergyPower,
+      detail: '装备带来的输出和生存效率',
+    },
+  ];
+}
+
 function categoryName(category: string) {
   const names: Record<string, string> = {
     main: '主线',
@@ -3199,13 +4409,55 @@ function statusName(status: string) {
   return names[status] ?? status;
 }
 
-function rewardName(type: string, amount: number) {
+function rewardName(reward: { type: string; amount: number; itemName?: string; targetId?: string }) {
   const names: Record<string, string> = {
     gold: '金币',
     experience: '经验',
-    itemTemplate: '装备',
+    itemTemplate: reward.itemName ?? '物品',
   };
-  return `${names[type] ?? type} +${amount}`;
+  return `${names[reward.type] ?? reward.itemName ?? reward.targetId ?? reward.type} +${reward.amount}`;
+}
+
+function conditionName(type: string) {
+  const names: Record<string, string> = {
+    dungeonCompleted: '通关副本',
+    monsterKills: '击败怪物',
+    equipmentEquipped: '穿戴装备',
+    enhancementAttempts: '强化尝试',
+    enhancementSuccesses: '强化成功',
+    enhancementStoneUsed: '使用强化石',
+    enhancementLevelReached: '强化等级',
+    combatPowerReached: '战力达成',
+    staminaSpent: '消耗疲劳',
+    itemUsed: '使用道具',
+    chestOpened: '开启宝箱',
+    fragmentCrafted: '碎片合成',
+    worldChatSent: '世界聊天',
+    marketVisited: '访问市场',
+    leaderboardViewed: '查看榜单',
+  };
+  return names[type] ?? type;
+}
+
+function questSortScore(quest: QuestRow) {
+  let score = 0;
+  if (quest.claimable || quest.status === 'completed') {
+    score += 10000;
+  }
+  if (quest.recommended) {
+    score += 1000;
+  }
+  if (quest.status === 'active') {
+    score += 500;
+  }
+  score += Math.min(100, quest.progressPercent ?? 0);
+  if (quest.category === 'main') {
+    score += 20;
+  }
+  if (quest.category === 'daily') {
+    score += 10;
+  }
+  return score;
 }
 
 function screenForQuestTarget(target?: string) {
@@ -3221,28 +4473,37 @@ function screenForQuestTarget(target?: string) {
   return 'home';
 }
 
-function dungeonRisk(combatPower: number, recommendedPower: number, playerLevel = 0, recommendedLevel = 0) {
+function dungeonRisk(
+  combatPower: number,
+  minimumPower: number,
+  playerLevel = 0,
+  minimumLevel = 0,
+  gate?: Dungeon['gate'],
+) {
   if (!combatPower) {
     return { label: '读取中', level: 'unknown' };
   }
-  const ratio = combatPower / Math.max(1, recommendedPower);
-  const levelGap = playerLevel > 0 && recommendedLevel > 0 ? recommendedLevel - playerLevel : 0;
-  if (levelGap >= 8) {
-    return { label: '极危', level: 'deadly' };
+  if (gate && !gate.eligible) {
+    if (gate.missingLevel > 0 && gate.missingPower > 0) {
+      return { label: '未达标', level: 'deadly' };
+    }
+    if (gate.missingLevel > 0) {
+      return { label: `差 ${gate.missingLevel} 级`, level: 'deadly' };
+    }
+    return { label: `差 ${formatNumber(gate.missingPower)}`, level: 'risky' };
   }
-  if (levelGap >= 4 && ratio < 1.2) {
-    return { label: '危险', level: 'risky' };
+  const ratio = combatPower / Math.max(1, minimumPower);
+  const levelGap = playerLevel > 0 && minimumLevel > 0 ? minimumLevel - playerLevel : 0;
+  if (levelGap > 0) {
+    return { label: `差 ${levelGap} 级`, level: 'deadly' };
   }
   if (ratio >= 1.2) {
     return { label: '碾压', level: 'safe' };
   }
-  if (ratio >= 0.95) {
+  if (ratio >= 1.0) {
     return { label: '稳妥', level: 'normal' };
   }
-  if (ratio >= 0.75) {
-    return { label: '危险', level: 'risky' };
-  }
-  return { label: '极危', level: 'deadly' };
+  return { label: '危险', level: 'risky' };
 }
 
 function dungeonMatchesLevelFilter(dungeon: Dungeon, filter: DungeonLevelFilter) {
@@ -3250,7 +4511,7 @@ function dungeonMatchesLevelFilter(dungeon: Dungeon, filter: DungeonLevelFilter)
     return true;
   }
   const [minLevel, maxLevel] = filter.split('-').map(Number);
-  return dungeon.recommendedLevel >= minLevel && dungeon.recommendedLevel <= maxLevel;
+  return dungeon.minimumLevel >= minLevel && dungeon.minimumLevel <= maxLevel;
 }
 
 function isSpecialDungeon(dungeon: Dungeon) {
@@ -3285,12 +4546,40 @@ function battleLogTone(log: string) {
   return '';
 }
 
+function battleEventName(frame: BattleFrame) {
+  if (frame.critical) {
+    return '暴击';
+  }
+  if (frame.missed) {
+    return '闪避';
+  }
+  const names: Record<string, string> = {
+    hit: frame.actor === 'enemy' ? '受击' : '命中',
+    miss: '闪避',
+    crit: '暴击',
+    phase: '机制',
+    heal: '恢复',
+    death: '击败',
+  };
+  return names[frame.eventType] ?? '记录';
+}
+
 function itemMatchesCategory(item: Item, category: string) {
-  return category === 'all' || itemTypesForCategory(category).includes(item.itemType);
+  if (category === 'all') {
+    return true;
+  }
+  if (category === 'equipment') {
+    return isEquipmentItem(item);
+  }
+  if (['consumable', 'material', 'chest'].includes(category)) {
+    return (item.itemCategory ?? '') === category;
+  }
+  return itemTypesForCategory(category).includes(item.itemType);
 }
 
 function itemTypesForCategory(category: string) {
   const map: Record<string, string[]> = {
+    equipment: ['weapon', 'helmet', 'armor', 'legs', 'boots', 'gloves', 'necklace', 'ring'],
     weapon: ['weapon'],
     armor: ['helmet', 'armor', 'legs', 'boots', 'gloves'],
     accessory: ['necklace', 'ring'],
@@ -3301,6 +4590,10 @@ function itemTypesForCategory(category: string) {
 function categoryNameForInventory(category: string) {
   const names: Record<string, string> = {
     all: '全部',
+    equipment: '装备',
+    consumable: '消耗品',
+    material: '材料',
+    chest: '宝箱',
     weapon: '武器',
     armor: '防具',
     accessory: '饰品',
@@ -3511,14 +4804,23 @@ function toEquipmentDetail(item: Item): EquipmentDetailData {
     name: item.name,
     displayName: item.displayName,
     itemType: item.itemType,
+    itemCategory: item.itemCategory,
     quality: item.quality,
     requiredLevel: item.requiredLevel,
     attackBonus: item.attackBonus,
     defenseBonus: item.defenseBonus,
+    resistanceBonus: item.resistanceBonus,
     hpBonus: item.hpBonus,
     mpBonus: item.mpBonus,
     critBonus: item.critBonus ?? 0,
     sellPrice: item.sellPrice,
+    quantity: item.quantity,
+    stackable: item.stackable,
+    effectType: item.effectType,
+    effectValueJson: item.effectValueJson,
+    enhanceBonusRate: item.enhanceBonusRate,
+    minEnhanceLevel: item.minEnhanceLevel,
+    maxEnhanceLevel: item.maxEnhanceLevel,
     enhancementLevel: item.enhancementLevel,
     enhancementLuck: item.enhancementLuck,
     origin: originForItem(item.templateId),
@@ -3536,13 +4838,14 @@ function leaderboardEquipmentToDetail(equipment: LeaderboardEquipment): Equipmen
     requiredLevel: equipment.level,
     attackBonus: equipment.attackBonus,
     defenseBonus: equipment.defenseBonus,
+    resistanceBonus: equipment.resistanceBonus,
     hpBonus: equipment.hpBonus,
     mpBonus: equipment.mpBonus,
     critBonus: equipment.critBonus,
     sellPrice: equipment.sellPrice,
     enhancementLevel: equipment.enhancementLevel,
     enhancementLuck: equipment.enhancementLuck,
-    origin: equipment.origin,
+    origin: equipmentOriginText(equipment),
     power: equipment.power,
   };
 }
@@ -3564,6 +4867,8 @@ function leaderboardEntryToSpeaker(entry: LeaderboardEntry): ChatSpeaker {
     intelligence: entry.intelligence,
     spirit: entry.spirit,
     freePoints: entry.freePoints,
+    derivedStats: entry.derivedStats,
+    equipmentPower: entry.equipmentPower,
     equipment: entry.equipment ?? [],
   };
 }
@@ -3575,6 +4880,9 @@ function leaderboardEquipmentBonusText(item: LeaderboardEquipment) {
   }
   if (item.defenseBonus > 0) {
     parts.push(`防御 +${item.defenseBonus}`);
+  }
+  if (item.resistanceBonus > 0) {
+    parts.push(`抗性 +${item.resistanceBonus}`);
   }
   if (item.hpBonus > 0) {
     parts.push(`生命 +${item.hpBonus}`);
@@ -3595,6 +4903,7 @@ function marketItemSnapshotToDetail(item: MarketListing['item']): EquipmentDetai
     requiredLevel: item.requiredLevel,
     attackBonus: item.attackBonus,
     defenseBonus: item.defenseBonus,
+    resistanceBonus: item.resistanceBonus,
     hpBonus: item.hpBonus,
     mpBonus: item.mpBonus,
     critBonus: item.critBonus,
@@ -3634,18 +4943,27 @@ function originForItem(templateId: string) {
   return '冒险者商会流通';
 }
 
-function itemPower(item: Pick<EquipmentDetailData, 'attackBonus' | 'defenseBonus' | 'hpBonus' | 'mpBonus' | 'critBonus' | 'enhancementLevel' | 'quality'>) {
+function equipmentOriginText(item: Pick<LeaderboardEquipment, 'origin' | 'templateId'>) {
+  if (!item.origin || item.origin.includes(item.templateId) || item.origin.includes('eq_')) {
+    return originForItem(item.templateId);
+  }
+  return item.origin;
+}
+
+function itemPower(item: Pick<EquipmentDetailData, 'attackBonus' | 'defenseBonus' | 'resistanceBonus' | 'hpBonus' | 'mpBonus' | 'critBonus' | 'enhancementLevel' | 'quality' | 'requiredLevel'>) {
   const level = item.enhancementLevel ?? 0;
   return Math.max(
     1,
     Math.round(
-      enhancedStatValue(item.attackBonus, level) * 12
-      + enhancedStatValue(item.defenseBonus, level) * 8
-      + enhancedStatValue(item.hpBonus, level) / 2
-      + enhancedStatValue(item.mpBonus, level) / 2
-      + enhancedCritValue(item.critBonus ?? 0, level) * 900
-      + level * 18
-      + qualityRank(item.quality) * 12,
+      enhancedStatValue(item.attackBonus, level) * 45
+      + enhancedStatValue(item.defenseBonus, level) * 30
+      + enhancedStatValue(item.resistanceBonus, level) * 30
+      + enhancedStatValue(item.hpBonus, level) * 4
+      + enhancedStatValue(item.mpBonus, level) * 2
+      + enhancedCritValue(item.critBonus ?? 0, level) * 3000
+      + level * 100
+      + Math.max(1, item.requiredLevel) * 20
+      + qualityRank(item.quality) * 60,
     ),
   );
 }
@@ -3678,9 +4996,10 @@ function enhancedCritValue(value: number, level: number) {
   return result;
 }
 
-function marketPriceEstimate(item: Pick<EquipmentDetailData, 'attackBonus' | 'defenseBonus' | 'hpBonus' | 'mpBonus' | 'critBonus' | 'enhancementLevel' | 'quality' | 'sellPrice' | 'requiredLevel'>) {
+function marketPriceEstimate(item: Pick<EquipmentDetailData, 'attackBonus' | 'defenseBonus' | 'resistanceBonus' | 'hpBonus' | 'mpBonus' | 'critBonus' | 'enhancementLevel' | 'quality' | 'sellPrice' | 'requiredLevel'>) {
   const statScore = item.attackBonus * 16
     + item.defenseBonus * 12
+    + item.resistanceBonus * 10
     + item.hpBonus / 2
     + item.mpBonus / 2
     + (item.critBonus ?? 0) * 1200
@@ -3697,13 +5016,14 @@ function enhanceCost(item: Item) {
 function enhanceChance(item: Item) {
   const nextLevel = item.enhancementLevel + 1;
   const base = nextLevel <= 3 ? 1 : nextLevel <= 6 ? 0.8 : nextLevel <= 9 ? 0.6 : nextLevel <= 12 ? 0.4 : 0.2;
-  return Math.min(1, base + item.enhancementLuck * 0.05);
+  return Math.min(0.95, base + item.enhancementLuck * 0.05);
 }
 
-function bonusText(item: Item) {
+function bonusText(item: Item | EquipmentDetailData) {
   const parts = [
     item.attackBonus > 0 ? `攻击 +${item.attackBonus}` : '',
     item.defenseBonus > 0 ? `防御 +${item.defenseBonus}` : '',
+    item.resistanceBonus > 0 ? `抗性 +${item.resistanceBonus}` : '',
     item.hpBonus > 0 ? `生命 +${item.hpBonus}` : '',
     item.mpBonus > 0 ? `法力 +${item.mpBonus}` : '',
     item.enhancementLevel > 0 ? `强化 +${item.enhancementLevel}` : '',
@@ -3715,6 +5035,7 @@ function dropBonusText(drop: DropPreview) {
   const parts = [
     drop.attackBonus > 0 ? `攻击 +${drop.attackBonus}` : '',
     drop.defenseBonus > 0 ? `防御 +${drop.defenseBonus}` : '',
+    drop.resistanceBonus > 0 ? `抗性 +${drop.resistanceBonus}` : '',
     drop.hpBonus > 0 ? `生命 +${drop.hpBonus}` : '',
     drop.mpBonus > 0 ? `法力 +${drop.mpBonus}` : '',
   ].filter(Boolean);

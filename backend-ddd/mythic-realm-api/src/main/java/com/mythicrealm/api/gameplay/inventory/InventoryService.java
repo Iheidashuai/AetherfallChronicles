@@ -1,10 +1,17 @@
 package com.mythicrealm.api.gameplay.inventory;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mythicrealm.api.gameplay.announcement.AnnouncementService;
+import com.mythicrealm.api.gameplay.combat.CombatPowerService;
+import com.mythicrealm.api.gameplay.combat.CombatStatsService;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.ItemTemplate;
 import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
+import com.mythicrealm.api.gameplay.stamina.StaminaService;
+import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
 import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
@@ -47,15 +54,27 @@ public class InventoryService {
     private final JdbcTemplate jdbcTemplate;
     private final GameConfigService gameConfigService;
     private final AnnouncementService announcementService;
+    private final CombatStatsService combatStatsService;
+    private final CombatPowerService combatPowerService;
+    private final StaminaService staminaService;
+    private final ObjectMapper objectMapper;
 
     public InventoryService(
         JdbcTemplate jdbcTemplate,
         GameConfigService gameConfigService,
-        AnnouncementService announcementService
+        AnnouncementService announcementService,
+        CombatStatsService combatStatsService,
+        CombatPowerService combatPowerService,
+        StaminaService staminaService,
+        ObjectMapper objectMapper
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.gameConfigService = gameConfigService;
         this.announcementService = announcementService;
+        this.combatStatsService = combatStatsService;
+        this.combatPowerService = combatPowerService;
+        this.staminaService = staminaService;
+        this.objectMapper = objectMapper;
     }
 
     public void grantStarterEquipment(long playerId) {
@@ -80,8 +99,8 @@ public class InventoryService {
                 """
                 INSERT INTO item_instance
                 (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
-                 defense_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 Statement.RETURN_GENERATED_KEYS
             );
@@ -93,16 +112,21 @@ public class InventoryService {
             ps.setInt(6, template.requiredLevel());
             ps.setInt(7, template.attackBonus() + roll(random, randomRange));
             ps.setInt(8, template.defenseBonus() + roll(random, randomRange));
-            ps.setInt(9, template.hpBonus());
-            ps.setInt(10, template.mpBonus());
-            ps.setBigDecimal(11, template.critBonus());
-            ps.setInt(12, template.sellPrice());
+            ps.setInt(9, template.resistanceBonus() + roll(random, randomRange));
+            ps.setInt(10, template.hpBonus());
+            ps.setInt(11, template.mpBonus());
+            ps.setBigDecimal(12, template.critBonus());
+            ps.setInt(13, template.sellPrice());
+            ps.setInt(14, 1);
             return ps;
         }, keyHolder);
         return keyHolder.getKey().longValue();
     }
 
     public ItemRecord addLootToInventory(long playerId, ItemTemplate template, Random random) {
+        if (template.stackable()) {
+            return addStackableItem(playerId, template, 1);
+        }
         int slot = nextFreeSlot(playerId);
         long itemId = createItem(playerId, template, random);
         jdbcTemplate.update(
@@ -115,7 +139,84 @@ public class InventoryService {
     }
 
     public ItemRecord addRewardItem(long playerId, String templateId, Random random) {
-        return addLootToInventory(playerId, gameConfigService.requireItem(templateId), random);
+        return grantItem(playerId, templateId, 1, random).getFirst();
+    }
+
+    public List<ItemRecord> grantItem(long playerId, String templateId, int amount, Random random) {
+        ItemTemplate template = gameConfigService.requireItem(templateId);
+        int count = Math.max(1, amount);
+        if (template.stackable()) {
+            return List.of(addStackableItem(playerId, template, count));
+        }
+        List<ItemRecord> result = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            result.add(addLootToInventory(playerId, template, random));
+        }
+        return result;
+    }
+
+    private ItemRecord addStackableItem(long playerId, ItemTemplate template, int amount) {
+        int count = Math.max(1, amount);
+        Optional<ItemRecord> existing = findInventoryStack(playerId, template.id());
+        if (existing.isPresent()) {
+            ItemRecord stack = existing.get();
+            jdbcTemplate.update(
+                "UPDATE item_instance SET quantity = LEAST(?, quantity + ?) WHERE id = ? AND player_id = ?",
+                Math.max(1, template.maxStack()),
+                count,
+                stack.id(),
+                playerId
+            );
+            return requireItem(stack.id());
+        }
+        int slot = nextFreeSlot(playerId);
+        var keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                """
+                INSERT INTO item_instance
+                (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
+                 defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity)
+                VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, ?)
+                """,
+                Statement.RETURN_GENERATED_KEYS
+            );
+            ps.setLong(1, playerId);
+            ps.setString(2, template.id());
+            ps.setString(3, template.name());
+            ps.setString(4, template.type());
+            ps.setString(5, template.quality());
+            ps.setInt(6, template.requiredLevel());
+            ps.setInt(7, template.sellPrice());
+            ps.setInt(8, Math.min(count, Math.max(1, template.maxStack())));
+            return ps;
+        }, keyHolder);
+        long itemId = keyHolder.getKey().longValue();
+        jdbcTemplate.update(
+            "INSERT INTO inventory_slot (player_id, slot_index, item_id) VALUES (?, ?, ?)",
+            playerId,
+            slot,
+            itemId
+        );
+        return requireItem(itemId);
+    }
+
+    private Optional<ItemRecord> findInventoryStack(long playerId, String templateId) {
+        return jdbcTemplate.query(
+            """
+            SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
+                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
+            FROM inventory_slot s
+            JOIN item_instance ii ON ii.id = s.item_id
+            JOIN item_template it ON it.id = ii.template_id
+            WHERE s.player_id = ? AND ii.template_id = ? AND it.stackable = TRUE
+            ORDER BY s.slot_index
+            LIMIT 1
+            """,
+            (rs, rowNum) -> mapItem(rs),
+            playerId,
+            templateId
+        ).stream().findFirst();
     }
 
     public ItemRecord addMarketItemToInventory(
@@ -127,6 +228,7 @@ public class InventoryService {
         int requiredLevel,
         int attackBonus,
         int defenseBonus,
+        int resistanceBonus,
         int hpBonus,
         int mpBonus,
         double critBonus,
@@ -141,8 +243,8 @@ public class InventoryService {
                 """
                 INSERT INTO item_instance
                 (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
-                 defense_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, enhancement_level, enhancement_luck)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity, enhancement_level, enhancement_luck)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                 """,
                 Statement.RETURN_GENERATED_KEYS
             );
@@ -154,12 +256,13 @@ public class InventoryService {
             ps.setInt(6, Math.max(1, requiredLevel));
             ps.setInt(7, Math.max(0, attackBonus));
             ps.setInt(8, Math.max(0, defenseBonus));
-            ps.setInt(9, Math.max(0, hpBonus));
-            ps.setInt(10, Math.max(0, mpBonus));
-            ps.setBigDecimal(11, BigDecimal.valueOf(Math.max(0, critBonus)));
-            ps.setInt(12, Math.max(1, sellPrice));
-            ps.setInt(13, Math.max(0, enhancementLevel));
-            ps.setInt(14, Math.max(0, enhancementLuck));
+            ps.setInt(9, Math.max(0, resistanceBonus));
+            ps.setInt(10, Math.max(0, hpBonus));
+            ps.setInt(11, Math.max(0, mpBonus));
+            ps.setBigDecimal(12, BigDecimal.valueOf(Math.max(0, critBonus)));
+            ps.setInt(13, Math.max(1, sellPrice));
+            ps.setInt(14, Math.max(0, enhancementLevel));
+            ps.setInt(15, Math.max(0, enhancementLuck));
             return ps;
         }, keyHolder);
         long itemId = keyHolder.getKey().longValue();
@@ -175,9 +278,11 @@ public class InventoryService {
     public List<ItemRecord> inventoryItems(long playerId) {
         return jdbcTemplate.query(
             """
-            SELECT ii.*
+            SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
+                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
             FROM inventory_slot s
             JOIN item_instance ii ON ii.id = s.item_id
+            JOIN item_template it ON it.id = ii.template_id
             WHERE s.player_id = ?
             ORDER BY s.slot_index
             """,
@@ -189,9 +294,11 @@ public class InventoryService {
     public Map<String, ItemRecord> equippedItems(long playerId) {
         return jdbcTemplate.query(
                 """
-                SELECT es.slot_name, ii.*
+                SELECT es.slot_name, ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
+                       it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
                 FROM equipment_slot es
                 JOIN item_instance ii ON ii.id = es.item_id
+                JOIN item_template it ON it.id = ii.template_id
                 WHERE es.player_id = ?
                 ORDER BY es.slot_name
                 """,
@@ -216,6 +323,9 @@ public class InventoryService {
     @Transactional
     public InventorySnapshot equip(PlayerRecord player, long itemId) {
         ItemRecord item = requireOwnedItem(player.id(), itemId);
+        if (!item.equipment()) {
+            throw ApiException.badRequest("Only equipment can be worn");
+        }
         String targetSlot = equipSlotForItem(player.id(), item);
         Integer sourceSlot = inventorySlot(player.id(), itemId)
             .orElseThrow(() -> ApiException.badRequest("只能穿戴背包中的装备"));
@@ -246,7 +356,7 @@ public class InventoryService {
 
     @Transactional
     public InventorySnapshot equipBest(PlayerRecord player) {
-        List<ItemRecord> candidates = new ArrayList<>(inventoryItems(player.id()));
+        List<ItemRecord> candidates = new ArrayList<>(inventoryItems(player.id()).stream().filter(ItemRecord::equipment).toList());
         candidates.addAll(equippedItems(player.id()).values());
         if (candidates.isEmpty()) {
             return snapshot(player);
@@ -311,7 +421,8 @@ public class InventoryService {
         inventorySlot(player.id(), itemId).orElseThrow(() -> ApiException.badRequest("只能出售背包中的装备"));
         jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ? AND item_id = ?", player.id(), itemId);
         jdbcTemplate.update("DELETE FROM item_instance WHERE id = ? AND player_id = ?", itemId, player.id());
-        jdbcTemplate.update("UPDATE player SET gold = gold + ? WHERE id = ?", item.sellPrice(), player.id());
+        int gainedGold = item.sellPrice() * Math.max(1, item.quantity());
+        jdbcTemplate.update("UPDATE player SET gold = gold + ? WHERE id = ?", gainedGold, player.id());
         return snapshot(new PlayerRecord(
             player.id(),
             player.accountId(),
@@ -319,7 +430,7 @@ public class InventoryService {
             player.profession(),
             player.level(),
             player.experience(),
-            player.gold() + item.sellPrice(),
+            player.gold() + gainedGold,
             player.strength(),
             player.agility(),
             player.constitution(),
@@ -331,16 +442,40 @@ public class InventoryService {
 
     @Transactional
     public EnhanceResult enhance(PlayerRecord player, long itemId) {
+        return enhance(player, itemId, List.of());
+    }
+
+    @Transactional
+    public EnhanceResult enhance(PlayerRecord player, long itemId, List<Long> stoneItemIds) {
         ItemRecord item = requireOwnedItem(player.id(), itemId);
+        if (!item.equipment()) {
+            throw ApiException.badRequest("Only equipment can be enhanced");
+        }
         if (item.enhancementLevel() >= 15) {
             throw ApiException.badRequest("装备已强化到上限");
         }
         int targetLevel = item.enhancementLevel() + 1;
+        List<Long> selectedStones = stoneItemIds == null ? List.of() : stoneItemIds.stream().filter(id -> id != null && id > 0).limit(4).toList();
+        if (selectedStones.size() > 3) {
+            throw ApiException.badRequest("At most three enhancement stones can be used");
+        }
+        double stoneBonus = 0;
+        for (long stoneItemId : selectedStones) {
+            ItemRecord stone = requireOwnedItem(player.id(), stoneItemId);
+            inventorySlot(player.id(), stone.id()).orElseThrow(() -> ApiException.badRequest("Enhancement stones must be in the inventory"));
+            if (!"enhancementStone".equals(stone.effectType())) {
+                throw ApiException.badRequest(stone.name() + " is not an enhancement stone");
+            }
+            if (targetLevel < stone.minEnhanceLevel() || targetLevel > stone.maxEnhanceLevel()) {
+                throw ApiException.badRequest(stone.name() + " cannot be used for +" + targetLevel);
+            }
+            stoneBonus += Math.max(0, stone.enhanceBonusRate());
+        }
         int cost = Math.max(1, item.requiredLevel()) * Math.max(1, item.requiredLevel()) * targetLevel * 10;
         if (player.gold() < cost) {
             throw ApiException.badRequest("金币不足，需要 " + cost + " 金");
         }
-        double chance = Math.min(1.0, baseSuccessRate(targetLevel) + item.enhancementLuck() * 0.05);
+        double chance = Math.min(0.95, baseSuccessRate(targetLevel) + item.enhancementLuck() * 0.05 + stoneBonus);
         boolean success = new Random(System.nanoTime() + itemId).nextDouble() <= chance;
         int nextLevel = item.enhancementLevel();
         int nextLuck = item.enhancementLuck();
@@ -354,6 +489,9 @@ public class InventoryService {
             } else if (targetLevel >= 13) {
                 nextLevel = Math.max(0, nextLevel - 2);
             }
+        }
+        for (long stoneItemId : selectedStones) {
+            consumeOne(player.id(), stoneItemId);
         }
         jdbcTemplate.update("UPDATE player SET gold = gold - ? WHERE id = ?", cost, player.id());
         jdbcTemplate.update(
@@ -381,7 +519,75 @@ public class InventoryService {
         if (success) {
             announcementService.publishEnhancementMilestone(player.name(), item.name(), nextLevel);
         }
-        return new EnhanceResult(success, cost, chance, snapshot(updatedPlayer));
+        return new EnhanceResult(success, cost, chance, selectedStones.size(), stoneBonus, nextLevel, snapshot(updatedPlayer));
+    }
+
+    @Transactional
+    public UseItemResult useItem(PlayerRecord player, long itemId) {
+        ItemRecord item = requireOwnedItem(player.id(), itemId);
+        inventorySlot(player.id(), itemId).orElseThrow(() -> ApiException.badRequest("Item must be in the inventory"));
+        if (item.effectType() == null || item.effectType().isBlank()) {
+            throw ApiException.badRequest("This item cannot be used");
+        }
+
+        if ("staminaPotion".equals(item.effectType())) {
+            int amount = effectInt(item, "amount", 0);
+            if (amount <= 0) {
+                throw ApiException.badRequest("Stamina potion is missing an amount");
+            }
+            consumeOne(player.id(), item.id());
+            StaminaSnapshot stamina = staminaService.add(player.id(), amount);
+            return new UseItemResult(item.name(), "staminaPotion", List.of(), stamina, snapshot(playerById(player.id())));
+        }
+
+        if ("attributePotion".equals(item.effectType())) {
+            JsonNode effect = effectNode(item);
+            String attribute = effect.path("attribute").asText("");
+            int amount = effect.path("amount").asInt(0);
+            int maxLevel = effect.path("maxLevel").asInt(90);
+            if (amount <= 0 || attribute.isBlank()) {
+                throw ApiException.badRequest("Attribute potion is missing an effect");
+            }
+            if (player.level() > maxLevel) {
+                throw ApiException.badRequest("This potion can only be used up to level " + maxLevel);
+            }
+            String column = attributeColumn(attribute);
+            jdbcTemplate.update("UPDATE player SET " + column + " = " + column + " + ? WHERE id = ?", amount, player.id());
+            consumeOne(player.id(), item.id());
+            return new UseItemResult(item.name(), "attributePotion", List.of(), staminaService.snapshot(player.id()), snapshot(playerById(player.id())));
+        }
+
+        if ("chest".equals(item.effectType())) {
+            ChestLoot loot = rollChestLoot(item.templateId(), new Random(System.nanoTime() + item.id()));
+            consumeOne(player.id(), item.id());
+            List<ItemRecord> rewards = grantItem(player.id(), loot.rewardTemplateId(), loot.quantity(), new Random(System.nanoTime() + loot.rewardTemplateId().hashCode()));
+            return new UseItemResult(item.name(), "chest", rewards, staminaService.snapshot(player.id()), snapshot(playerById(player.id())));
+        }
+
+        throw ApiException.badRequest("This item effect is not implemented: " + item.effectType());
+    }
+
+    @Transactional
+    public CraftResult craftRecipe(PlayerRecord player, String recipeId) {
+        CraftRecipe recipe = requireRecipe(recipeId);
+        if (player.level() < recipe.requiredLevel()) {
+            throw ApiException.badRequest("Recipe requires level " + recipe.requiredLevel());
+        }
+        List<CraftCost> costs = recipeCosts(recipeId);
+        if (costs.isEmpty()) {
+            throw ApiException.badRequest("Recipe has no material costs");
+        }
+        for (CraftCost cost : costs) {
+            int owned = stackableQuantity(player.id(), cost.itemTemplateId());
+            if (owned < cost.quantity()) {
+                throw ApiException.badRequest("Missing material " + cost.itemTemplateId() + ": " + owned + "/" + cost.quantity());
+            }
+        }
+        for (CraftCost cost : costs) {
+            consumeQuantityByTemplate(player.id(), cost.itemTemplateId(), cost.quantity());
+        }
+        List<ItemRecord> rewards = grantItem(player.id(), recipe.resultTemplateId(), recipe.resultQuantity(), new Random(System.nanoTime() + recipe.id().hashCode()));
+        return new CraftResult(recipe.id(), recipe.name(), rewards, snapshot(playerById(player.id())));
     }
 
     @Transactional
@@ -423,7 +629,7 @@ public class InventoryService {
             .filter(item -> qualitySet.isEmpty() || qualitySet.contains(item.quality()))
             .filter(item -> typeSet.isEmpty() || typeSet.contains(item.itemType()))
             .toList();
-        int goldGained = soldItems.stream().mapToInt(ItemRecord::sellPrice).sum();
+        int goldGained = soldItems.stream().mapToInt(item -> item.sellPrice() * Math.max(1, item.quantity())).sum();
         for (ItemRecord item : soldItems) {
             jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ? AND item_id = ?", player.id(), item.id());
             jdbcTemplate.update("DELETE FROM item_instance WHERE id = ? AND player_id = ?", item.id(), player.id());
@@ -468,33 +674,22 @@ public class InventoryService {
 
     public int combatPower(PlayerRecord player) {
         var equipment = equippedItems(player.id()).values();
-        int equipmentAttack = equipment.stream().mapToInt(ItemRecord::enhancedAttackBonus).sum();
-        int equipmentDefense = equipment.stream().mapToInt(ItemRecord::enhancedDefenseBonus).sum();
-        int equipmentHp = equipment.stream().mapToInt(ItemRecord::enhancedHpBonus).sum();
-        int equipmentMp = equipment.stream().mapToInt(ItemRecord::enhancedMpBonus).sum();
-        double equipmentCrit = equipment.stream().mapToDouble(ItemRecord::enhancedCritBonus).sum();
-
-        double attack = player.attack() + equipmentAttack;
-        double defense = player.defense() + equipmentDefense;
-        double hp = player.maxHp() + equipmentHp;
-        double mp = player.maxMp() + equipmentMp;
-        double critRate = Math.min(0.45, player.agility() * 0.001 + equipmentCrit);
-        double equippedSlots = equipment.size();
-
-        double offenseScore = attack * 12;
-        double defenseScore = defense * 8;
-        double healthScore = Math.sqrt(Math.max(1, hp)) * 26;
-        double manaScore = Math.sqrt(Math.max(1, mp)) * 12;
-        double critScore = offenseScore * critRate * 0.8;
-        double levelScore = player.level() * 45.0;
-        double slotSetBonus = 1 + Math.min(0.10, equippedSlots * 0.008);
-
-        return (int) ((offenseScore + defenseScore + healthScore + manaScore + critScore + levelScore) * slotSetBonus);
+        return combatPowerService.combatPower(
+            combatStatsService.playerStats(player, equipment),
+            combatStatsService.playerStats(player, List.of()),
+            equipment.stream().mapToInt(this::equipmentPower).sum()
+        );
     }
 
     public ItemRecord requireItem(long itemId) {
         return jdbcTemplate.query(
-                "SELECT * FROM item_instance WHERE id = ?",
+                """
+                SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
+                       it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
+                FROM item_instance ii
+                JOIN item_template it ON it.id = ii.template_id
+                WHERE ii.id = ?
+                """,
                 (rs, rowNum) -> mapItem(rs),
                 itemId
             )
@@ -566,6 +761,166 @@ public class InventoryService {
         jdbcTemplate.update("UPDATE item_instance SET player_id = ? WHERE id = ?", playerId, itemId);
     }
 
+    private void consumeOne(long playerId, long itemId) {
+        ItemRecord item = requireOwnedItem(playerId, itemId);
+        inventorySlot(playerId, itemId).orElseThrow(() -> ApiException.badRequest("Item must be in the inventory"));
+        if (item.stackable() && item.quantity() > 1) {
+            jdbcTemplate.update("UPDATE item_instance SET quantity = quantity - 1 WHERE id = ? AND player_id = ?", itemId, playerId);
+            return;
+        }
+        jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ? AND item_id = ?", playerId, itemId);
+        jdbcTemplate.update("DELETE FROM item_instance WHERE id = ? AND player_id = ?", itemId, playerId);
+    }
+
+    private void consumeQuantityByTemplate(long playerId, String templateId, int quantity) {
+        int remaining = Math.max(0, quantity);
+        List<ItemRecord> stacks = jdbcTemplate.query(
+            """
+            SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
+                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
+            FROM inventory_slot s
+            JOIN item_instance ii ON ii.id = s.item_id
+            JOIN item_template it ON it.id = ii.template_id
+            WHERE s.player_id = ? AND ii.template_id = ?
+            ORDER BY s.slot_index
+            """,
+            (rs, rowNum) -> mapItem(rs),
+            playerId,
+            templateId
+        );
+        for (ItemRecord stack : stacks) {
+            if (remaining <= 0) {
+                break;
+            }
+            int consume = Math.min(remaining, Math.max(1, stack.quantity()));
+            if (consume >= stack.quantity()) {
+                jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ? AND item_id = ?", playerId, stack.id());
+                jdbcTemplate.update("DELETE FROM item_instance WHERE id = ? AND player_id = ?", stack.id(), playerId);
+            } else {
+                jdbcTemplate.update("UPDATE item_instance SET quantity = quantity - ? WHERE id = ? AND player_id = ?", consume, stack.id(), playerId);
+            }
+            remaining -= consume;
+        }
+        if (remaining > 0) {
+            throw ApiException.badRequest("Missing material " + templateId);
+        }
+    }
+
+    private int stackableQuantity(long playerId, String templateId) {
+        Integer total = jdbcTemplate.queryForObject(
+            """
+            SELECT COALESCE(SUM(ii.quantity), 0)
+            FROM inventory_slot s
+            JOIN item_instance ii ON ii.id = s.item_id
+            WHERE s.player_id = ? AND ii.template_id = ?
+            """,
+            Integer.class,
+            playerId,
+            templateId
+        );
+        return total == null ? 0 : total;
+    }
+
+    private JsonNode effectNode(ItemRecord item) {
+        try {
+            return objectMapper.readTree(item.effectValueJson() == null || item.effectValueJson().isBlank() ? "{}" : item.effectValueJson());
+        } catch (Exception error) {
+            throw ApiException.badRequest("Invalid item effect config for " + item.templateId());
+        }
+    }
+
+    private int effectInt(ItemRecord item, String field, int defaultValue) {
+        return effectNode(item).path(field).asInt(defaultValue);
+    }
+
+    private String attributeColumn(String attribute) {
+        return switch (attribute) {
+            case "strength", "agility", "constitution", "intelligence", "spirit" -> attribute;
+            default -> throw ApiException.badRequest("Unsupported attribute: " + attribute);
+        };
+    }
+
+    private ChestLoot rollChestLoot(String chestTemplateId, Random random) {
+        List<ChestLootOption> options = jdbcTemplate.query(
+            """
+            SELECT reward_template_id, min_quantity, max_quantity, weight
+            FROM chest_loot
+            WHERE chest_template_id = ?
+            """,
+            (rs, rowNum) -> new ChestLootOption(
+                rs.getString("reward_template_id"),
+                rs.getInt("min_quantity"),
+                rs.getInt("max_quantity"),
+                Math.max(1, rs.getInt("weight"))
+            ),
+            chestTemplateId
+        );
+        if (options.isEmpty()) {
+            throw ApiException.badRequest("Chest has no loot table: " + chestTemplateId);
+        }
+        int totalWeight = options.stream().mapToInt(ChestLootOption::weight).sum();
+        int roll = random.nextInt(Math.max(1, totalWeight));
+        int cursor = 0;
+        for (ChestLootOption option : options) {
+            cursor += option.weight();
+            if (roll < cursor) {
+                int min = Math.max(1, option.minQuantity());
+                int max = Math.max(min, option.maxQuantity());
+                int quantity = min + random.nextInt(max - min + 1);
+                return new ChestLoot(option.rewardTemplateId(), quantity);
+            }
+        }
+        ChestLootOption fallback = options.getLast();
+        return new ChestLoot(fallback.rewardTemplateId(), Math.max(1, fallback.minQuantity()));
+    }
+
+    private CraftRecipe requireRecipe(String recipeId) {
+        return jdbcTemplate.query(
+            "SELECT id, name, result_template_id, result_quantity, required_level FROM craft_recipe WHERE id = ?",
+            (rs, rowNum) -> new CraftRecipe(
+                rs.getString("id"),
+                rs.getString("name"),
+                rs.getString("result_template_id"),
+                rs.getInt("result_quantity"),
+                rs.getInt("required_level")
+            ),
+            recipeId
+        ).stream().findFirst().orElseThrow(() -> ApiException.notFound("Recipe not found: " + recipeId));
+    }
+
+    private List<CraftCost> recipeCosts(String recipeId) {
+        return jdbcTemplate.query(
+            "SELECT item_template_id, quantity FROM craft_recipe_cost WHERE recipe_id = ?",
+            (rs, rowNum) -> new CraftCost(rs.getString("item_template_id"), rs.getInt("quantity")),
+            recipeId
+        );
+    }
+
+    private PlayerRecord playerById(long playerId) {
+        return jdbcTemplate.query(
+            "SELECT * FROM player WHERE id = ?",
+            (rs, rowNum) -> new PlayerRecord(
+                rs.getLong("id"),
+                rs.getObject("account_id") == null ? 0 : rs.getLong("account_id"),
+                rs.getString("name"),
+                rs.getString("profession"),
+                rs.getInt("level"),
+                rs.getInt("experience"),
+                rs.getLong("gold"),
+                rs.getLong("real_money"),
+                rs.getInt("wealth_tier_level"),
+                rs.getString("wealth_tier"),
+                rs.getInt("strength"),
+                rs.getInt("agility"),
+                rs.getInt("constitution"),
+                rs.getInt("intelligence"),
+                rs.getInt("spirit"),
+                rs.getInt("free_points")
+            ),
+            playerId
+        ).stream().findFirst().orElseThrow(() -> ApiException.notFound("Player not found"));
+    }
+
     private String equipSlotForItem(long playerId, ItemRecord item) {
         Optional<String> baseSlot = equipSlotFor(item.itemType());
         if (baseSlot.isEmpty()) {
@@ -623,11 +978,13 @@ public class InventoryService {
                 continue;
             }
             candidates.stream()
+                .filter(ItemRecord::equipment)
                 .filter(item -> slot.equals(equipSlotFor(item.itemType()).orElse(null)))
                 .max(byPower)
                 .ifPresent(item -> result.put(slot, item));
         }
         List<ItemRecord> bestRings = candidates.stream()
+            .filter(ItemRecord::equipment)
             .filter(item -> "ring".equals(item.itemType()))
             .sorted(byPower.reversed())
             .limit(2)
@@ -638,22 +995,24 @@ public class InventoryService {
         return result;
     }
 
-    private int equipmentPower(ItemRecord item) {
+    public int equipmentPower(ItemRecord item) {
         return Math.max(
             1,
             (int) Math.round(
-                item.enhancedAttackBonus() * 12
-                    + item.enhancedDefenseBonus() * 8
-                    + item.enhancedHpBonus() / 2.0
-                    + item.enhancedMpBonus() / 2.0
-                    + item.enhancedCritBonus() * 900
-                    + item.enhancementLevel() * 18
-                    + qualityRank(item.quality()) * 12
+                item.enhancedAttackBonus() * 45
+                    + item.enhancedDefenseBonus() * 30
+                    + item.enhancedResistanceBonus() * 30
+                    + item.enhancedHpBonus() * 4.0
+                    + item.enhancedMpBonus() * 2.0
+                    + item.enhancedCritBonus() * 3000
+                    + item.enhancementLevel() * 100
+                    + item.requiredLevel() * 20
+                    + qualityRank(item.quality()) * 60
             )
         );
     }
 
-    private int qualityRank(String quality) {
+    public int qualityRank(String quality) {
         return switch (quality) {
             case "immortal" -> 6;
             case "legendary" -> 5;
@@ -671,14 +1030,23 @@ public class InventoryService {
             rs.getString("template_id"),
             rs.getString("name"),
             rs.getString("item_type"),
+            rs.getString("item_category"),
             rs.getString("quality"),
             rs.getInt("required_level"),
             rs.getInt("attack_bonus"),
             rs.getInt("defense_bonus"),
+            rs.getInt("resistance_bonus"),
             rs.getInt("hp_bonus"),
             rs.getInt("mp_bonus"),
             rs.getBigDecimal("crit_bonus"),
             rs.getInt("sell_price"),
+            rs.getInt("quantity"),
+            rs.getBoolean("stackable"),
+            rs.getString("effect_type"),
+            rs.getString("effect_value_json"),
+            rs.getDouble("enhance_bonus_rate"),
+            rs.getInt("min_enhance_level"),
+            rs.getInt("max_enhance_level"),
             rs.getInt("enhancement_level"),
             rs.getInt("enhancement_luck")
         );
@@ -691,14 +1059,50 @@ public class InventoryService {
         long gold,
         int capacity
     ) {
+        @JsonProperty("items")
+        public List<ItemRecord> items() {
+            return inventory;
+        }
     }
 
-    public record EnhanceResult(boolean success, int cost, double chance, InventorySnapshot inventory) {
+    public record EnhanceResult(
+        boolean success,
+        int cost,
+        double chance,
+        int usedStoneCount,
+        double stoneBonus,
+        int enhancementLevel,
+        InventorySnapshot inventory
+    ) {
     }
 
     public record BulkSellResult(int soldCount, int goldGained, InventorySnapshot inventory) {
     }
 
     public record EnhancementTransferResult(ItemRecord sourceItem, ItemRecord targetItem, InventorySnapshot inventory) {
+    }
+
+    public record UseItemResult(
+        String itemName,
+        String effectType,
+        List<ItemRecord> rewards,
+        StaminaSnapshot stamina,
+        InventorySnapshot inventory
+    ) {
+    }
+
+    public record CraftResult(String recipeId, String recipeName, List<ItemRecord> rewards, InventorySnapshot inventory) {
+    }
+
+    private record ChestLootOption(String rewardTemplateId, int minQuantity, int maxQuantity, int weight) {
+    }
+
+    private record ChestLoot(String rewardTemplateId, int quantity) {
+    }
+
+    private record CraftRecipe(String id, String name, String resultTemplateId, int resultQuantity, int requiredLevel) {
+    }
+
+    private record CraftCost(String itemTemplateId, int quantity) {
     }
 }

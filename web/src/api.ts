@@ -22,17 +22,34 @@ export type Item = {
   templateId: string;
   name: string;
   itemType: string;
+  itemCategory: string;
   quality: string;
   requiredLevel: number;
   attackBonus: number;
   defenseBonus: number;
+  resistanceBonus: number;
   hpBonus: number;
   mpBonus: number;
   critBonus?: number;
   sellPrice: number;
+  quantity: number;
+  stackable: boolean;
+  effectType?: string;
+  effectValueJson?: string;
+  enhanceBonusRate: number;
+  minEnhanceLevel: number;
+  maxEnhanceLevel: number;
   enhancementLevel: number;
   enhancementLuck: number;
   displayName?: string;
+};
+
+export type StaminaSnapshot = {
+  current: number;
+  max: number;
+  secondsUntilNext: number;
+  secondsUntilFull: number;
+  updatedAt: string;
 };
 
 export type InventorySnapshot = {
@@ -47,6 +64,24 @@ export type EnhanceResult = {
   success: boolean;
   cost: number;
   chance: number;
+  usedStoneCount: number;
+  stoneBonus: number;
+  enhancementLevel: number;
+  inventory: InventorySnapshot;
+};
+
+export type UseItemResult = {
+  itemName: string;
+  effectType: string;
+  rewards: Item[];
+  stamina?: StaminaSnapshot;
+  inventory: InventorySnapshot;
+};
+
+export type CraftResult = {
+  recipeId: string;
+  recipeName: string;
+  rewards: Item[];
   inventory: InventorySnapshot;
 };
 
@@ -72,7 +107,32 @@ export type QuestRow = {
   status: string;
   currentValue: number;
   targetValue: number;
-  rewards: Array<{ type: string; targetId?: string; amount: number }>;
+  conditionLogic: string;
+  resetPeriod: string;
+  claimable: boolean;
+  progressPercent: number;
+  resetAt?: string;
+  recommended: boolean;
+  conditions: QuestCondition[];
+  rewards: QuestReward[];
+};
+
+export type QuestCondition = {
+  conditionId: string;
+  conditionType: string;
+  targetId?: string;
+  targetValue: number;
+  currentValue: number;
+  completed: boolean;
+};
+
+export type QuestReward = {
+  type: string;
+  targetId?: string;
+  amount: number;
+  itemName?: string;
+  quality?: string;
+  itemCategory?: string;
 };
 
 export type MarketListing = {
@@ -88,6 +148,7 @@ export type MarketListing = {
     requiredLevel: number;
     attackBonus: number;
     defenseBonus: number;
+    resistanceBonus: number;
     hpBonus: number;
     mpBonus: number;
     critBonus: number;
@@ -166,6 +227,8 @@ export type ChatSpeaker = {
   intelligence: number;
   spirit: number;
   freePoints: number;
+  derivedStats?: DerivedStats;
+  equipmentPower?: number;
   equipment: LeaderboardEquipment[];
 };
 
@@ -185,6 +248,8 @@ export type LeaderboardEntry = {
   intelligence: number;
   spirit: number;
   freePoints: number;
+  derivedStats: DerivedStats;
+  equipmentPower: number;
   equipment: LeaderboardEquipment[];
 };
 
@@ -198,6 +263,7 @@ export type LeaderboardEquipment = {
   power: number;
   attackBonus: number;
   defenseBonus: number;
+  resistanceBonus: number;
   hpBonus: number;
   mpBonus: number;
   critBonus: number;
@@ -212,6 +278,11 @@ export type HomeSnapshot = {
   combatPower: number;
   maxHp: number;
   maxMp: number;
+  derivedStats: DerivedStats;
+  baseStats: DerivedStats;
+  equipmentStats: DerivedStats;
+  equipmentPower: number;
+  powerBreakdown: PowerBreakdown;
   equippedItems: Record<string, Item>;
   inventoryCount: number;
   inventoryCapacity: number;
@@ -223,6 +294,27 @@ export type HomeSnapshot = {
     dungeonCount: number;
     questCount: number;
   };
+  stamina: StaminaSnapshot;
+};
+
+export type PowerBreakdown = {
+  basePower: number;
+  equipmentPower: number;
+  synergyPower: number;
+  totalPower: number;
+};
+
+export type DerivedStats = {
+  maxHp: number;
+  maxMp: number;
+  attackPower: number;
+  armor: number;
+  resistance: number;
+  speed: number;
+  accuracy: number;
+  evasion: number;
+  critChance: number;
+  critDamage: number;
 };
 
 export type Dungeon = {
@@ -232,18 +324,31 @@ export type Dungeon = {
   difficulty: string;
   recommendedLevel: number;
   recommendedPower: number;
+  minimumLevel: number;
+  minimumPower: number;
+  bossArchetype: string;
+  expectedRounds: number;
   drops: DropPreview[];
   cleared: boolean;
+  gate: {
+    eligible: boolean;
+    missingLevel: number;
+    missingPower: number;
+    label: string;
+  };
+  stamina?: StaminaSnapshot;
 };
 
 export type DropPreview = {
   templateId: string;
   name: string;
   itemType: string;
+  itemCategory: string;
   quality: string;
   requiredLevel: number;
   attackBonus: number;
   defenseBonus: number;
+  resistanceBonus: number;
   hpBonus: number;
   mpBonus: number;
   sellPrice: number;
@@ -266,6 +371,7 @@ export type DungeonRunResult = {
   playerMaxHp: number;
   playerFinalHp: number;
   frames: BattleFrame[];
+  stamina: StaminaSnapshot;
 };
 
 export type DungeonSweepResult = {
@@ -279,6 +385,7 @@ export type DungeonSweepResult = {
   player: Player;
   combatPower: number;
   logs: string[];
+  stamina: StaminaSnapshot;
 };
 
 export type BattleFrame = {
@@ -291,6 +398,11 @@ export type BattleFrame = {
   playerMaxHp: number;
   enemyHp: number;
   enemyMaxHp: number;
+  actor: 'player' | 'enemy' | 'system';
+  eventType: 'hit' | 'miss' | 'crit' | 'phase' | 'heal' | 'death';
+  damage: number;
+  critical: boolean;
+  missed: boolean;
 };
 
 export type AuthResponse = {
@@ -527,7 +639,16 @@ export const gameApi = {
   equipBest: (token: string) => api<InventorySnapshot>('/api/inventory/equip-best', { method: 'POST' }, token),
   unequip: (token: string, itemId: number) => api<InventorySnapshot>(`/api/inventory/${itemId}/unequip`, { method: 'POST' }, token),
   sell: (token: string, itemId: number) => api<InventorySnapshot>(`/api/inventory/${itemId}/sell`, { method: 'POST' }, token),
-  enhance: (token: string, itemId: number) => api<EnhanceResult>(`/api/inventory/${itemId}/enhance`, { method: 'POST' }, token),
+  enhance: (token: string, itemId: number, stoneItemIds: number[] = []) =>
+    api<EnhanceResult>(
+      `/api/inventory/${itemId}/enhance`,
+      { method: 'POST', body: JSON.stringify({ stoneItemIds }) },
+      token,
+    ),
+  useItem: (token: string, itemId: number) =>
+    api<UseItemResult>(`/api/inventory/${itemId}/use`, { method: 'POST' }, token),
+  craftRecipe: (token: string, recipeId: string) =>
+    api<CraftResult>(`/api/inventory/recipes/${recipeId}/craft`, { method: 'POST' }, token),
   transferEnhancement: (token: string, sourceItemId: number, targetItemId: number) =>
     api<EnhancementTransferResult>('/api/inventory/transfer-enhancement', { method: 'POST', body: JSON.stringify({ sourceItemId, targetItemId }) }, token),
   bulkSell: (token: string, qualities: string[], itemTypes: string[] = []) =>
@@ -545,6 +666,7 @@ export const gameApi = {
     api<void>(`/api/market/listings/${listingId}/cancel`, { method: 'POST' }, token),
   chatMessages: (token: string) => api<ChatMessage[]>('/api/chat/messages', {}, token),
   sendChat: (token: string, text: string) => api<ChatMessage>('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text }) }, token),
+  chatStreamUrl: (token: string, afterId = 0) => `/api/chat/stream?${new URLSearchParams({ token, afterId: String(afterId) }).toString()}`,
   leaderboard: (token: string) => api<LeaderboardEntry[]>('/api/leaderboard/power', {}, token),
   robotActivity: (token: string) => api<RobotActivitySnapshot>('/api/robots/activity', {}, token),
   robotActivityDetail: (token: string, robotId: number) => api<RobotActivityDetail>(`/api/robots/${robotId}/activity`, {}, token),

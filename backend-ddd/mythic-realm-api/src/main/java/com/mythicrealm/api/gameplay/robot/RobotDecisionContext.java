@@ -3,6 +3,7 @@ package com.mythicrealm.api.gameplay.robot;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.recharge.RechargeService;
+import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
 import java.util.Random;
 
 public record RobotDecisionContext(
@@ -14,6 +15,15 @@ public record RobotDecisionContext(
     int inventoryCount,
     int activeListings,
     int marketOpportunities,
+    StaminaSnapshot stamina,
+    int claimableQuestCount,
+    String firstClaimableQuestId,
+    int staminaPotionCount,
+    int attributePotionCount,
+    int chestCount,
+    int legendaryFragmentCount,
+    int immortalFragmentCount,
+    int usableEnhancementStoneCount,
     Random random
 ) {
     public PlayerRecord player() {
@@ -24,7 +34,7 @@ public record RobotDecisionContext(
         if (progressionDungeon == null) {
             return 0;
         }
-        return Math.max(0, progressionDungeon.recommendedPower() - actor.power());
+        return Math.max(0, progressionDungeon.minimumPower() - actor.power());
     }
 
     public long goldAfterPossibleRecharge() {

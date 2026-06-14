@@ -11,6 +11,7 @@ import com.mythicrealm.api.gameplay.player.PlayerService;
 import com.mythicrealm.api.gameplay.recharge.RechargeService;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -162,7 +163,11 @@ public class RobotEquipmentService {
         int beforePower = inventoryService.combatPower(fundedRobot);
         InventoryService.EnhanceResult result;
         try {
-            result = inventoryService.enhance(fundedRobot, equipped.item().id());
+            result = inventoryService.enhance(
+                fundedRobot,
+                equipped.item().id(),
+                selectEnhancementStones(fundedRobot.id(), equipped.item().enhancementLevel() + 1)
+            );
         } catch (ApiException error) {
             return null;
         }
@@ -174,10 +179,34 @@ public class RobotEquipmentService {
             result.inventory().combatPower() - beforePower,
             itemPower(updatedItem),
             result.success(),
+            result.usedStoneCount(),
             recharge != null,
             recharge == null ? 0 : recharge.rmbAmount(),
             recharge == null ? 0 : recharge.goldAmount()
         );
+    }
+
+    private List<Long> selectEnhancementStones(long playerId, int nextLevel) {
+        List<ItemRecord> candidates = inventoryService.inventoryItems(playerId).stream()
+            .filter(item -> "enhancementStone".equals(item.effectType()))
+            .filter(item -> item.minEnhanceLevel() <= nextLevel && item.maxEnhanceLevel() >= nextLevel)
+            .sorted(Comparator
+                .<ItemRecord>comparingDouble(ItemRecord::enhanceBonusRate)
+                .reversed()
+                .thenComparingInt(ItemRecord::sellPrice)
+                .thenComparing(ItemRecord::templateId))
+            .toList();
+        List<Long> selected = new ArrayList<>();
+        for (ItemRecord stone : candidates) {
+            int usable = Math.max(1, stone.quantity());
+            for (int index = 0; index < usable && selected.size() < 3; index++) {
+                selected.add(stone.id());
+            }
+            if (selected.size() >= 3) {
+                break;
+            }
+        }
+        return selected;
     }
 
     private long enhancementCost(ItemRecord item) {
@@ -227,14 +256,55 @@ public class RobotEquipmentService {
             itemPower(item),
             item.attackBonus(),
             item.defenseBonus(),
+            item.resistanceBonus(),
             item.hpBonus(),
             item.mpBonus(),
             item.critBonus().doubleValue(),
             item.sellPrice(),
             item.enhancementLevel(),
             item.enhancementLuck(),
-            "角色装备栏 · " + item.templateId()
+            originFor(item.templateId())
         );
+    }
+
+    private String originFor(String templateId) {
+        int tier = itemTier(templateId);
+        if (tier >= 37) {
+            return "副本掉落 · 龙眠王庭";
+        }
+        if (tier >= 31) {
+            return "副本掉落 · 星陨荒原";
+        }
+        if (tier >= 25) {
+            return "副本掉落 · 黑曜山脉";
+        }
+        if (tier >= 19) {
+            return "副本掉落 · 古堡回廊";
+        }
+        if (tier >= 7) {
+            return "副本掉落 · 腐沼边境";
+        }
+        if (tier >= 1) {
+            return "副本掉落 · 蛛影林地";
+        }
+        return "冒险者商会流通";
+    }
+
+    private int itemTier(String templateId) {
+        int start = templateId.indexOf("eq_t");
+        if (start < 0) {
+            return 0;
+        }
+        int index = start + 4;
+        StringBuilder value = new StringBuilder();
+        while (index < templateId.length() && Character.isDigit(templateId.charAt(index))) {
+            value.append(templateId.charAt(index));
+            index++;
+        }
+        if (value.isEmpty()) {
+            return 0;
+        }
+        return Integer.parseInt(value.toString());
     }
 
     private ItemTemplate chooseBootstrapTemplate(String itemType, PlayerRecord robot, Random random) {
@@ -306,11 +376,7 @@ public class RobotEquipmentService {
     }
 
     private int itemPower(ItemRecord item) {
-        return Math.max(1, item.enhancedAttackBonus() * 12
-            + item.enhancedDefenseBonus() * 8
-            + item.enhancedHpBonus() / 2
-            + item.enhancedMpBonus() / 2
-            + item.enhancementLevel() * 16);
+        return inventoryService.equipmentPower(item);
     }
 
     private String qualityForLevel(int level) {
@@ -363,6 +429,7 @@ public class RobotEquipmentService {
             rs.getInt("required_level"),
             rs.getInt("attack_bonus"),
             rs.getInt("defense_bonus"),
+            rs.getInt("resistance_bonus"),
             rs.getInt("hp_bonus"),
             rs.getInt("mp_bonus"),
             rs.getBigDecimal("crit_bonus"),
@@ -401,12 +468,13 @@ public class RobotEquipmentService {
         int powerGain,
         int itemPower,
         boolean success,
+        int usedStoneCount,
         boolean recharged,
         long rechargeRmb,
         long rechargeGold
     ) {
         public EquipmentChange(String itemName, String slotName, int enhancementLevel, int powerGain, int itemPower, boolean success) {
-            this(itemName, slotName, enhancementLevel, powerGain, itemPower, success, false, 0, 0);
+            this(itemName, slotName, enhancementLevel, powerGain, itemPower, success, 0, false, 0, 0);
         }
     }
 }

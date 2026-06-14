@@ -22,7 +22,10 @@ public class DungeonRunRobotAction implements RobotDecisionAction {
 
     @Override
     public boolean canRun(RobotDecisionContext context) {
-        return context.runnableDungeon() != null && context.inventoryCount() < 960;
+        return context.runnableDungeon() != null
+            && context.inventoryCount() < 960
+            && context.stamina() != null
+            && context.stamina().current() > 0;
     }
 
     @Override
@@ -32,9 +35,18 @@ public class DungeonRunRobotAction implements RobotDecisionAction {
         }
         double value = 45;
         value += Math.min(18, context.player().level() / 4.0);
-        value += Math.min(18, context.runnableDungeon().recommendedPower() / Math.max(1.0, context.actor().power()) * 10);
-        if (context.runnableDungeon().recommendedPower() <= context.actor().power()) {
+        value += Math.min(18, context.runnableDungeon().minimumPower() / Math.max(1.0, context.actor().power()) * 10);
+        if (context.runnableDungeon().minimumPower() <= context.actor().power()) {
             value += 10;
+        }
+        if (context.stamina() != null) {
+            if (context.stamina().current() >= 180) {
+                value += 18;
+            } else if (context.stamina().current() >= 120) {
+                value += 10;
+            } else if (context.stamina().current() <= 20) {
+                value -= 18;
+            }
         }
         if (context.progressionDungeon() != null && context.runnableDungeon().id().equals(context.progressionDungeon().id())) {
             value += 12;
