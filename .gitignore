@@ -18,17 +18,23 @@ xcuserdata/
 
 # Java backend
 backend/target/
+backend-ddd/**/target/
 backend/.m2/
 backend/.mvn/wrapper/maven-wrapper.jar
+backend-ddd/*.log
 
 # H5 frontend
 web/node_modules/
 web/dist/
 web/.vite/
 web/*.tsbuildinfo
+web/*.log
 
 # Local environment
 .env
 .env.*
 !.env.example
 .local/
+
+.idea
+tools/python/

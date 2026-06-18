@@ -3,23 +3,47 @@ package com.mythicrealm.api.gameplay.chat;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.leaderboard.LeaderboardService;
+import com.mythicrealm.api.gameplay.leaderboard.LeaderboardService.DerivedStats;
 import com.mythicrealm.api.gameplay.leaderboard.LeaderboardService.EquipmentSummary;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.player.PlayerService;
+import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
 public class ChatService {
+    private static final List<String> AMBIENT_LINES = List.of(
+        "副本大厅有人补输出吗？我刚测完一轮。",
+        "刚从铁匠铺出来，强化成功一次真的很提神。",
+        "市场里有几件低等级好词条装备，手慢可能就没了。",
+        "今天先刷装备再冲副本，战力门槛别硬莽。",
+        "有人看到高护甲装备可以留意下，Boss 重击越来越疼了。",
+        "我刚换了一件抗性装，法系怪明显好打很多。",
+        "副本风险提示挺准，黄色以上我一般先补装备。",
+        "背包快满了，扫荡之前记得清一下。"
+    );
+
     private final JdbcTemplate jdbcTemplate;
     private final PlayerService playerService;
     private final InventoryService inventoryService;
     private final LeaderboardService leaderboardService;
+    private final ExecutorService streamExecutor = Executors.newCachedThreadPool();
 
     public ChatService(
         JdbcTemplate jdbcTemplate,
@@ -36,8 +60,18 @@ public class ChatService {
     @Transactional
     public List<ChatMessageView> messages() {
         ensureOpeningMessages();
-        ensureAmbientMessages();
         return recentMessages();
+    }
+
+    public SseEmitter stream(long afterId) {
+        ensureOpeningMessages();
+        SseEmitter emitter = new SseEmitter(0L);
+        AtomicBoolean open = new AtomicBoolean(true);
+        emitter.onCompletion(() -> open.set(false));
+        emitter.onTimeout(() -> open.set(false));
+        emitter.onError(error -> open.set(false));
+        streamExecutor.execute(() -> runStream(emitter, open, Math.max(0, afterId)));
+        return emitter;
     }
 
     @Transactional
@@ -46,12 +80,18 @@ public class ChatService {
         if (text.isBlank()) {
             throw ApiException.badRequest("消息不能为空");
         }
-        jdbcTemplate.update(
-            "INSERT INTO chat_message (player_id, sender_name, kind, text) VALUES (?, ?, 'player', ?)",
-            player.id(),
-            player.name(),
-            text
-        );
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                "INSERT INTO chat_message (player_id, sender_name, kind, text) VALUES (?, ?, 'player', ?)",
+                Statement.RETURN_GENERATED_KEYS
+            );
+            statement.setLong(1, player.id());
+            statement.setString(2, player.name());
+            statement.setString(3, text);
+            return statement;
+        }, keyHolder);
+        Number playerMessageId = keyHolder.getKey();
         List<RobotLite> robots = jdbcTemplate.query(
             "SELECT id, name, title FROM player WHERE controller_type = 'robot' ORDER BY RAND() LIMIT 3",
             (rs, rowNum) -> new RobotLite(rs.getLong("id"), rs.getString("name"), rs.getString("title"))
@@ -78,7 +118,104 @@ public class ChatService {
                 followUpFor(player.name(), text)
             );
         }
-        return recentMessages().get(recentMessages().size() - 1);
+        trimOldMessages();
+        if (playerMessageId == null) {
+            return recentMessages().get(recentMessages().size() - 1);
+        }
+        return messageById(playerMessageId.longValue());
+    }
+
+    @PreDestroy
+    void shutdown() {
+        streamExecutor.shutdownNow();
+    }
+
+    private void runStream(SseEmitter emitter, AtomicBoolean open, long afterId) {
+        long lastId = afterId;
+        long nextAmbientAt = System.currentTimeMillis() + nextAmbientDelayMillis();
+        try {
+            while (open.get()) {
+                List<ChatMessageView> pending = messagesAfter(lastId);
+                if (pending.isEmpty() && System.currentTimeMillis() >= nextAmbientAt) {
+                    insertAmbientMessage();
+                    nextAmbientAt = System.currentTimeMillis() + nextAmbientDelayMillis();
+                    pending = messagesAfter(lastId);
+                }
+                if (pending.isEmpty()) {
+                    sleep(open, 900);
+                    continue;
+                }
+                for (ChatMessageView message : pending) {
+                    if (!open.get()) {
+                        return;
+                    }
+                    emitter.send(SseEmitter.event()
+                        .name("message")
+                        .id(Long.toString(message.id()))
+                        .data(message));
+                    lastId = Math.max(lastId, message.id());
+                    sleep(open, 650);
+                }
+            }
+        } catch (IOException | IllegalStateException error) {
+            if (open.get()) {
+                emitter.completeWithError(error);
+            }
+        } finally {
+            open.set(false);
+        }
+    }
+
+    private void insertAmbientMessage() {
+        List<RobotLite> robots = jdbcTemplate.query(
+            "SELECT id, name, title FROM player WHERE controller_type = 'robot' ORDER BY RAND() LIMIT 1",
+            (rs, rowNum) -> new RobotLite(rs.getLong("id"), rs.getString("name"), rs.getString("title"))
+        );
+        String text = AMBIENT_LINES.get(ThreadLocalRandom.current().nextInt(AMBIENT_LINES.size()));
+        if (robots.isEmpty()) {
+            jdbcTemplate.update(
+                "INSERT INTO chat_message (sender_name, kind, text) VALUES (?, 'system', ?)",
+                "公会书记",
+                text
+            );
+        } else {
+            RobotLite robot = robots.get(0);
+            jdbcTemplate.update(
+                "INSERT INTO chat_message (player_id, sender_name, kind, text) VALUES (?, ?, 'robot', ?)",
+                robot.id(),
+                robot.name(),
+                text
+            );
+        }
+        trimOldMessages();
+    }
+
+    private long nextAmbientDelayMillis() {
+        return ThreadLocalRandom.current().nextLong(2_800, 6_800);
+    }
+
+    private void sleep(AtomicBoolean open, long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            open.set(false);
+        }
+    }
+
+    private void trimOldMessages() {
+        jdbcTemplate.update(
+            """
+            DELETE FROM chat_message
+            WHERE id NOT IN (
+                SELECT id FROM (
+                    SELECT id FROM chat_message
+                    ORDER BY id DESC
+                    LIMIT 260
+                ) recent_messages
+            )
+            """
+        );
     }
 
     private void ensureOpeningMessages() {
@@ -101,65 +238,59 @@ public class ChatService {
         );
     }
 
-    private void ensureAmbientMessages() {
-        Integer recentCount = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM chat_message WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL 8 MINUTE",
-            Integer.class
-        );
-        int needed = 70 - (recentCount == null ? 0 : recentCount);
-        if (needed <= 0) {
-            return;
-        }
-        jdbcTemplate.update(
-            """
-            INSERT INTO chat_message (player_id, sender_name, kind, text)
-            SELECT id, name, 'robot',
-                CASE FLOOR(RAND() * 14)
-                    WHEN 0 THEN CONCAT(title, ' 刚刷新战力榜，前 100 又卷起来了。')
-                    WHEN 1 THEN '刚从副本出来，危险档奖励高，但真的扛不住。'
-                    WHEN 2 THEN '商会低价装备有人秒吗？我刚看到一件不错的。'
-                    WHEN 3 THEN '强化成功以后战力涨得很明显，金币也掉得很明显。'
-                    WHEN 4 THEN '背包整理完舒服多了，普通装直接清。'
-                    WHEN 5 THEN CONCAT('有人在刷蛛影林地吗？', title, ' 想换一件护手。')
-                    WHEN 6 THEN '别光看颜色，词条歪了也要卖。'
-                    WHEN 7 THEN '今日任务还没交，差点忘了。'
-                    WHEN 8 THEN '刚买到一件低级稀有，比副本掉的还香。'
-                    WHEN 9 THEN '刚有人出传说，世界通告亮得我手一抖。'
-                    WHEN 10 THEN '稳妥副本适合挂机刷，极危副本别硬上。'
-                    WHEN 11 THEN '有人看见月刃剑士吗？刚才还在喊组队。'
-                    WHEN 12 THEN '我回了一个新人问题，结果三个人同时抢答。'
-                    ELSE '公会大厅今晚人不少，频道刷得太快了。'
-                END
-            FROM player
-            WHERE controller_type = 'robot'
-            ORDER BY RAND()
-            LIMIT ?
-            """,
-            needed
-        );
-    }
-
     private List<ChatMessageView> recentMessages() {
         List<RawMessage> raw = jdbcTemplate.query(
             """
             SELECT id, player_id, sender_name, kind, text, created_at
             FROM chat_message
-            ORDER BY created_at DESC, id DESC
+            ORDER BY id DESC
             LIMIT 80
             """,
-            (rs, rowNum) -> {
-                long playerId = rs.getLong("player_id");
-                boolean playerIdMissing = rs.wasNull();
-                return new RawMessage(
-                    rs.getLong("id"),
-                    playerIdMissing ? null : playerId,
-                    rs.getString("sender_name"),
-                    rs.getString("kind"),
-                    rs.getString("text"),
-                    rs.getTimestamp("created_at").toInstant()
-                );
-            }
+            (rs, rowNum) -> mapRawMessage(rs)
         ).reversed();
+        return toViews(raw);
+    }
+
+    private List<ChatMessageView> messagesAfter(long afterId) {
+        return toViews(jdbcTemplate.query(
+            """
+            SELECT id, player_id, sender_name, kind, text, created_at
+            FROM chat_message
+            WHERE id > ?
+            ORDER BY id ASC
+            LIMIT 24
+            """,
+            (rs, rowNum) -> mapRawMessage(rs),
+            afterId
+        ));
+    }
+
+    private ChatMessageView messageById(long messageId) {
+        return toViews(jdbcTemplate.query(
+            """
+            SELECT id, player_id, sender_name, kind, text, created_at
+            FROM chat_message
+            WHERE id = ?
+            """,
+            (rs, rowNum) -> mapRawMessage(rs),
+            messageId
+        )).stream().findFirst().orElseGet(() -> recentMessages().get(recentMessages().size() - 1));
+    }
+
+    private RawMessage mapRawMessage(java.sql.ResultSet rs) throws java.sql.SQLException {
+        long playerId = rs.getLong("player_id");
+        boolean playerIdMissing = rs.wasNull();
+        return new RawMessage(
+            rs.getLong("id"),
+            playerIdMissing ? null : playerId,
+            rs.getString("sender_name"),
+            rs.getString("kind"),
+            rs.getString("text"),
+            rs.getTimestamp("created_at").toInstant()
+        );
+    }
+
+    private List<ChatMessageView> toViews(List<RawMessage> raw) {
         Map<String, SpeakerProfile> speakerCache = new HashMap<>();
         return raw.stream()
             .map(message -> new ChatMessageView(
@@ -230,6 +361,9 @@ public class ChatService {
             (rs, rowNum) -> {
                 PlayerRecord player = mapPlayer(rs);
                 String kind = rs.getString("controller_type");
+                List<EquipmentSummary> equipment = "robot".equals(kind)
+                    ? leaderboardService.equipmentForRobot(player.id(), player.name(), player.profession(), player.level(), inventoryService.combatPower(player))
+                    : leaderboardService.equipmentForPlayer(player);
                 return new SpeakerProfile(
                     player.id(),
                     player.name(),
@@ -246,9 +380,9 @@ public class ChatService {
                     player.intelligence(),
                     player.spirit(),
                     player.freePoints(),
-                    "robot".equals(kind)
-                        ? leaderboardService.equipmentForRobot(player.id(), player.name(), player.profession(), player.level(), inventoryService.combatPower(player))
-                        : leaderboardService.equipmentForPlayer(player)
+                    leaderboardService.derivedStatsForPlayer(player),
+                    equipment.stream().mapToInt(EquipmentSummary::power).sum(),
+                    equipment
                 );
             },
             playerId
@@ -268,6 +402,7 @@ public class ChatService {
                 """,
                 (rs, rowNum) -> {
                     PlayerRecord robot = mapPlayer(rs);
+                    List<EquipmentSummary> equipment = leaderboardService.equipmentForRobot(robot.id(), robot.name(), robot.profession(), robot.level(), inventoryService.combatPower(robot));
                     return new SpeakerProfile(
                         robot.id(),
                         robot.name(),
@@ -284,7 +419,9 @@ public class ChatService {
                         robot.intelligence(),
                         robot.spirit(),
                         robot.freePoints(),
-                        leaderboardService.equipmentForRobot(robot.id(), robot.name(), robot.profession(), robot.level(), inventoryService.combatPower(robot))
+                        leaderboardService.derivedStatsForPlayer(robot),
+                        equipment.stream().mapToInt(EquipmentSummary::power).sum(),
+                        equipment
                     );
                 },
                 senderName
@@ -295,7 +432,26 @@ public class ChatService {
     }
 
     private SpeakerProfile systemSpeaker(String name) {
-        return new SpeakerProfile(null, name, "系统", "system", "system", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, List.of());
+        return new SpeakerProfile(
+            null,
+            name,
+            "系统",
+            "system",
+            "system",
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            new DerivedStats(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            0,
+            List.of()
+        );
     }
 
     private PlayerRecord mapPlayer(java.sql.ResultSet rs) throws java.sql.SQLException {
@@ -341,6 +497,8 @@ public class ChatService {
         int intelligence,
         int spirit,
         int freePoints,
+        DerivedStats derivedStats,
+        int equipmentPower,
         List<EquipmentSummary> equipment
     ) {
     }

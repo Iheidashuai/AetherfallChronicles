@@ -101,4 +101,4 @@ Primary experience:
 - Frontend styles: `web/src/styles.css`
 - Backend battle authority: `backend-ddd/mythic-realm-api/src/main/java/com/mythicrealm/api/gameplay/dungeon/DungeonService.java`
 - Backend inventory authority: `backend-ddd/mythic-realm-api/src/main/java/com/mythicrealm/api/gameplay/inventory/InventoryService.java`
-- Robot population and latest schema: `backend-ddd/mythic-realm-starter/src/main/resources/db/migration/V1__latest_schema.sql`
+- Robot population and latest schema: `backend-ddd/mythic-realm-starter/src/main/resources/db/latest_schema.sql`

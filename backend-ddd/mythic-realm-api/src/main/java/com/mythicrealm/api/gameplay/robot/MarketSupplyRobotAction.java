@@ -22,7 +22,11 @@ public class MarketSupplyRobotAction implements RobotDecisionAction {
 
     @Override
     public boolean canRun(RobotDecisionContext context) {
-        return context.runnableDungeon() != null && context.activeListings() < 4 && context.inventoryCount() < 970;
+        return context.runnableDungeon() != null
+            && context.activeListings() < 4
+            && context.inventoryCount() < 970
+            && context.stamina() != null
+            && context.stamina().current() > 0;
     }
 
     @Override
@@ -33,6 +37,9 @@ public class MarketSupplyRobotAction implements RobotDecisionAction {
         double value = 22 + Math.max(0, 4 - context.activeListings()) * 5.0;
         if (context.marketOpportunities() < 3) {
             value += 10;
+        }
+        if (context.stamina() != null && context.stamina().current() >= 180) {
+            value += 8;
         }
         if (context.personalityContains("商会") || context.personalityContains("掉落")) {
             value += 8;

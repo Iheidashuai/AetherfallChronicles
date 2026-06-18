@@ -17,7 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
-@DependsOn("flywayInitializer")
+@DependsOn("localDatabaseSchemaInitializer")
 public class GameConfigService {
     private final JdbcTemplate jdbcTemplate;
 
@@ -136,16 +136,25 @@ public class GameConfigService {
                 rs.getString("id"),
                 rs.getString("name"),
                 rs.getString("item_type"),
+                rs.getString("item_category"),
                 rs.getString("quality"),
                 rs.getInt("required_level"),
                 rs.getInt("attack_bonus"),
                 rs.getInt("defense_bonus"),
+                rs.getInt("resistance_bonus"),
                 rs.getInt("hp_bonus"),
                 rs.getInt("mp_bonus"),
                 rs.getBigDecimal("crit_bonus"),
                 rs.getInt("random_range"),
                 rs.getString("description"),
-                rs.getInt("sell_price")
+                rs.getInt("sell_price"),
+                rs.getBoolean("stackable"),
+                rs.getInt("max_stack"),
+                rs.getString("effect_type"),
+                rs.getString("effect_value_json"),
+                rs.getBigDecimal("enhance_bonus_rate").doubleValue(),
+                rs.getInt("min_enhance_level"),
+                rs.getInt("max_enhance_level")
             )
         );
     }
@@ -168,7 +177,17 @@ public class GameConfigService {
                     rs.getString("name"),
                     rs.getInt("level"),
                     rs.getInt("max_hp"),
-                    rs.getInt("strength"),
+                    rs.getInt("attack_power"),
+                    rs.getInt("armor"),
+                    rs.getInt("resistance"),
+                    rs.getBigDecimal("accuracy").doubleValue(),
+                    rs.getBigDecimal("evasion").doubleValue(),
+                    rs.getBigDecimal("crit_chance").doubleValue(),
+                    rs.getBigDecimal("crit_resist").doubleValue(),
+                    rs.getInt("speed"),
+                    rs.getString("damage_type"),
+                    rs.getString("archetype"),
+                    rs.getString("mechanic"),
                     rs.getBoolean("is_boss"),
                     loot,
                     rs.getInt("exp_reward"),
@@ -210,7 +229,11 @@ public class GameConfigService {
                     rs.getString("difficulty"),
                     rooms,
                     rs.getInt("recommended_level"),
-                    rs.getInt("recommended_power")
+                    rs.getInt("recommended_power"),
+                    rs.getInt("minimum_level"),
+                    rs.getInt("minimum_power"),
+                    rs.getString("boss_archetype"),
+                    rs.getInt("expected_rounds")
                 );
             }
         );
@@ -253,6 +276,10 @@ public class GameConfigService {
                     rs.getString("lore"),
                     rs.getInt("priority"),
                     rs.getString("navigation_target"),
+                    rs.getString("condition_logic"),
+                    rs.getString("reset_period"),
+                    rs.getInt("difficulty_score"),
+                    rs.getString("reward_tier"),
                     prerequisites,
                     conditions,
                     rewards
@@ -295,10 +322,12 @@ public class GameConfigService {
                     item.id(),
                     item.name(),
                     item.type(),
+                    item.category(),
                     item.quality(),
                     item.requiredLevel(),
                     item.attackBonus(),
                     item.defenseBonus(),
+                    item.resistanceBonus(),
                     item.hpBonus(),
                     item.mpBonus(),
                     item.sellPrice(),
@@ -318,6 +347,10 @@ public class GameConfigService {
             dungeon.difficulty(),
             dungeon.recommendedLevel(),
             dungeon.recommendedPower(),
+            dungeon.minimumLevel(),
+            dungeon.minimumPower(),
+            dungeon.bossArchetype(),
+            dungeon.expectedRounds(),
             drops
         );
     }
@@ -340,6 +373,10 @@ public class GameConfigService {
         String difficulty,
         int recommendedLevel,
         int recommendedPower,
+        int minimumLevel,
+        int minimumPower,
+        String bossArchetype,
+        int expectedRounds,
         List<DropPreview> drops
     ) {
     }
@@ -348,10 +385,12 @@ public class GameConfigService {
         String templateId,
         String name,
         String itemType,
+        String itemCategory,
         String quality,
         int requiredLevel,
         int attackBonus,
         int defenseBonus,
+        int resistanceBonus,
         int hpBonus,
         int mpBonus,
         int sellPrice,

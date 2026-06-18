@@ -2,6 +2,11 @@ package com.mythicrealm.api.gameplay.dungeon;
 
 import com.mythicrealm.api.gameplay.auth.AuthenticatedAccount;
 import com.mythicrealm.api.gameplay.announcement.AnnouncementService;
+import com.mythicrealm.api.gameplay.combat.CombatEngine;
+import com.mythicrealm.api.gameplay.combat.CombatEngine.CombatEvent;
+import com.mythicrealm.api.gameplay.combat.CombatEngine.EncounterOutcome;
+import com.mythicrealm.api.gameplay.combat.CombatStatsService;
+import com.mythicrealm.api.gameplay.combat.EncounterGate;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.ItemTemplate;
@@ -14,6 +19,8 @@ import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.player.PlayerService;
 import com.mythicrealm.api.gameplay.quest.QuestService;
 import com.mythicrealm.api.gameplay.quest.QuestService.QuestEvent;
+import com.mythicrealm.api.gameplay.stamina.StaminaService;
+import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -36,7 +43,11 @@ public class DungeonService {
     private final PlayerService playerService;
     private final InventoryService inventoryService;
     private final QuestService questService;
+    private final StaminaService staminaService;
     private final AnnouncementService announcementService;
+    private final CombatStatsService combatStatsService;
+    private final EncounterGate encounterGate;
+    private final CombatEngine combatEngine;
     private final String configVersion;
 
     public static boolean isSpecialDungeon(String dungeonId) {
@@ -49,7 +60,11 @@ public class DungeonService {
         PlayerService playerService,
         InventoryService inventoryService,
         QuestService questService,
+        StaminaService staminaService,
         AnnouncementService announcementService,
+        CombatStatsService combatStatsService,
+        EncounterGate encounterGate,
+        CombatEngine combatEngine,
         @Value("${mythic.config.version}") String configVersion
     ) {
         this.jdbcTemplate = jdbcTemplate;
@@ -57,11 +72,18 @@ public class DungeonService {
         this.playerService = playerService;
         this.inventoryService = inventoryService;
         this.questService = questService;
+        this.staminaService = staminaService;
         this.announcementService = announcementService;
+        this.combatStatsService = combatStatsService;
+        this.encounterGate = encounterGate;
+        this.combatEngine = combatEngine;
         this.configVersion = configVersion;
     }
 
     public List<DungeonProgressPreview> dungeonPreviews(long playerId) {
+        PlayerRecord player = playerService.requireById(playerId);
+        int combatPower = inventoryService.combatPower(player);
+        StaminaSnapshot stamina = staminaService.snapshot(playerId);
         Set<String> cleared = jdbcTemplate.queryForList(
                 "SELECT DISTINCT dungeon_id FROM dungeon_run WHERE player_id = ? AND success = TRUE",
                 String.class,
@@ -70,7 +92,12 @@ public class DungeonService {
             .stream()
             .collect(Collectors.toSet());
         return gameConfigService.dungeonPreviews().stream()
-            .map(preview -> DungeonProgressPreview.from(preview, cleared.contains(preview.id())))
+            .map(preview -> DungeonProgressPreview.from(
+                preview,
+                cleared.contains(preview.id()),
+                encounterGate.evaluate(player, combatPower, gameConfigService.requireDungeon(preview.id())),
+                stamina
+            ))
             .toList();
     }
 
@@ -93,6 +120,11 @@ public class DungeonService {
         DungeonConfig dungeon = gameConfigService.requireDungeon(dungeonId);
         boolean specialDungeon = isSpecialDungeon(dungeon.id());
         int combatPower = inventoryService.combatPower(player);
+        var gate = encounterGate.evaluate(player, combatPower, dungeon);
+        if (!gate.eligible()) {
+            throw ApiException.badRequest("未达到副本门槛：" + gate.label());
+        }
+        StaminaSnapshot stamina = staminaService.consume(player.id(), 1);
         Random random = new Random(Objects.hash(player.id(), dungeonId, normalizedRequestId, System.nanoTime()));
         var logs = new ArrayList<String>();
         var frames = new ArrayList<BattleFrame>();
@@ -102,22 +134,19 @@ public class DungeonService {
         int monstersKilled = 0;
         int rareOrBetterLoot = 0;
         var equipment = inventoryService.equippedItems(player.id()).values();
-        int playerMaxHp = (int) Math.max(1, player.maxHp() + equipment.stream().mapToInt(ItemRecord::enhancedHpBonus).sum());
+        var playerCombatant = combatStatsService.playerCombatant(player, equipment);
+        int playerMaxHp = playerCombatant.stats().maxHp();
         int playerHp = Math.max(1, playerMaxHp);
-        int playerAttack = (int) Math.max(1, player.attack() + equipment.stream().mapToInt(ItemRecord::enhancedAttackBonus).sum());
-        int playerDefense = (int) Math.max(0, player.defense() + equipment.stream().mapToInt(ItemRecord::enhancedDefenseBonus).sum());
-        double critRate = Math.min(0.45, player.agility() * 0.001 + equipment.stream().mapToDouble(ItemRecord::enhancedCritBonus).sum());
         double powerRatio = combatPower / (double) Math.max(1, dungeon.recommendedPower());
-        double pressure = pressureMultiplier(powerRatio);
         boolean success = true;
 
         appendFrame(logs, frames, "进入副本【" + dungeon.name() + "】", "system", "准备", null, playerHp, playerMaxHp, 0, 0);
-        appendFrame(logs, frames, "推荐战力 " + dungeon.recommendedPower() + "，当前战力 " + combatPower, "system", "准备", null, playerHp, playerMaxHp, 0, 0);
+        appendFrame(logs, frames, "门槛 " + dungeon.minimumLevel() + " 级 / " + dungeon.minimumPower() + " 战力，当前战力 " + combatPower, "system", "准备", null, playerHp, playerMaxHp, 0, 0);
         appendFrame(
             logs,
             frames,
-            powerRatio >= 1 ? "战力评估：压制区域，推进节奏稳定。" : "战力评估：危险越级，敌方压迫感明显增强。",
-            powerRatio >= 1 ? "system" : "danger",
+            powerRatio >= 1.15 ? "战力评估：压制区域，推进节奏稳定。" : "战力评估：刚达标，仍需注意命中、暴击和 Boss 机制。",
+            powerRatio >= 1.15 ? "system" : "danger",
             "准备",
             null,
             playerHp,
@@ -148,104 +177,32 @@ public class DungeonService {
             for (var roomMonster : room.monsters()) {
                 MonsterConfig monster = gameConfigService.requireMonster(roomMonster.monsterId());
                 for (int i = 0; i < roomMonster.count(); i++) {
-                    int monsterHp = scaledMonsterHp(monster, pressure);
-                    int monsterMaxHp = monsterHp;
-                    int monsterAttack = scaledMonsterAttack(monster, pressure);
-                    int roundLimit = roundLimit(monster);
-                    int round = 1;
+                    var enemy = combatStatsService.monsterCombatant(monster);
+                    int monsterMaxHp = enemy.stats().maxHp();
+                    int roundLimit = roundLimit();
                     appendFrame(
                         logs,
                         frames,
-                        "遭遇 " + monster.name() + " Lv." + monster.level() + "，生命 " + monsterHp,
+                        "遭遇 " + monster.name() + " Lv." + monster.level() + "，" + monster.archetype() + " / " + monster.damageType() + "，生命 " + monsterMaxHp,
                         monster.isBoss() ? "danger" : "system",
                         roomLabel,
                         monster.name(),
                         playerHp,
                         playerMaxHp,
-                        monsterHp,
+                        monsterMaxHp,
                         monsterMaxHp
                     );
-                    while (monsterHp > 0 && playerHp > 0 && round <= roundLimit) {
-                        boolean critical = random.nextDouble() < critRate;
-                        int playerDamage = damageRoll(playerAttack, monster.strength(), critical, random);
-                        monsterHp = Math.max(0, monsterHp - playerDamage);
-                        appendFrame(
-                            logs,
-                            frames,
-                            "第 " + round + " 回合：你" + (critical ? "打出暴击 " : "造成 ") + playerDamage + " 伤害，" + monster.name() + " 剩余 " + monsterHp,
-                            critical ? "critical" : "hit",
-                            roomLabel,
-                            monster.name(),
-                            playerHp,
-                            playerMaxHp,
-                            monsterHp,
-                            monsterMaxHp
-                        );
-                        if (monsterHp <= 0) {
-                            break;
-                        }
-                        int monsterDamage = damageRoll(monsterAttack, playerDefense, false, random);
-                        playerHp = Math.max(0, playerHp - monsterDamage);
-                        appendFrame(
-                            logs,
-                            frames,
-                            "第 " + round + " 回合：" + monster.name() + " 反击 " + monsterDamage + " 伤害，你剩余 " + playerHp + "/" + playerMaxHp,
-                            "enemy",
-                            roomLabel,
-                            monster.name(),
-                            playerHp,
-                            playerMaxHp,
-                            monsterHp,
-                            monsterMaxHp
-                        );
-                        round++;
+                    EncounterOutcome encounter = combatEngine.fight(playerCombatant, enemy, playerHp, roundLimit, random);
+                    for (CombatEvent event : encounter.events()) {
+                        appendCombatEvent(logs, frames, event, roomLabel);
                     }
-                    if (monsterHp > 0 && playerHp > 0) {
-                        int attritionDamage = Math.max(1, monsterAttack / 2);
-                        playerHp = Math.max(0, playerHp - attritionDamage);
-                        appendFrame(
-                            logs,
-                            frames,
-                            "战斗拖入消耗，额外承受 " + attritionDamage + " 伤害。",
-                            "danger",
-                            roomLabel,
-                            monster.name(),
-                            playerHp,
-                            playerMaxHp,
-                            monsterHp,
-                            monsterMaxHp
-                        );
-                    }
-                    if (playerHp <= 0) {
+                    playerHp = encounter.playerHp();
+                    if (encounter.playerDefeated()) {
                         success = false;
-                        appendFrame(
-                            logs,
-                            frames,
-                            "你在 " + monster.name() + " 面前倒下，副本推进中止。",
-                            "danger",
-                            roomLabel,
-                            monster.name(),
-                            playerHp,
-                            playerMaxHp,
-                            monsterHp,
-                            monsterMaxHp
-                        );
                         break battle;
                     }
-                    if (monsterHp > 0) {
+                    if (!encounter.enemyDefeated()) {
                         success = false;
-                        appendFrame(
-                            logs,
-                            frames,
-                            "久战不下，输出不足以击破 " + monster.name() + "，副本推进中止。",
-                            "danger",
-                            roomLabel,
-                            monster.name(),
-                            playerHp,
-                            playerMaxHp,
-                            monsterHp,
-                            monsterMaxHp
-                        );
                         break battle;
                     }
                     monstersKilled++;
@@ -285,16 +242,16 @@ public class DungeonService {
                                 playerHp,
                                 playerMaxHp,
                                 0,
-                                monsterMaxHp
+                                encounter.enemyMaxHp()
                             );
                         }
                     }
                 }
             }
             if (success && playerHp > 0 && roomIndex < dungeon.rooms().size() - 1) {
-                int recover = Math.max(6, playerMaxHp / 8);
+                int recover = Math.max(1, (int) Math.round(playerMaxHp * combatStatsService.roomRecoveryRate(player)));
                 playerHp = Math.min(playerMaxHp, playerHp + recover);
-                appendFrame(logs, frames, "短暂整备，恢复 " + recover + " 生命，当前 " + playerHp + "/" + playerMaxHp, "heal", roomLabel, null, playerHp, playerMaxHp, 0, 0);
+                appendFrame(logs, frames, "短暂整备，恢复 " + recover + " 生命，当前 " + playerHp + "/" + playerMaxHp, "heal", roomLabel, null, playerHp, playerMaxHp, 0, 0, "system", "heal", recover, false, false);
             }
         }
         if (success && specialDungeon) {
@@ -318,13 +275,15 @@ public class DungeonService {
             dungeon.recommendedPower(),
             playerMaxHp,
             playerHp,
-            frames
+            frames,
+            stamina
         );
         persistRun(player.id(), dungeon.id(), normalizedRequestId, result);
         publishLegendaryLoot(player.name(), dungeon.name(), loot);
         if (success) {
             questService.recordEvent(player.id(), new QuestEvent("dungeonCompleted", dungeon.id(), 1));
         }
+        questService.recordEvent(player.id(), new QuestEvent("staminaSpent", null, 1));
         if (monstersKilled > 0) {
             questService.recordEvent(player.id(), new QuestEvent("monsterKills", null, monstersKilled));
         }
@@ -347,6 +306,7 @@ public class DungeonService {
         }
 
         int sweepTimes = Math.max(1, Math.min(10, times));
+        StaminaSnapshot stamina = staminaService.consume(player.id(), sweepTimes);
         Random random = new Random(Objects.hash(player.id(), dungeonId, normalizeRequestId(requestId), System.nanoTime()));
         var logs = new ArrayList<String>();
         var loot = new ArrayList<ItemRecord>();
@@ -401,11 +361,13 @@ public class DungeonService {
             loot,
             updatedPlayer,
             inventoryService.combatPower(updatedPlayer),
-            logs
+            logs,
+            stamina
         );
         persistSweep(player.id(), dungeon.id(), normalizeRequestId(requestId), result);
         publishLegendaryLoot(player.name(), dungeon.name(), loot);
         questService.recordEvent(player.id(), new QuestEvent("dungeonCompleted", dungeon.id(), sweepTimes));
+        questService.recordEvent(player.id(), new QuestEvent("staminaSpent", null, sweepTimes));
         if (monstersKilled > 0) {
             questService.recordEvent(player.id(), new QuestEvent("monsterKills", null, monstersKilled));
         }
@@ -584,38 +546,8 @@ public class DungeonService {
         return clears == null ? 0 : clears;
     }
 
-    private int scaledMonsterHp(MonsterConfig monster, double pressure) {
-        return (int) Math.max(1, monster.maxHP() * pressure);
-    }
-
-    private int scaledMonsterAttack(MonsterConfig monster, double pressure) {
-        return (int) Math.max(1, monster.strength() * (0.9 + pressure * 0.45));
-    }
-
-    private int roundLimit(MonsterConfig monster) {
-        return monster.isBoss() ? 26 : 18;
-    }
-
-    private int damageRoll(int attack, int defense, boolean critical, Random random) {
-        double variance = 0.88 + random.nextDouble() * 0.24;
-        double critMultiplier = critical ? 1.75 : 1.0;
-        return (int) Math.max(1, (attack * critMultiplier - defense * 0.42) * variance);
-    }
-
-    private double pressureMultiplier(double powerRatio) {
-        if (powerRatio >= 1.2) {
-            return 0.85;
-        }
-        if (powerRatio >= 1.0) {
-            return 1.0;
-        }
-        if (powerRatio >= 0.8) {
-            return 1.25;
-        }
-        if (powerRatio >= 0.6) {
-            return 1.75;
-        }
-        return 2.55;
+    private int roundLimit() {
+        return CombatEngine.DEFAULT_ROUND_LIMIT;
     }
 
     private String rating(boolean success, double powerRatio, int playerHp, int playerMaxHp) {
@@ -651,6 +583,26 @@ public class DungeonService {
         int enemyHp,
         int enemyMaxHp
     ) {
+        appendFrame(logs, frames, text, tone, roomLabel, enemyName, playerHp, playerMaxHp, enemyHp, enemyMaxHp, "system", "phase", 0, false, false);
+    }
+
+    private void appendFrame(
+        List<String> logs,
+        List<BattleFrame> frames,
+        String text,
+        String tone,
+        String roomLabel,
+        String enemyName,
+        int playerHp,
+        int playerMaxHp,
+        int enemyHp,
+        int enemyMaxHp,
+        String actor,
+        String eventType,
+        int damage,
+        boolean critical,
+        boolean missed
+    ) {
         logs.add(text);
         frames.add(new BattleFrame(
             frames.size() + 1,
@@ -661,8 +613,33 @@ public class DungeonService {
             playerHp,
             playerMaxHp,
             enemyHp,
-            enemyMaxHp
+            enemyMaxHp,
+            actor,
+            eventType,
+            damage,
+            critical,
+            missed
         ));
+    }
+
+    private void appendCombatEvent(List<String> logs, List<BattleFrame> frames, CombatEvent event, String roomLabel) {
+        appendFrame(
+            logs,
+            frames,
+            event.text(),
+            event.tone(),
+            roomLabel,
+            event.enemyName(),
+            event.playerHp(),
+            event.playerMaxHp(),
+            event.enemyHp(),
+            event.enemyMaxHp(),
+            event.actor(),
+            event.eventType(),
+            event.damage(),
+            event.critical(),
+            event.missed()
+        );
     }
 
     private DungeonRunResult findExistingResult(long playerId, String requestId) {
@@ -709,7 +686,8 @@ public class DungeonService {
             run.recommendedPower(),
             run.playerMaxHp(),
             run.playerFinalHp(),
-            loadRunFrames(run.id())
+            loadRunFrames(run.id()),
+            staminaService.snapshot(playerId)
         );
     }
 
@@ -790,9 +768,9 @@ public class DungeonService {
             """
             INSERT INTO dungeon_run_loot
             (dungeon_run_id, loot_order, item_id, item_template_id, item_name, item_type, quality,
-             required_level, attack_bonus, defense_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price,
+             required_level, attack_bonus, defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price,
              enhancement_level, enhancement_luck)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             loot,
             100,
@@ -807,12 +785,13 @@ public class DungeonService {
                 ps.setInt(8, item.requiredLevel());
                 ps.setInt(9, item.attackBonus());
                 ps.setInt(10, item.defenseBonus());
-                ps.setInt(11, item.hpBonus());
-                ps.setInt(12, item.mpBonus());
-                ps.setBigDecimal(13, item.critBonus());
-                ps.setInt(14, item.sellPrice());
-                ps.setInt(15, item.enhancementLevel());
-                ps.setInt(16, item.enhancementLuck());
+                ps.setInt(11, item.resistanceBonus());
+                ps.setInt(12, item.hpBonus());
+                ps.setInt(13, item.mpBonus());
+                ps.setBigDecimal(14, item.critBonus());
+                ps.setInt(15, item.sellPrice());
+                ps.setInt(16, item.enhancementLevel());
+                ps.setInt(17, item.enhancementLuck());
             }
         );
     }
@@ -836,8 +815,8 @@ public class DungeonService {
             """
             INSERT INTO dungeon_run_frame
             (dungeon_run_id, frame_index, text, tone, room_label, enemy_name,
-             player_hp, player_max_hp, enemy_hp, enemy_max_hp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             player_hp, player_max_hp, enemy_hp, enemy_max_hp, actor, event_type, damage, critical, missed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             frames,
             200,
@@ -852,6 +831,11 @@ public class DungeonService {
                 ps.setInt(8, frame.playerMaxHp());
                 ps.setInt(9, frame.enemyHp());
                 ps.setInt(10, frame.enemyMaxHp());
+                ps.setString(11, frame.actor());
+                ps.setString(12, frame.eventType());
+                ps.setInt(13, frame.damage());
+                ps.setBoolean(14, frame.critical());
+                ps.setBoolean(15, frame.missed());
             }
         );
     }
@@ -874,6 +858,7 @@ public class DungeonService {
                 rs.getInt("required_level"),
                 rs.getInt("attack_bonus"),
                 rs.getInt("defense_bonus"),
+                rs.getInt("resistance_bonus"),
                 rs.getInt("hp_bonus"),
                 rs.getInt("mp_bonus"),
                 rs.getBigDecimal("crit_bonus"),
@@ -915,7 +900,12 @@ public class DungeonService {
                 rs.getInt("player_hp"),
                 rs.getInt("player_max_hp"),
                 rs.getInt("enemy_hp"),
-                rs.getInt("enemy_max_hp")
+                rs.getInt("enemy_max_hp"),
+                rs.getString("actor"),
+                rs.getString("event_type"),
+                rs.getInt("damage"),
+                rs.getBoolean("critical"),
+                rs.getBoolean("missed")
             ),
             runId
         );
@@ -958,7 +948,8 @@ public class DungeonService {
         int recommendedPower,
         int playerMaxHp,
         int playerFinalHp,
-        List<BattleFrame> frames
+        List<BattleFrame> frames,
+        StaminaSnapshot stamina
     ) {
     }
 
@@ -971,7 +962,12 @@ public class DungeonService {
         int playerHp,
         int playerMaxHp,
         int enemyHp,
-        int enemyMaxHp
+        int enemyMaxHp,
+        String actor,
+        String eventType,
+        int damage,
+        boolean critical,
+        boolean missed
     ) {
     }
 
@@ -985,7 +981,8 @@ public class DungeonService {
         List<ItemRecord> loot,
         PlayerRecord player,
         int combatPower,
-        List<String> logs
+        List<String> logs,
+        StaminaSnapshot stamina
     ) {
     }
 
@@ -996,10 +993,29 @@ public class DungeonService {
         String difficulty,
         int recommendedLevel,
         int recommendedPower,
+        int minimumLevel,
+        int minimumPower,
+        String bossArchetype,
+        int expectedRounds,
         List<GameConfigService.DropPreview> drops,
-        boolean cleared
+        boolean cleared,
+        EncounterGate.GateStatus gate,
+        StaminaSnapshot stamina
     ) {
         static DungeonProgressPreview from(DungeonPreview preview, boolean cleared) {
+            return from(
+                preview,
+                cleared,
+                new EncounterGate.GateStatus(false, preview.minimumLevel(), preview.minimumPower(), "登录后查看"),
+                null
+            );
+        }
+
+        static DungeonProgressPreview from(DungeonPreview preview, boolean cleared, EncounterGate.GateStatus gate) {
+            return from(preview, cleared, gate, null);
+        }
+
+        static DungeonProgressPreview from(DungeonPreview preview, boolean cleared, EncounterGate.GateStatus gate, StaminaSnapshot stamina) {
             return new DungeonProgressPreview(
                 preview.id(),
                 preview.name(),
@@ -1007,8 +1023,14 @@ public class DungeonService {
                 preview.difficulty(),
                 preview.recommendedLevel(),
                 preview.recommendedPower(),
+                preview.minimumLevel(),
+                preview.minimumPower(),
+                preview.bossArchetype(),
+                preview.expectedRounds(),
                 preview.drops(),
-                cleared
+                cleared,
+                gate,
+                stamina
             );
         }
     }

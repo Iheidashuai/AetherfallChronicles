@@ -37,6 +37,9 @@ public class RobotActivityService {
 
     @Scheduled(initialDelay = 6_000, fixedDelay = 15_000)
     public void simulateTick() {
+        if (!hasHumanPlayer()) {
+            return;
+        }
         List<RobotAgent> robots = jdbcTemplate.query(
             """
             SELECT id, account_id, name, title, profession, level, experience, gold, real_money,
@@ -63,6 +66,14 @@ public class RobotActivityService {
             robotBrainService.thinkAndAct(actor, target);
         }
         robotActionSupport.trimChat();
+    }
+
+    private boolean hasHumanPlayer() {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM player WHERE account_id IS NOT NULL",
+            Integer.class
+        );
+        return count != null && count > 0;
     }
 
     private RobotAgent mapRobot(ResultSet rs) throws SQLException {

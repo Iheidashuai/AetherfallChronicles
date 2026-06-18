@@ -3,16 +3,10 @@ spring:
     name: mythic-realm
 
   datasource:
-    url: jdbc:mysql://127.0.0.1:3307/mythicrealm?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://127.0.0.1:3306/mythicrealm?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
     username: root
-    password:
+    password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
-
-  flyway:
-    enabled: true
-    baseline-on-migrate: false
-    clean-disabled: false
-    locations: classpath:db/migration
 
   redis:
     host: localhost
@@ -24,7 +18,7 @@ spring:
     date-format: yyyy-MM-dd HH:mm:ss
 
 server:
-  port: 8080
+  port: 18080
 
 logging:
   level:
@@ -32,6 +26,7 @@ logging:
 
 mythic:
   database:
-    destructive-reset-on-migration-error: true
+    schema-location: classpath:db/latest_schema.sql
+    rebuild-on-start: false
   config:
-    version: v1.1-level90-bloodmoon
+    version: v2.0-combat-db-source

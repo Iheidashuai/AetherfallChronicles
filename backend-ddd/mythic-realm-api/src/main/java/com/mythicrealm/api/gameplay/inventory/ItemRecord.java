@@ -8,19 +8,90 @@ public record ItemRecord(
     String templateId,
     String name,
     String itemType,
+    String itemCategory,
     String quality,
     int requiredLevel,
     int attackBonus,
     int defenseBonus,
+    int resistanceBonus,
     int hpBonus,
     int mpBonus,
     BigDecimal critBonus,
     int sellPrice,
+    int quantity,
+    boolean stackable,
+    String effectType,
+    String effectValueJson,
+    double enhanceBonusRate,
+    int minEnhanceLevel,
+    int maxEnhanceLevel,
     int enhancementLevel,
     int enhancementLuck
 ) {
+    public ItemRecord(
+        long id,
+        long playerId,
+        String templateId,
+        String name,
+        String itemType,
+        String quality,
+        int requiredLevel,
+        int attackBonus,
+        int defenseBonus,
+        int resistanceBonus,
+        int hpBonus,
+        int mpBonus,
+        BigDecimal critBonus,
+        int sellPrice,
+        int enhancementLevel,
+        int enhancementLuck
+    ) {
+        this(
+            id,
+            playerId,
+            templateId,
+            name,
+            itemType,
+            "equipment",
+            quality,
+            requiredLevel,
+            attackBonus,
+            defenseBonus,
+            resistanceBonus,
+            hpBonus,
+            mpBonus,
+            critBonus,
+            sellPrice,
+            1,
+            false,
+            null,
+            null,
+            0,
+            1,
+            15,
+            enhancementLevel,
+            enhancementLuck
+        );
+    }
+
     public String displayName() {
         return enhancementLevel > 0 ? name + " +" + enhancementLevel : name;
+    }
+
+    public boolean equipment() {
+        return "equipment".equals(itemCategory);
+    }
+
+    public boolean consumable() {
+        return "consumable".equals(itemCategory);
+    }
+
+    public boolean material() {
+        return "material".equals(itemCategory);
+    }
+
+    public boolean chest() {
+        return "chest".equals(itemCategory) || "chest".equals(effectType);
     }
 
     public int enhancedAttackBonus() {
@@ -29,6 +100,10 @@ public record ItemRecord(
 
     public int enhancedDefenseBonus() {
         return enhancedValue(defenseBonus);
+    }
+
+    public int enhancedResistanceBonus() {
+        return enhancedValue(resistanceBonus);
     }
 
     public int enhancedHpBonus() {

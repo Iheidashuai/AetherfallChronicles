@@ -43,6 +43,7 @@ public class MarketService {
     private final DungeonService dungeonService;
     private final RechargeService rechargeService;
     private final Map<String, String> originCache = new ConcurrentHashMap<>();
+    private final Object robotListingMonitor = new Object();
     private Instant nextMarketPulseAt = Instant.now().plusSeconds(5);
 
     public MarketService(
@@ -107,8 +108,11 @@ public class MarketService {
         jdbcTemplate.update(
             """
             INSERT INTO market_listing
-            (seller_player_id, seller_name, item_id, item_template_id, item_enhancement_level, item_enhancement_luck, price, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'listed')
+            (seller_player_id, seller_name, item_id, item_template_id, item_enhancement_level, item_enhancement_luck,
+             snapshot_name, snapshot_item_type, snapshot_quality, snapshot_required_level, snapshot_attack_bonus,
+             snapshot_defense_bonus, snapshot_resistance_bonus, snapshot_hp_bonus, snapshot_mp_bonus,
+             snapshot_crit_bonus, snapshot_sell_price, price, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'listed')
             """,
             player.id(),
             player.name(),
@@ -116,6 +120,17 @@ public class MarketService {
             item.templateId(),
             item.enhancementLevel(),
             item.enhancementLuck(),
+            snapshot.name(),
+            snapshot.itemType(),
+            snapshot.quality(),
+            snapshot.requiredLevel(),
+            snapshot.attackBonus(),
+            snapshot.defenseBonus(),
+            snapshot.resistanceBonus(),
+            snapshot.hpBonus(),
+            snapshot.mpBonus(),
+            snapshot.critBonus(),
+            snapshot.sellPrice(),
             price
         );
         long listingId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
@@ -183,16 +198,17 @@ public class MarketService {
             """
             SELECT ml.id, ml.seller_player_id, ml.seller_name, ml.item_id,
                    COALESCE(ii.template_id, ml.item_template_id) AS snapshot_template_id,
-                   COALESCE(ii.name, it.name) AS snapshot_name,
-                   COALESCE(ii.item_type, it.item_type) AS snapshot_item_type,
-                   COALESCE(ii.quality, it.quality) AS snapshot_quality,
-                   COALESCE(ii.required_level, it.required_level) AS snapshot_required_level,
-                   COALESCE(ii.attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
-                   COALESCE(ii.defense_bonus, it.defense_bonus) AS snapshot_defense_bonus,
-                   COALESCE(ii.hp_bonus, it.hp_bonus) AS snapshot_hp_bonus,
-                   COALESCE(ii.mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
-                   COALESCE(ii.crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
-                   COALESCE(ii.sell_price, it.sell_price) AS snapshot_sell_price,
+                   COALESCE(ii.name, ml.snapshot_name, it.name) AS snapshot_name,
+                   COALESCE(ii.item_type, ml.snapshot_item_type, it.item_type) AS snapshot_item_type,
+                   COALESCE(ii.quality, ml.snapshot_quality, it.quality) AS snapshot_quality,
+                   COALESCE(ii.required_level, ml.snapshot_required_level, it.required_level) AS snapshot_required_level,
+                   COALESCE(ii.attack_bonus, ml.snapshot_attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
+                   COALESCE(ii.defense_bonus, ml.snapshot_defense_bonus, it.defense_bonus) AS snapshot_defense_bonus,
+                   COALESCE(ii.resistance_bonus, ml.snapshot_resistance_bonus, it.resistance_bonus) AS snapshot_resistance_bonus,
+                   COALESCE(ii.hp_bonus, ml.snapshot_hp_bonus, it.hp_bonus) AS snapshot_hp_bonus,
+                   COALESCE(ii.mp_bonus, ml.snapshot_mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
+                   COALESCE(ii.crit_bonus, ml.snapshot_crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
+                   COALESCE(ii.sell_price, ml.snapshot_sell_price, it.sell_price) AS snapshot_sell_price,
                    COALESCE(ii.enhancement_level, ml.item_enhancement_level) AS snapshot_enhancement_level,
                    COALESCE(ii.enhancement_luck, ml.item_enhancement_luck) AS snapshot_enhancement_luck,
                    ml.price, ml.status, ml.created_at,
@@ -245,6 +261,12 @@ public class MarketService {
     }
 
     private void ensureRobotListings(int maxRequiredLevel) {
+        synchronized (robotListingMonitor) {
+            ensureRobotListingsLocked(maxRequiredLevel);
+        }
+    }
+
+    private void ensureRobotListingsLocked(int maxRequiredLevel) {
         Integer activeRobotListings = jdbcTemplate.queryForObject(
             """
             SELECT COUNT(*)
@@ -272,6 +294,9 @@ public class MarketService {
 
     @Scheduled(initialDelay = 5_000, fixedDelay = 5_000)
     public void simulateMarketPulse() {
+        if (!hasHumanPlayer()) {
+            return;
+        }
         Instant now = Instant.now();
         if (now.isBefore(nextMarketPulseAt)) {
             return;
@@ -281,6 +306,14 @@ public class MarketService {
         if (new Random().nextInt(100) >= 58 || !listRobotDrop()) {
             robotBuyListing(null, null);
         }
+    }
+
+    private boolean hasHumanPlayer() {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM player WHERE account_id IS NOT NULL",
+            Integer.class
+        );
+        return count != null && count > 0;
     }
 
     @Transactional
@@ -351,6 +384,16 @@ public class MarketService {
         int equipped = 0;
         PlayerRecord updatedRobot = runResult.player();
         for (ItemRecord item : runResult.loot()) {
+            if (!item.equipment()) {
+                boolean legendary = isLegendaryOrBetter(item.quality());
+                if (legendary) {
+                    jdbcTemplate.update(
+                        "UPDATE player SET legendary_loot_count = legendary_loot_count + 1 WHERE id = ?",
+                        robot.id()
+                    );
+                }
+                continue;
+            }
             RobotEquipmentService.DropResolution drop = robotEquipmentService.resolveDropIfUpgrade(updatedRobot, item, random);
             boolean legendary = isLegendaryOrBetter(item.quality());
             if (legendary) {
@@ -385,22 +428,15 @@ public class MarketService {
     private DungeonConfig chooseRobotDungeon(RobotSeller robot, int maxRequiredLevel, Random random) {
         int levelLimit = Math.max(1, Math.min(maxRequiredLevel, robot.level() + 6));
         List<DungeonConfig> candidates = gameConfigService.dungeons().stream()
-            .filter(dungeon -> dungeon.recommendedLevel() <= levelLimit)
-            .filter(dungeon -> dungeon.recommendedPower() <= Math.max(1, (int) (robot.power() * 1.35)))
+            .filter(dungeon -> dungeon.minimumLevel() <= Math.min(levelLimit, robot.level()))
+            .filter(dungeon -> dungeon.minimumPower() <= Math.max(1, robot.power()))
             .sorted(Comparator
                 .comparing((DungeonConfig dungeon) -> !DungeonService.isSpecialDungeon(dungeon.id()))
-                .thenComparingInt((DungeonConfig dungeon) -> Math.abs(dungeon.recommendedLevel() - Math.max(1, robot.level())))
-                .thenComparingInt(dungeon -> Math.abs(dungeon.recommendedPower() - robot.power()))
+                .thenComparingInt((DungeonConfig dungeon) -> Math.abs(dungeon.minimumLevel() - Math.max(1, robot.level())))
+                .thenComparingInt(dungeon -> Math.abs(dungeon.minimumPower() - robot.power()))
                 .thenComparing(DungeonConfig::id))
             .limit(8)
             .toList();
-        if (candidates.isEmpty()) {
-            candidates = gameConfigService.dungeons().stream()
-                .filter(dungeon -> !DungeonService.isSpecialDungeon(dungeon.id()))
-                .sorted(Comparator.comparingInt(DungeonConfig::recommendedLevel).thenComparing(DungeonConfig::id))
-                .limit(3)
-                .toList();
-        }
         if (candidates.isEmpty()) {
             return null;
         }
@@ -417,16 +453,17 @@ public class MarketService {
             """
             SELECT ml.id, ml.seller_player_id, ml.seller_name, ml.item_id,
                    COALESCE(ii.template_id, ml.item_template_id) AS snapshot_template_id,
-                   COALESCE(ii.name, it.name) AS snapshot_name,
-                   COALESCE(ii.item_type, it.item_type) AS snapshot_item_type,
-                   COALESCE(ii.quality, it.quality) AS snapshot_quality,
-                   COALESCE(ii.required_level, it.required_level) AS snapshot_required_level,
-                   COALESCE(ii.attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
-                   COALESCE(ii.defense_bonus, it.defense_bonus) AS snapshot_defense_bonus,
-                   COALESCE(ii.hp_bonus, it.hp_bonus) AS snapshot_hp_bonus,
-                   COALESCE(ii.mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
-                   COALESCE(ii.crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
-                   COALESCE(ii.sell_price, it.sell_price) AS snapshot_sell_price,
+                   COALESCE(ii.name, ml.snapshot_name, it.name) AS snapshot_name,
+                   COALESCE(ii.item_type, ml.snapshot_item_type, it.item_type) AS snapshot_item_type,
+                   COALESCE(ii.quality, ml.snapshot_quality, it.quality) AS snapshot_quality,
+                   COALESCE(ii.required_level, ml.snapshot_required_level, it.required_level) AS snapshot_required_level,
+                   COALESCE(ii.attack_bonus, ml.snapshot_attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
+                   COALESCE(ii.defense_bonus, ml.snapshot_defense_bonus, it.defense_bonus) AS snapshot_defense_bonus,
+                   COALESCE(ii.resistance_bonus, ml.snapshot_resistance_bonus, it.resistance_bonus) AS snapshot_resistance_bonus,
+                   COALESCE(ii.hp_bonus, ml.snapshot_hp_bonus, it.hp_bonus) AS snapshot_hp_bonus,
+                   COALESCE(ii.mp_bonus, ml.snapshot_mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
+                   COALESCE(ii.crit_bonus, ml.snapshot_crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
+                   COALESCE(ii.sell_price, ml.snapshot_sell_price, it.sell_price) AS snapshot_sell_price,
                    COALESCE(ii.enhancement_level, ml.item_enhancement_level) AS snapshot_enhancement_level,
                    COALESCE(ii.enhancement_luck, ml.item_enhancement_luck) AS snapshot_enhancement_luck,
                    ml.price, ml.status,
@@ -613,8 +650,11 @@ public class MarketService {
         jdbcTemplate.update(
             """
             INSERT INTO market_listing
-            (seller_player_id, seller_name, item_id, item_template_id, item_enhancement_level, item_enhancement_luck, price, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'listed')
+            (seller_player_id, seller_name, item_id, item_template_id, item_enhancement_level, item_enhancement_luck,
+             snapshot_name, snapshot_item_type, snapshot_quality, snapshot_required_level, snapshot_attack_bonus,
+             snapshot_defense_bonus, snapshot_resistance_bonus, snapshot_hp_bonus, snapshot_mp_bonus,
+             snapshot_crit_bonus, snapshot_sell_price, price, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'listed')
             """,
             robot.id(),
             robot.name(),
@@ -622,6 +662,17 @@ public class MarketService {
             item.templateId(),
             item.enhancementLevel(),
             item.enhancementLuck(),
+            snapshot.name(),
+            snapshot.itemType(),
+            snapshot.quality(),
+            snapshot.requiredLevel(),
+            snapshot.attackBonus(),
+            snapshot.defenseBonus(),
+            snapshot.resistanceBonus(),
+            snapshot.hpBonus(),
+            snapshot.mpBonus(),
+            snapshot.critBonus(),
+            snapshot.sellPrice(),
             price
         );
         long listingId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
@@ -659,6 +710,7 @@ public class MarketService {
             item.requiredLevel(),
             item.attackBonus(),
             item.defenseBonus(),
+            item.resistanceBonus(),
             item.hpBonus(),
             item.mpBonus(),
             item.critBonus(),
@@ -740,16 +792,17 @@ public class MarketService {
             """
             SELECT ml.id, ml.item_id,
                    COALESCE(ii.template_id, ml.item_template_id) AS snapshot_template_id,
-                   COALESCE(ii.name, it.name) AS snapshot_name,
-                   COALESCE(ii.item_type, it.item_type) AS snapshot_item_type,
-                   COALESCE(ii.quality, it.quality) AS snapshot_quality,
-                   COALESCE(ii.required_level, it.required_level) AS snapshot_required_level,
-                   COALESCE(ii.attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
-                   COALESCE(ii.defense_bonus, it.defense_bonus) AS snapshot_defense_bonus,
-                   COALESCE(ii.hp_bonus, it.hp_bonus) AS snapshot_hp_bonus,
-                   COALESCE(ii.mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
-                   COALESCE(ii.crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
-                   COALESCE(ii.sell_price, it.sell_price) AS snapshot_sell_price,
+                   COALESCE(ii.name, ml.snapshot_name, it.name) AS snapshot_name,
+                   COALESCE(ii.item_type, ml.snapshot_item_type, it.item_type) AS snapshot_item_type,
+                   COALESCE(ii.quality, ml.snapshot_quality, it.quality) AS snapshot_quality,
+                   COALESCE(ii.required_level, ml.snapshot_required_level, it.required_level) AS snapshot_required_level,
+                   COALESCE(ii.attack_bonus, ml.snapshot_attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
+                   COALESCE(ii.defense_bonus, ml.snapshot_defense_bonus, it.defense_bonus) AS snapshot_defense_bonus,
+                   COALESCE(ii.resistance_bonus, ml.snapshot_resistance_bonus, it.resistance_bonus) AS snapshot_resistance_bonus,
+                   COALESCE(ii.hp_bonus, ml.snapshot_hp_bonus, it.hp_bonus) AS snapshot_hp_bonus,
+                   COALESCE(ii.mp_bonus, ml.snapshot_mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
+                   COALESCE(ii.crit_bonus, ml.snapshot_crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
+                   COALESCE(ii.sell_price, ml.snapshot_sell_price, it.sell_price) AS snapshot_sell_price,
                    COALESCE(ii.enhancement_level, ml.item_enhancement_level) AS snapshot_enhancement_level,
                    COALESCE(ii.enhancement_luck, ml.item_enhancement_luck) AS snapshot_enhancement_luck,
                    ml.price,
@@ -783,6 +836,7 @@ public class MarketService {
     private int recommendedPrice(ItemSnapshot item) {
         int statScore = item.attackBonus() * 16
             + item.defenseBonus() * 12
+            + item.resistanceBonus() * 10
             + item.hpBonus() / 2
             + item.mpBonus() / 2
             + (int) Math.round(item.critBonus() * 1200)
@@ -837,16 +891,17 @@ public class MarketService {
             """
             SELECT ml.id, ml.seller_player_id, ml.seller_name, ml.item_id,
                    COALESCE(ii.template_id, ml.item_template_id) AS snapshot_template_id,
-                   COALESCE(ii.name, it.name) AS snapshot_name,
-                   COALESCE(ii.item_type, it.item_type) AS snapshot_item_type,
-                   COALESCE(ii.quality, it.quality) AS snapshot_quality,
-                   COALESCE(ii.required_level, it.required_level) AS snapshot_required_level,
-                   COALESCE(ii.attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
-                   COALESCE(ii.defense_bonus, it.defense_bonus) AS snapshot_defense_bonus,
-                   COALESCE(ii.hp_bonus, it.hp_bonus) AS snapshot_hp_bonus,
-                   COALESCE(ii.mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
-                   COALESCE(ii.crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
-                   COALESCE(ii.sell_price, it.sell_price) AS snapshot_sell_price,
+                   COALESCE(ii.name, ml.snapshot_name, it.name) AS snapshot_name,
+                   COALESCE(ii.item_type, ml.snapshot_item_type, it.item_type) AS snapshot_item_type,
+                   COALESCE(ii.quality, ml.snapshot_quality, it.quality) AS snapshot_quality,
+                   COALESCE(ii.required_level, ml.snapshot_required_level, it.required_level) AS snapshot_required_level,
+                   COALESCE(ii.attack_bonus, ml.snapshot_attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
+                   COALESCE(ii.defense_bonus, ml.snapshot_defense_bonus, it.defense_bonus) AS snapshot_defense_bonus,
+                   COALESCE(ii.resistance_bonus, ml.snapshot_resistance_bonus, it.resistance_bonus) AS snapshot_resistance_bonus,
+                   COALESCE(ii.hp_bonus, ml.snapshot_hp_bonus, it.hp_bonus) AS snapshot_hp_bonus,
+                   COALESCE(ii.mp_bonus, ml.snapshot_mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
+                   COALESCE(ii.crit_bonus, ml.snapshot_crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
+                   COALESCE(ii.sell_price, ml.snapshot_sell_price, it.sell_price) AS snapshot_sell_price,
                    COALESCE(ii.enhancement_level, ml.item_enhancement_level) AS snapshot_enhancement_level,
                    COALESCE(ii.enhancement_luck, ml.item_enhancement_luck) AS snapshot_enhancement_luck,
                    ml.price, ml.status,
@@ -897,6 +952,7 @@ public class MarketService {
             requiredLevel > 0 ? requiredLevel : template.requiredLevel(),
             rs.getInt("snapshot_attack_bonus"),
             rs.getInt("snapshot_defense_bonus"),
+            rs.getInt("snapshot_resistance_bonus"),
             rs.getInt("snapshot_hp_bonus"),
             rs.getInt("snapshot_mp_bonus"),
             rs.getBigDecimal("snapshot_crit_bonus").doubleValue(),
@@ -1002,6 +1058,7 @@ public class MarketService {
         int requiredLevel,
         int attackBonus,
         int defenseBonus,
+        int resistanceBonus,
         int hpBonus,
         int mpBonus,
         double critBonus,
@@ -1019,6 +1076,7 @@ public class MarketService {
                 item.requiredLevel(),
                 item.attackBonus(),
                 item.defenseBonus(),
+                item.resistanceBonus(),
                 item.hpBonus(),
                 item.mpBonus(),
                 item.critBonus().doubleValue(),

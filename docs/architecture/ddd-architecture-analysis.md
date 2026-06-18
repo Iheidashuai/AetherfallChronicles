@@ -460,11 +460,11 @@ class GameConfigDungeonAdapter implements DungeonConfigRepository {
    CONSTRAINT fk_inventory_item FOREIGN KEY (item_id) REFERENCES item_instance (id)
    ```
 
-3. **使用 JSON 字段存储复杂数据**:
+3. **使用结构化表存储复杂数据**:
    ```sql
-   loot_json JSON NOT NULL        -- 副本掉落
-   result_json JSON NOT NULL      -- 副本结果
-   item_snapshot_json TEXT        -- 市场快照
+   dungeon_run_loot               -- 副本掉落
+   dungeon_run_frame              -- 战斗回放
+   market_listing.snapshot_*      -- 市场快照
    ```
 
 ### ⚠️ 问题

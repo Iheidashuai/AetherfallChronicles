@@ -98,7 +98,7 @@
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  PERSISTENCE                                                                │
 │    ├─ DungeonRepositoryImpl (uses GameConfigService + JdbcTemplate)        │
-│    ├─ DungeonRunRepositoryImpl (uses JdbcTemplate + ObjectMapper)          │
+│    ├─ DungeonRunRepositoryImpl (uses JdbcTemplate + structured tables)     │
 │    └─ DungeonRunPO (maps to dungeon_run table)                             │
 │                                                                             │
 │  CONFIGURATION                                                              │
@@ -113,7 +113,7 @@
 │        ├─ config_version, request_id                                       │
 │        ├─ success, rating                                                  │
 │        ├─ monsters_killed, exp_gained, gold_gained                         │
-│        ├─ loot_json, result_json                                           │
+│        ├─ dungeon_run_loot, dungeon_run_log, dungeon_run_frame             │
 │        └─ created_at                                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
 

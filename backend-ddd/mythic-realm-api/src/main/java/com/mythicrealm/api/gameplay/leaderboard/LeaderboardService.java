@@ -1,5 +1,7 @@
 package com.mythicrealm.api.gameplay.leaderboard;
 
+import com.mythicrealm.api.gameplay.combat.CombatStats;
+import com.mythicrealm.api.gameplay.combat.CombatStatsService;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.inventory.ItemRecord;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
@@ -17,11 +19,18 @@ public class LeaderboardService {
     private final JdbcTemplate jdbcTemplate;
     private final InventoryService inventoryService;
     private final RobotEquipmentService robotEquipmentService;
+    private final CombatStatsService combatStatsService;
 
-    public LeaderboardService(JdbcTemplate jdbcTemplate, InventoryService inventoryService, RobotEquipmentService robotEquipmentService) {
+    public LeaderboardService(
+        JdbcTemplate jdbcTemplate,
+        InventoryService inventoryService,
+        RobotEquipmentService robotEquipmentService,
+        CombatStatsService combatStatsService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.inventoryService = inventoryService;
         this.robotEquipmentService = robotEquipmentService;
+        this.combatStatsService = combatStatsService;
     }
 
     public List<LeaderboardEntry> entries(PlayerRecord player) {
@@ -37,13 +46,19 @@ public class LeaderboardService {
                 PlayerRecord entryPlayer = mapPlayer(rs);
                 boolean self = entryPlayer.id() == player.id();
                 boolean robot = "robot".equals(rs.getString("controller_type"));
+                List<EquipmentSummary> equipment = robot
+                    ? robotEquipmentService.equipmentForRobot(entryPlayer.id(), entryPlayer.name(), entryPlayer.profession(), entryPlayer.level(), inventoryService.combatPower(entryPlayer))
+                    : equipmentForPlayer(entryPlayer);
+                DerivedStats derivedStats = derivedStatsForPlayer(entryPlayer);
+                int power = inventoryService.combatPower(entryPlayer);
+                int equipmentPower = equipment.stream().mapToInt(EquipmentSummary::power).sum();
                 return new LeaderboardEntry(
                     0,
                     entryPlayer.name(),
                     self ? "你" : rs.getString("title"),
                     entryPlayer.profession(),
                     entryPlayer.level(),
-                    inventoryService.combatPower(entryPlayer),
+                    power,
                     self,
                     entryPlayer.experience(),
                     entryPlayer.gold(),
@@ -53,9 +68,9 @@ public class LeaderboardService {
                     entryPlayer.intelligence(),
                     entryPlayer.spirit(),
                     entryPlayer.freePoints(),
-                    robot
-                        ? robotEquipmentService.equipmentForRobot(entryPlayer.id(), entryPlayer.name(), entryPlayer.profession(), entryPlayer.level(), inventoryService.combatPower(entryPlayer))
-                        : equipmentForPlayer(entryPlayer)
+                    derivedStats,
+                    equipmentPower,
+                    equipment
                 );
             }
         ));
@@ -79,6 +94,8 @@ public class LeaderboardService {
                 entry.intelligence(),
                 entry.spirit(),
                 entry.freePoints(),
+                entry.derivedStats(),
+                entry.equipmentPower(),
                 entry.equipment()
             ));
         }
@@ -93,12 +110,16 @@ public class LeaderboardService {
             .toList();
     }
 
+    public DerivedStats derivedStatsForPlayer(PlayerRecord player) {
+        CombatStats stats = combatStatsService.playerStats(player, inventoryService.equippedItems(player.id()).values());
+        return DerivedStats.from(stats);
+    }
+
+    public int equipmentPowerForPlayer(PlayerRecord player) {
+        return equipmentForPlayer(player).stream().mapToInt(EquipmentSummary::power).sum();
+    }
+
     private EquipmentSummary equipmentSummary(String slot, ItemRecord item) {
-        int power = item.enhancedAttackBonus() * 12
-            + item.enhancedDefenseBonus() * 8
-            + item.enhancedHpBonus() / 2
-            + item.enhancedMpBonus() / 2
-            + item.enhancementLevel() * 16;
         return new EquipmentSummary(
             item.templateId(),
             slot,
@@ -106,9 +127,10 @@ public class LeaderboardService {
             item.displayName(),
             item.quality(),
             item.requiredLevel(),
-            Math.max(1, power),
+            inventoryService.equipmentPower(item),
             item.attackBonus(),
             item.defenseBonus(),
+            item.resistanceBonus(),
             item.hpBonus(),
             item.mpBonus(),
             item.critBonus().doubleValue(),
@@ -124,7 +146,43 @@ public class LeaderboardService {
     }
 
     private String originFor(String templateId) {
-        return "角色装备栏 · " + templateId;
+        int tier = itemTier(templateId);
+        if (tier >= 37) {
+            return "副本掉落 · 龙眠王庭";
+        }
+        if (tier >= 31) {
+            return "副本掉落 · 星陨荒原";
+        }
+        if (tier >= 25) {
+            return "副本掉落 · 黑曜山脉";
+        }
+        if (tier >= 19) {
+            return "副本掉落 · 古堡回廊";
+        }
+        if (tier >= 7) {
+            return "副本掉落 · 腐沼边境";
+        }
+        if (tier >= 1) {
+            return "副本掉落 · 蛛影林地";
+        }
+        return "冒险者商会流通";
+    }
+
+    private int itemTier(String templateId) {
+        int start = templateId.indexOf("eq_t");
+        if (start < 0) {
+            return 0;
+        }
+        int index = start + 4;
+        StringBuilder value = new StringBuilder();
+        while (index < templateId.length() && Character.isDigit(templateId.charAt(index))) {
+            value.append(templateId.charAt(index));
+            index++;
+        }
+        if (value.isEmpty()) {
+            return 0;
+        }
+        return Integer.parseInt(value.toString());
     }
 
     private String slotName(String slot) {
@@ -176,8 +234,38 @@ public class LeaderboardService {
         int intelligence,
         int spirit,
         int freePoints,
+        DerivedStats derivedStats,
+        int equipmentPower,
         List<EquipmentSummary> equipment
     ) {
+    }
+
+    public record DerivedStats(
+        int maxHp,
+        int maxMp,
+        int attackPower,
+        int armor,
+        int resistance,
+        int speed,
+        double accuracy,
+        double evasion,
+        double critChance,
+        double critDamage
+    ) {
+        static DerivedStats from(CombatStats stats) {
+            return new DerivedStats(
+                stats.maxHp(),
+                stats.maxMp(),
+                stats.attackPower(),
+                stats.armor(),
+                stats.resistance(),
+                stats.speed(),
+                stats.accuracy(),
+                stats.evasion(),
+                stats.critChance(),
+                stats.critDamage()
+            );
+        }
     }
 
     public record EquipmentSummary(
@@ -190,6 +278,7 @@ public class LeaderboardService {
         int power,
         int attackBonus,
         int defenseBonus,
+        int resistanceBonus,
         int hpBonus,
         int mpBonus,
         double critBonus,

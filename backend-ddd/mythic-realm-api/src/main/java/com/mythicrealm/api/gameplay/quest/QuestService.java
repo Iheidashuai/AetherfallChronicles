@@ -9,6 +9,10 @@ import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.player.PlayerService;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.WeekFields;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class QuestService {
+    private static final ZoneId GAME_ZONE = ZoneId.of("Asia/Shanghai");
+
     private final JdbcTemplate jdbcTemplate;
     private final GameConfigService gameConfigService;
     private final PlayerService playerService;
@@ -53,16 +59,28 @@ public class QuestService {
             if (!"active".equals(status)) {
                 continue;
             }
-            int current = currentValue(playerId, quest.id());
-            int updated = applyEvent(current, quest, event);
-            if (updated != current) {
-                jdbcTemplate.update(
-                    "UPDATE quest_progress SET current_value = ? WHERE player_id = ? AND quest_id = ?",
-                    updated,
-                    playerId,
-                    quest.id()
-                );
+            String periodKey = periodKey(quest);
+            for (QuestCondition condition : quest.conditions()) {
+                ConditionState state = conditionState(playerId, quest.id(), condition.id());
+                int updated = applyEvent(state.currentValue(), condition, event);
+                boolean completed = updated >= targetValue(condition);
+                if (updated != state.currentValue() || completed != state.completed()) {
+                    jdbcTemplate.update(
+                        """
+                        UPDATE quest_condition_progress
+                        SET current_value = ?, completed = ?, period_key = ?
+                        WHERE player_id = ? AND quest_id = ? AND condition_id = ?
+                        """,
+                        updated,
+                        completed,
+                        periodKey,
+                        playerId,
+                        quest.id(),
+                        condition.id()
+                    );
+                }
             }
+            syncQuestCurrentValue(playerId, quest);
         }
         updateCompletionAndUnlocks(playerId);
     }
@@ -70,27 +88,41 @@ public class QuestService {
     @Transactional
     public QuestClaimResult claim(AuthenticatedAccount account, String questId) {
         PlayerRecord player = playerService.requireByAccount(account);
+        return claimForPlayer(player, questId);
+    }
+
+    @Transactional
+    public QuestClaimResult claimForPlayer(PlayerRecord player, String questId) {
         ensureProgress(player.id());
         QuestConfig quest = gameConfigService.quests().stream()
             .filter(config -> config.id().equals(questId))
             .findFirst()
-            .orElseThrow(() -> ApiException.notFound("任务不存在"));
+            .orElseThrow(() -> ApiException.notFound("Quest not found"));
         String status = statusOf(player.id(), questId);
         if (!"completed".equals(status)) {
-            throw ApiException.badRequest("任务尚未完成");
+            throw ApiException.badRequest("Quest is not completed");
         }
 
         int gold = 0;
         int exp = 0;
         int itemCount = 0;
+        var grants = new java.util.ArrayList<RewardGrant>();
         for (QuestReward reward : quest.rewards()) {
             switch (reward.type()) {
-                case "gold" -> gold += reward.amount();
-                case "experience" -> exp += reward.amount();
+                case "gold" -> {
+                    gold += reward.amount();
+                    grants.add(new RewardGrant("gold", null, reward.amount(), null, null, null));
+                }
+                case "experience" -> {
+                    exp += reward.amount();
+                    grants.add(new RewardGrant("experience", null, reward.amount(), null, null, null));
+                }
                 case "itemTemplate" -> {
-                    for (int i = 0; i < reward.amount(); i++) {
-                        inventoryService.addRewardItem(player.id(), reward.targetId(), new Random((questId + i).hashCode()));
-                        itemCount++;
+                    var items = inventoryService.grantItem(player.id(), reward.targetId(), reward.amount(), new Random((questId + reward.targetId()).hashCode()));
+                    itemCount += items.stream().mapToInt(item -> Math.max(1, item.quantity())).sum();
+                    if (!items.isEmpty()) {
+                        var item = items.getFirst();
+                        grants.add(new RewardGrant("itemTemplate", reward.targetId(), reward.amount(), item.name(), item.quality(), item.itemCategory()));
                     }
                 }
                 default -> {
@@ -104,29 +136,97 @@ public class QuestService {
             questId
         );
         updateCompletionAndUnlocks(player.id());
-        return new QuestClaimResult(questId, quest.title(), gold, exp, itemCount, updated);
+        return new QuestClaimResult(questId, quest.title(), gold, exp, itemCount, grants, updated);
+    }
+
+    public int claimableCount(long playerId) {
+        ensureProgress(playerId);
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM quest_progress WHERE player_id = ? AND status = 'completed'",
+            Integer.class,
+            playerId
+        );
+        return count == null ? 0 : count;
+    }
+
+    public String firstClaimableQuestId(long playerId) {
+        ensureProgress(playerId);
+        return jdbcTemplate.query(
+            """
+            SELECT qp.quest_id
+            FROM quest_progress qp
+            JOIN quest_config qc ON qc.id = qp.quest_id
+            WHERE qp.player_id = ? AND qp.status = 'completed'
+            ORDER BY qc.priority, qp.quest_id
+            LIMIT 1
+            """,
+            (rs, rowNum) -> rs.getString("quest_id"),
+            playerId
+        ).stream().findFirst().orElse(null);
     }
 
     private void ensureProgress(long playerId) {
-        Map<String, String> statuses = jdbcTemplate.query(
-            "SELECT quest_id, status FROM quest_progress WHERE player_id = ?",
-            (rs, rowNum) -> Map.entry(rs.getString("quest_id"), rs.getString("status")),
+        Map<String, ProgressState> states = jdbcTemplate.query(
+            "SELECT quest_id, status, period_key FROM quest_progress WHERE player_id = ?",
+            (rs, rowNum) -> Map.entry(
+                rs.getString("quest_id"),
+                new ProgressState(rs.getString("status"), rs.getString("period_key"))
+            ),
             playerId
         ).stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         for (QuestConfig quest : gameConfigService.quests()) {
-            if (statuses.containsKey(quest.id())) {
-                continue;
+            String periodKey = periodKey(quest);
+            ProgressState state = states.get(quest.id());
+            if (state == null) {
+                String status = prerequisitesClaimed(playerId, quest) ? "active" : "locked";
+                jdbcTemplate.update(
+                    "INSERT INTO quest_progress (player_id, quest_id, status, current_value, period_key) VALUES (?, ?, ?, 0, ?)",
+                    playerId,
+                    quest.id(),
+                    status,
+                    periodKey
+                );
+            } else if (isResettable(quest) && !periodKey.equals(state.periodKey())) {
+                String status = prerequisitesClaimed(playerId, quest) ? "active" : "locked";
+                jdbcTemplate.update(
+                    "UPDATE quest_progress SET status = ?, current_value = 0, period_key = ?, claimed_at = NULL WHERE player_id = ? AND quest_id = ?",
+                    status,
+                    periodKey,
+                    playerId,
+                    quest.id()
+                );
+                jdbcTemplate.update("DELETE FROM quest_condition_progress WHERE player_id = ? AND quest_id = ?", playerId, quest.id());
             }
-            String status = prerequisitesClaimed(playerId, quest) ? "active" : "locked";
-            jdbcTemplate.update(
-                "INSERT INTO quest_progress (player_id, quest_id, status, current_value) VALUES (?, ?, ?, 0)",
-                playerId,
-                quest.id(),
-                status
-            );
+            ensureConditionProgress(playerId, quest, periodKey);
+            syncQuestCurrentValue(playerId, quest);
         }
         updateCompletionAndUnlocks(playerId);
+    }
+
+    private void ensureConditionProgress(long playerId, QuestConfig quest, String periodKey) {
+        for (QuestCondition condition : quest.conditions()) {
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM quest_condition_progress WHERE player_id = ? AND quest_id = ? AND condition_id = ?",
+                Integer.class,
+                playerId,
+                quest.id(),
+                condition.id()
+            );
+            if (count == null || count == 0) {
+                jdbcTemplate.update(
+                    """
+                    INSERT INTO quest_condition_progress
+                    (player_id, quest_id, condition_id, current_value, completed, period_key)
+                    VALUES (?, ?, ?, 0, FALSE, ?)
+                    """,
+                    playerId,
+                    quest.id(),
+                    condition.id(),
+                    periodKey
+                );
+            }
+        }
     }
 
     private void updateCompletionAndUnlocks(long playerId) {
@@ -140,7 +240,7 @@ public class QuestService {
                 );
                 status = "active";
             }
-            if ("active".equals(status) && currentValue(playerId, quest.id()) >= targetValue(quest)) {
+            if ("active".equals(status) && questComplete(playerId, quest)) {
                 jdbcTemplate.update(
                     "UPDATE quest_progress SET status = 'completed' WHERE player_id = ? AND quest_id = ?",
                     playerId,
@@ -152,45 +252,103 @@ public class QuestService {
 
     private List<QuestRow> rowsForPlayer(long playerId) {
         return gameConfigService.quests().stream()
-            .sorted(Comparator.comparingInt(QuestConfig::priority))
-            .map(config -> new QuestRow(
-                config.id(),
-                config.title(),
-                config.category(),
-                config.description(),
-                config.lore(),
-                config.navigationTarget(),
-                statusOf(playerId, config.id()),
-                currentValue(playerId, config.id()),
-                targetValue(config),
-                config.rewards()
-            ))
+            .sorted(Comparator
+                .comparingInt((QuestConfig config) -> statusSort(statusOf(playerId, config.id())))
+                .thenComparingInt(QuestConfig::priority))
+            .map(config -> toRow(playerId, config))
             .toList();
     }
 
-    private int applyEvent(int current, QuestConfig quest, QuestEvent event) {
-        QuestCondition condition = quest.conditions().isEmpty() ? null : quest.conditions().get(0);
-        if (condition == null) {
-            return current;
+    private QuestRow toRow(long playerId, QuestConfig config) {
+        List<QuestConditionRow> conditions = config.conditions().stream()
+            .map(condition -> {
+                ConditionState state = conditionState(playerId, config.id(), condition.id());
+                int target = targetValue(condition);
+                return new QuestConditionRow(
+                    condition.id(),
+                    condition.type(),
+                    condition.targetId(),
+                    state.currentValue(),
+                    target,
+                    state.currentValue() >= target
+                );
+            })
+            .toList();
+        int current = conditions.stream().mapToInt(QuestConditionRow::currentValue).sum();
+        int target = Math.max(1, conditions.stream().mapToInt(QuestConditionRow::targetValue).sum());
+        int percent = Math.min(100, (int) Math.round(current * 100.0 / target));
+        String status = statusOf(playerId, config.id());
+        boolean claimable = "completed".equals(status);
+        List<QuestRewardRow> rewards = config.rewards().stream().map(this::toRewardRow).toList();
+        return new QuestRow(
+            config.id(),
+            config.title(),
+            config.category(),
+            config.description(),
+            config.lore(),
+            config.navigationTarget(),
+            status,
+            current,
+            target,
+            config.conditionLogic(),
+            config.resetPeriod(),
+            claimable,
+            percent,
+            resetAt(config),
+            recommended(config, status, percent),
+            conditions,
+            rewards
+        );
+    }
+
+    private QuestRewardRow toRewardRow(QuestReward reward) {
+        if ("itemTemplate".equals(reward.type()) && reward.targetId() != null) {
+            var item = gameConfigService.requireItem(reward.targetId());
+            return new QuestRewardRow(reward.type(), reward.targetId(), reward.amount(), item.name(), item.quality(), item.category());
         }
+        return new QuestRewardRow(reward.type(), reward.targetId(), reward.amount(), null, null, null);
+    }
+
+    private int applyEvent(int current, QuestCondition condition, QuestEvent event) {
         if (!condition.type().equals(event.type())) {
             if ("dungeonClears".equals(condition.type()) && "dungeonCompleted".equals(event.type())) {
                 return current + event.amount();
             }
-            if ("monsterKills".equals(condition.type()) && "monsterKills".equals(event.type())) {
-                return current + event.amount();
-            }
             return current;
         }
-        if (condition.targetId() != null && !condition.targetId().isBlank() && !condition.targetId().equals(event.targetId())) {
+        if (!targetMatches(condition, event)) {
             return current;
         }
         return switch (condition.type()) {
-            case "combatPowerReached" -> Math.max(current, event.amount());
+            case "combatPowerReached", "enhancementLevelReached" -> Math.max(current, event.amount());
             case "leaderboardRankReached" -> event.amount() <= condition.targetValue() ? condition.targetValue() : current;
             case "marketViewed", "leaderboardViewed", "chatOpened" -> condition.targetValue();
+            case "dungeonRatingReached" -> condition.targetValue();
             default -> current + Math.max(1, event.amount());
         };
+    }
+
+    private boolean targetMatches(QuestCondition condition, QuestEvent event) {
+        if (condition.targetId() == null || condition.targetId().isBlank()) {
+            return true;
+        }
+        if ("itemQualityObtained".equals(condition.type())) {
+            return qualityRank(event.targetId()) >= qualityRank(condition.targetId());
+        }
+        return condition.targetId().equals(event.targetId());
+    }
+
+    private boolean questComplete(long playerId, QuestConfig quest) {
+        if (quest.conditions().isEmpty()) {
+            return true;
+        }
+        List<Boolean> completed = quest.conditions().stream()
+            .map(condition -> conditionState(playerId, quest.id(), condition.id()).currentValue() >= targetValue(condition))
+            .toList();
+        if ("ANY".equalsIgnoreCase(quest.conditionLogic())) {
+            return completed.stream().anyMatch(Boolean::booleanValue);
+        }
+        return completed.stream().allMatch(Boolean::booleanValue);
     }
 
     private boolean prerequisitesClaimed(long playerId, QuestConfig quest) {
@@ -205,6 +363,18 @@ public class QuestService {
         return true;
     }
 
+    private void syncQuestCurrentValue(long playerId, QuestConfig quest) {
+        int current = quest.conditions().stream()
+            .mapToInt(condition -> conditionState(playerId, quest.id(), condition.id()).currentValue())
+            .sum();
+        jdbcTemplate.update(
+            "UPDATE quest_progress SET current_value = ? WHERE player_id = ? AND quest_id = ?",
+            current,
+            playerId,
+            quest.id()
+        );
+    }
+
     private String statusOf(long playerId, String questId) {
         return jdbcTemplate.query(
             "SELECT status FROM quest_progress WHERE player_id = ? AND quest_id = ?",
@@ -214,17 +384,69 @@ public class QuestService {
         ).stream().findFirst().orElse("locked");
     }
 
-    private int currentValue(long playerId, String questId) {
+    private ConditionState conditionState(long playerId, String questId, String conditionId) {
         return jdbcTemplate.query(
-            "SELECT current_value FROM quest_progress WHERE player_id = ? AND quest_id = ?",
-            (rs, rowNum) -> rs.getInt("current_value"),
+            "SELECT current_value, completed FROM quest_condition_progress WHERE player_id = ? AND quest_id = ? AND condition_id = ?",
+            (rs, rowNum) -> new ConditionState(rs.getInt("current_value"), rs.getBoolean("completed")),
             playerId,
-            questId
-        ).stream().findFirst().orElse(0);
+            questId,
+            conditionId
+        ).stream().findFirst().orElse(new ConditionState(0, false));
     }
 
-    private int targetValue(QuestConfig quest) {
-        return quest.conditions().isEmpty() ? 1 : Math.max(1, quest.conditions().get(0).targetValue());
+    private int targetValue(QuestCondition condition) {
+        return Math.max(1, condition.targetValue());
+    }
+
+    private String periodKey(QuestConfig quest) {
+        LocalDate today = LocalDate.now(GAME_ZONE);
+        return switch (quest.resetPeriod()) {
+            case "daily" -> today.toString();
+            case "weekly" -> {
+                WeekFields weekFields = WeekFields.of(DayOfWeek.MONDAY, 4);
+                yield today.get(weekFields.weekBasedYear()) + "-W" + today.get(weekFields.weekOfWeekBasedYear());
+            }
+            default -> "lifetime";
+        };
+    }
+
+    private boolean isResettable(QuestConfig quest) {
+        return !"lifetime".equals(quest.resetPeriod());
+    }
+
+    private String resetAt(QuestConfig quest) {
+        if ("daily".equals(quest.resetPeriod())) {
+            return LocalDate.now(GAME_ZONE).plusDays(1).atStartOfDay(GAME_ZONE).toInstant().toString();
+        }
+        if ("weekly".equals(quest.resetPeriod())) {
+            return LocalDate.now(GAME_ZONE).with(DayOfWeek.MONDAY).plusWeeks(1).atStartOfDay(GAME_ZONE).toInstant().toString();
+        }
+        return null;
+    }
+
+    private boolean recommended(QuestConfig config, String status, int percent) {
+        return "completed".equals(status)
+            || ("active".equals(status) && (percent >= 70 || "main".equals(config.category())));
+    }
+
+    private int statusSort(String status) {
+        return switch (status) {
+            case "completed" -> 0;
+            case "active" -> 1;
+            case "locked" -> 2;
+            default -> 3;
+        };
+    }
+
+    private int qualityRank(String quality) {
+        return switch (quality == null ? "" : quality) {
+            case "immortal" -> 6;
+            case "legendary" -> 5;
+            case "epic" -> 4;
+            case "rare" -> 3;
+            case "uncommon" -> 2;
+            default -> 1;
+        };
     }
 
     public record QuestEvent(String type, String targetId, int amount) {
@@ -243,10 +465,61 @@ public class QuestService {
         String status,
         int currentValue,
         int targetValue,
-        List<QuestReward> rewards
+        String conditionLogic,
+        String resetPeriod,
+        boolean claimable,
+        int progressPercent,
+        String resetAt,
+        boolean recommended,
+        List<QuestConditionRow> conditions,
+        List<QuestRewardRow> rewards
     ) {
     }
 
-    public record QuestClaimResult(String questId, String title, int gold, int experience, int itemCount, PlayerRecord player) {
+    public record QuestConditionRow(
+        String id,
+        String type,
+        String targetId,
+        int currentValue,
+        int targetValue,
+        boolean completed
+    ) {
+    }
+
+    public record QuestRewardRow(
+        String type,
+        String targetId,
+        int amount,
+        String itemName,
+        String quality,
+        String itemCategory
+    ) {
+    }
+
+    public record QuestClaimResult(
+        String questId,
+        String title,
+        int gold,
+        int experience,
+        int itemCount,
+        List<RewardGrant> rewards,
+        PlayerRecord player
+    ) {
+    }
+
+    public record RewardGrant(
+        String type,
+        String targetId,
+        int amount,
+        String itemName,
+        String quality,
+        String itemCategory
+    ) {
+    }
+
+    private record ProgressState(String status, String periodKey) {
+    }
+
+    private record ConditionState(int currentValue, boolean completed) {
     }
 }

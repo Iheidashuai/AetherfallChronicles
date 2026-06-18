@@ -40,6 +40,7 @@ public class EnhanceEquipmentRobotAction implements RobotDecisionAction {
         value += Math.max(0, 10 - opportunity.currentLevel()) * 2.0;
         value += Math.min(14, context.actor().wealthTierLevel() * 0.8);
         value += opportunity.affordableNow() ? 8 : 4;
+        value += Math.min(12, context.usableEnhancementStoneCount() * 4.0);
         if (context.personalityContains("强化")) {
             value += 10;
         }

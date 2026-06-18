@@ -1,9 +1,0 @@
-com/mythicrealm/common/domain/ValueObject.class
-com/mythicrealm/common/api/ApiResponse.class
-com/mythicrealm/common/domain/AggregateRoot.class
-com/mythicrealm/common/exception/DomainException.class
-com/mythicrealm/common/event/EventPublisher.class
-com/mythicrealm/common/util/IdGenerator.class
-com/mythicrealm/common/domain/Entity.class
-com/mythicrealm/common/exception/BusinessException.class
-com/mythicrealm/common/domain/DomainEvent.class

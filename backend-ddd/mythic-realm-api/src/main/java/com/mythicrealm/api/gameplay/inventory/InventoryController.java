@@ -85,15 +85,49 @@ public class InventoryController {
     @PostMapping("/{itemId}/enhance")
     InventoryService.EnhanceResult enhance(
         @RequestHeader(name = "Authorization", required = false) String authorization,
+        @PathVariable("itemId") long itemId,
+        @RequestBody(required = false) EnhanceRequest request
+    ) {
+        PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
+        var result = inventoryService.enhance(player, itemId, request == null ? List.of() : request.stoneItemIds());
+        questService.recordEvent(player.id(), QuestEvent.of("enhancementAttempts"));
+        if (result.usedStoneCount() > 0) {
+            questService.recordEvent(player.id(), new QuestEvent("enhancementStoneUsed", null, result.usedStoneCount()));
+        }
+        if (result.success()) {
+            questService.recordEvent(player.id(), QuestEvent.of("enhancementSuccesses"));
+            questService.recordEvent(player.id(), new QuestEvent("enhancementLevelReached", null, result.enhancementLevel()));
+        }
+        questService.recordEvent(player.id(), new QuestEvent("combatPowerReached", null, result.inventory().combatPower()));
+        return result;
+    }
+
+    @PostMapping("/{itemId}/use")
+    InventoryService.UseItemResult useItem(
+        @RequestHeader(name = "Authorization", required = false) String authorization,
         @PathVariable("itemId") long itemId
     ) {
         PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
-        var result = inventoryService.enhance(player, itemId);
-        questService.recordEvent(player.id(), QuestEvent.of("enhancementAttempts"));
-        if (result.success()) {
-            questService.recordEvent(player.id(), QuestEvent.of("enhancementSuccesses"));
+        var result = inventoryService.useItem(player, itemId);
+        questService.recordEvent(player.id(), new QuestEvent("itemUsed", result.effectType(), 1));
+        if ("chest".equals(result.effectType())) {
+            questService.recordEvent(player.id(), QuestEvent.of("chestOpened"));
+        }
+        if ("staminaPotion".equals(result.effectType())) {
+            questService.recordEvent(player.id(), QuestEvent.of("staminaPotionUsed"));
         }
         questService.recordEvent(player.id(), new QuestEvent("combatPowerReached", null, result.inventory().combatPower()));
+        return result;
+    }
+
+    @PostMapping("/recipes/{recipeId}/craft")
+    InventoryService.CraftResult craftRecipe(
+        @RequestHeader(name = "Authorization", required = false) String authorization,
+        @PathVariable("recipeId") String recipeId
+    ) {
+        PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
+        var result = inventoryService.craftRecipe(player, recipeId);
+        questService.recordEvent(player.id(), new QuestEvent("fragmentCrafted", recipeId, 1));
         return result;
     }
 
@@ -133,5 +167,8 @@ public class InventoryController {
     }
 
     record EnhancementTransferRequest(long sourceItemId, long targetItemId) {
+    }
+
+    record EnhanceRequest(List<Long> stoneItemIds) {
     }
 }
