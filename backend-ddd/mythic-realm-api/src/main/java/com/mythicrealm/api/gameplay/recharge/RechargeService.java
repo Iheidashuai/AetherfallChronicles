@@ -141,6 +141,9 @@ public class RechargeService {
     @Scheduled(initialDelay = 10_000, fixedDelay = 180_000)
     @Transactional
     public void grantIncomeTick() {
+        if (!hasHumanPlayer()) {
+            return;
+        }
         List<PlayerIncomeTarget> players = jdbcTemplate.query(
             """
             SELECT id, name, controller_type, wealth_tier_level, wealth_tier
@@ -180,6 +183,14 @@ public class RechargeService {
         jdbcTemplate.update(
             "DELETE FROM cash_income_event WHERE id NOT IN (SELECT id FROM (SELECT id FROM cash_income_event ORDER BY created_at DESC, id DESC LIMIT 2000) recent)"
         );
+    }
+
+    private boolean hasHumanPlayer() {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM player WHERE account_id IS NOT NULL",
+            Integer.class
+        );
+        return count != null && count > 0;
     }
 
     public RechargeWallet wallet(PlayerRecord player) {

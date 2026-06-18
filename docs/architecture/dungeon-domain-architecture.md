@@ -144,13 +144,12 @@ The Dungeon domain implements a complete DDD (Domain-Driven Design) architecture
 - Location: `infrastructure/persistence/DungeonRunRepositoryImpl.java`
 - Persists runs to `dungeon_run` table
 - Creates economy audit events
-- JSON serialization/deserialization via ObjectMapper
-- Stores: loot_json, result_json for history replay
+- Stores structured loot/log/frame rows for history replay
 
 **DungeonRunPO**
 - Location: `infrastructure/persistence/DungeonRunPO.java`
 - Maps to `dungeon_run` database table
-- Fields: id, playerId, dungeonId, configVersion, requestId, success, rating, rewards, JSON columns
+- Fields: id, playerId, dungeonId, configVersion, requestId, success, rating, rewards, structured frame references
 
 #### 3.2 Configuration
 

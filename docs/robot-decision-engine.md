@@ -23,5 +23,6 @@ Current robot action families:
 - Rest fallback when no useful action is available.
 
 Database note: this single-player learning project intentionally keeps one
-mutable Flyway migration, `V1__latest_schema.sql`. If the local schema history
-does not match the latest file, startup cleans and rebuilds the database.
+mutable latest schema file, `backend-ddd/mythic-realm-starter/src/main/resources/db/latest_schema.sql`.
+Flyway is not used; if the recorded local checksum does not match the latest file,
+startup cleans and rebuilds the database.
