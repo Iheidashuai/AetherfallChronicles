@@ -8254,3 +8254,123 @@ body {
 .guild-boss-rank-dmg {
   color: rgba(244, 240, 232, 0.85);
 }
+
+/* Guild progression + competition (P3/P4) */
+.guild-perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.guild-perk-chip {
+  font-size: 11px;
+  color: #d5c17a;
+  background: rgba(213, 193, 122, 0.14);
+  border: 1px solid rgba(213, 193, 122, 0.28);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.guild-donate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.guild-donate-actions {
+  display: flex;
+  gap: 8px;
+}
+.guild-donate-btn {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(213, 193, 122, 0.16);
+  border: 1px solid rgba(213, 193, 122, 0.36);
+  color: #f0e2b6;
+  font-size: 12px;
+}
+.guild-ranking,
+.guild-shop {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.guild-rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.guild-rank-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+}
+.guild-rank-row.mine {
+  background: rgba(120, 180, 255, 0.14);
+  border: 1px solid rgba(120, 180, 255, 0.3);
+}
+.guild-rank-no {
+  color: #d5c17a;
+}
+.guild-rank-lv {
+  color: rgba(244, 240, 232, 0.45);
+  font-size: 11px;
+}
+.guild-rank-val {
+  color: #d5c17a;
+}
+.guild-shop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.guild-shop-coin {
+  color: #d5c17a;
+  font-size: 13px;
+}
+.guild-shop-msg {
+  margin: 0;
+  font-size: 12px;
+  color: #ffd98a;
+}
+.guild-shop-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+.guild-shop-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.guild-shop-info {
+  display: flex;
+  flex-direction: column;
+}
+.guild-shop-info small {
+  color: rgba(244, 240, 232, 0.55);
+  font-size: 11px;
+}
+.guild-shop-buy {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(213, 193, 122, 0.16);
+  border: 1px solid rgba(213, 193, 122, 0.36);
+  color: #f0e2b6;
+  white-space: nowrap;
+}

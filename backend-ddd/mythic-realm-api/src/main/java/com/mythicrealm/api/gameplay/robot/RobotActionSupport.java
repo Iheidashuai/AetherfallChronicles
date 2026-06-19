@@ -4,6 +4,7 @@ import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.build.BuildService;
 import com.mythicrealm.api.gameplay.dungeon.DungeonService;
 import com.mythicrealm.api.gameplay.guild.GuildBossService;
+import com.mythicrealm.api.gameplay.guild.GuildService;
 import com.mythicrealm.api.gameplay.endgame.EndgameRiftService;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.inventory.EquipmentProcessingService;
@@ -46,6 +47,7 @@ public class RobotActionSupport {
     private final BuildService buildService;
     private final EquipmentProcessingService equipmentProcessingService;
     private final GuildBossService guildBossService;
+    private final GuildService guildService;
 
     public RobotActionSupport(
         JdbcTemplate jdbcTemplate,
@@ -60,7 +62,8 @@ public class RobotActionSupport {
         EndgameRiftService endgameRiftService,
         BuildService buildService,
         EquipmentProcessingService equipmentProcessingService,
-        GuildBossService guildBossService
+        GuildBossService guildBossService,
+        GuildService guildService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.robotEquipmentService = robotEquipmentService;
@@ -75,6 +78,7 @@ public class RobotActionSupport {
         this.buildService = buildService;
         this.equipmentProcessingService = equipmentProcessingService;
         this.guildBossService = guildBossService;
+        this.guildService = guildService;
     }
 
     public RobotActionResult runDungeon(RobotDecisionContext context, RobotActionScore score) {
@@ -524,6 +528,16 @@ public class RobotActionSupport {
     public RobotActionResult rest(RobotAgent actor, String text, String reason) {
         record(actor, "rest", text, reason);
         return RobotActionResult.success("rest", text);
+    }
+
+    public RobotActionResult guildDonate(RobotDecisionContext context, RobotActionScore score) {
+        boolean donated = guildService.robotDonate(context.actor().id());
+        if (!donated) {
+            return rest(context.actor(), "金币还不够，先攒一攒再给公会捐献。", score.reason());
+        }
+        String text = "给公会捐了一笔金币，离公会升级更近一步。";
+        record(context.actor(), "guild_donate", text, score.reason());
+        return RobotActionResult.success("guild_donate", text);
     }
 
     public RobotActionResult guildBoss(RobotDecisionContext context, RobotActionScore score) {

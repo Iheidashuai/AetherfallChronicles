@@ -82,6 +82,32 @@ public class GuildController {
         return guildService.sendChat(requirePlayer(authorization), request.text());
     }
 
+    @PostMapping("/donate")
+    GuildService.DonateResult donate(
+        @RequestHeader(name = "Authorization", required = false) String authorization,
+        @RequestBody DonateRequest request
+    ) {
+        return guildService.donate(requirePlayer(authorization), request.amount());
+    }
+
+    @GetMapping("/shop")
+    GuildService.GuildShopView shop(@RequestHeader(name = "Authorization", required = false) String authorization) {
+        return guildService.shop(requirePlayer(authorization));
+    }
+
+    @PostMapping("/shop/{offerId}/buy")
+    GuildService.GuildShopView buy(
+        @RequestHeader(name = "Authorization", required = false) String authorization,
+        @PathVariable String offerId
+    ) {
+        return guildService.buy(requirePlayer(authorization), offerId);
+    }
+
+    @GetMapping("/ranking")
+    List<GuildService.GuildRankEntry> ranking(@RequestHeader(name = "Authorization", required = false) String authorization) {
+        return guildService.ranking(requirePlayer(authorization));
+    }
+
     private PlayerRecord requirePlayer(String authorization) {
         return playerService.requireByAccount(sessionService.require(authorization));
     }
@@ -90,5 +116,8 @@ public class GuildController {
     }
 
     record SendGuildMessageRequest(@NotBlank String text) {
+    }
+
+    record DonateRequest(long amount) {
     }
 }

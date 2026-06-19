@@ -85,6 +85,10 @@ function GuildBrowser({ token, onJoined }: { token: string; onJoined: () => void
 function GuildHall({ token, view, onChanged }: { token: string; view: GuildView; onChanged: () => void }) {
   const { guild, members } = view;
   const leaveMutation = useMutation({ mutationFn: () => gameApi.leaveGuild(token), onSuccess: onChanged });
+  const donateMutation = useMutation({
+    mutationFn: (amount: number) => gameApi.donateGuild(token, amount),
+    onSuccess: onChanged,
+  });
 
   return (
     <div className="guild-hall">
@@ -98,13 +102,36 @@ function GuildHall({ token, view, onChanged }: { token: string; view: GuildView;
         <div className="guild-banner-stats">
           <Metric icon={<Trophy size={15} />} label="公会等级" value={`Lv.${guild.level}`} />
           <Metric icon={<Shield size={15} />} label="服务器排名" value={`#${guild.rank}`} />
-          <Metric icon={<UserRound size={15} />} label="成员" value={`${guild.memberCount}`} />
-          <Metric icon={<Coins size={15} />} label="我的身份" value={view.myRole === 'leader' ? '会长' : '成员'} />
+          <Metric icon={<Coins size={15} />} label="我的公会币" value={`${view.myGuildCoin.toLocaleString()}`} />
+          <Metric icon={<UserRound size={15} />} label="公会资金" value={`${view.fund.toLocaleString()}`} />
         </div>
-        <p className="guild-blurb">“{guild.recruitingBlurb}”</p>
+        <div className="guild-perks">
+          {view.perks.map((perk) => (
+            <span key={perk} className="guild-perk-chip">{perk}</span>
+          ))}
+        </div>
+        <div className="guild-donate-row">
+          <span className="guild-blurb">“{guild.recruitingBlurb}”</span>
+          <div className="guild-donate-actions">
+            {[10000, 50000].map((amt) => (
+              <button
+                key={amt}
+                className="guild-donate-btn"
+                disabled={donateMutation.isPending}
+                onClick={() => donateMutation.mutate(amt)}
+              >
+                捐献 {amt.toLocaleString()} 金
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <GuildBoss token={token} />
+
+      <GuildRanking token={token} />
+
+      <GuildShop token={token} />
 
       <div className="guild-hall-body">
         <div className="guild-members">
@@ -197,6 +224,78 @@ function GuildBoss({ token }: { token: string }) {
             </div>
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+function GuildRanking({ token }: { token: string }) {
+  const rankQuery = useQuery({
+    queryKey: ['guild', 'ranking'],
+    queryFn: () => gameApi.guildRanking(token),
+    refetchInterval: 8000,
+  });
+  const rows = rankQuery.data ?? [];
+  return (
+    <div className="guild-ranking">
+      <SectionTitle icon={<Trophy size={16} />} title="公会周榜 · 本周贡献" />
+      <div className="guild-rank-list">
+        {rows.map((r) => (
+          <div key={r.id} className={`guild-rank-row ${r.mine ? 'mine' : ''}`}>
+            <span className="guild-rank-no">#{r.rank}</span>
+            <span className="guild-rank-name">
+              {r.name}
+              <span className="guild-rank-lv"> Lv.{r.level}</span>
+              {r.mine ? <span className="guild-tag-you">我的公会</span> : null}
+            </span>
+            <span className="guild-rank-val">{r.weeklyContribution.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GuildShop({ token }: { token: string }) {
+  const queryClient = useQueryClient();
+  const [msg, setMsg] = useState<string | null>(null);
+  const shopQuery = useQuery({ queryKey: ['guild', 'shop'], queryFn: () => gameApi.guildShop(token) });
+  const buyMutation = useMutation({
+    mutationFn: (offerId: string) => gameApi.buyGuildShop(token, offerId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['guild', 'shop'], data);
+      queryClient.invalidateQueries({ queryKey: ['guild', 'home'] });
+      setMsg('兑换成功！');
+    },
+    onError: (error) => setMsg((error as Error)?.message ?? '兑换失败'),
+  });
+  const data = shopQuery.data;
+  if (!data) {
+    return null;
+  }
+  return (
+    <div className="guild-shop">
+      <div className="guild-shop-head">
+        <SectionTitle icon={<Coins size={16} />} title="公会商店" />
+        <span className="guild-shop-coin">公会币 {data.guildCoin.toLocaleString()}</span>
+      </div>
+      {msg ? <p className="guild-shop-msg">{msg}</p> : null}
+      <div className="guild-shop-list">
+        {data.offers.map((o) => (
+          <div key={o.id} className="guild-shop-card">
+            <div className="guild-shop-info">
+              <strong>{o.name}</strong>
+              <small>{o.description}</small>
+            </div>
+            <button
+              className="guild-shop-buy"
+              disabled={buyMutation.isPending || data.guildCoin < o.costGuildCoin}
+              onClick={() => buyMutation.mutate(o.id)}
+            >
+              {o.costGuildCoin} 币
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

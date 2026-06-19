@@ -1,6 +1,6 @@
 # 机器人社交生态：公会系统 设计
 
-> 状态：**设计提案（未实现）**，经一轮 grilling 确定。
+> 状态：**P1-P4 已实现**（社交外壳 / 公会 Boss / 养成双轨 / 周榜+结算），经一轮 grilling 确定方案。代码见 `gameplay/guild/` 与 `screens/GuildScreen.tsx`；v2（阵营 / 挖人戏剧）仍为提案。
 > 北极星：**让玩家觉得自己活在一个有人的世界里**。这是本项目最差异化的方向。
 > 依赖现状：机器人是 `controller_type='robot'` 的 `player` 行（200 个），由 `RobotBrainService`（Utility-AI，`@Scheduled` 15s 采样 24 个）驱动；SSE 聊天；JdbcTemplate + MySQL；无 DB 行锁（单 JVM `synchronized`）。
 

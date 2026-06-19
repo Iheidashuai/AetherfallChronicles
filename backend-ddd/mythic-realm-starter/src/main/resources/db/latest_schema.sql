@@ -31,6 +31,7 @@ CREATE TABLE player (
     experience INT NOT NULL DEFAULT 0,
     gold BIGINT NOT NULL DEFAULT 100,
     real_money BIGINT NOT NULL DEFAULT 0,
+    guild_coin BIGINT NOT NULL DEFAULT 0,
     wealth_tier_level INT NOT NULL DEFAULT 0,
     wealth_tier VARCHAR(64) NOT NULL DEFAULT '贫民',
     strength INT NOT NULL,
@@ -584,6 +585,7 @@ CREATE TABLE guild (
     level INT NOT NULL DEFAULT 1,
     fund BIGINT NOT NULL DEFAULT 0,
     total_contribution BIGINT NOT NULL DEFAULT 0,
+    weekly_contribution BIGINT NOT NULL DEFAULT 0,
     recruiting_blurb VARCHAR(200) NOT NULL DEFAULT '',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_guild_leader FOREIGN KEY (leader_robot_id) REFERENCES player (id)
@@ -629,6 +631,35 @@ CREATE TABLE guild_boss_contribution (
     KEY idx_gbc_rank (guild_id, week_key, damage),
     CONSTRAINT fk_gbc_guild FOREIGN KEY (guild_id) REFERENCES guild (id),
     CONSTRAINT fk_gbc_player FOREIGN KEY (player_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Guild social ecosystem (P3): guild coin shop.
+CREATE TABLE guild_shop_offer (
+    id VARCHAR(48) PRIMARY KEY,
+    name VARCHAR(64) NOT NULL,
+    description VARCHAR(160) NOT NULL DEFAULT '',
+    cost_guild_coin INT NOT NULL,
+    reward_kind VARCHAR(24) NOT NULL,
+    reward_ref VARCHAR(64) NULL,
+    reward_amount INT NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO guild_shop_offer (id, name, description, cost_guild_coin, reward_kind, reward_ref, reward_amount, sort_order) VALUES
+    ('guild_gold_small', '公会金币补给', '用公会币兑换 50,000 金币', 50, 'gold', NULL, 50000, 1),
+    ('guild_gold_large', '公会金库大额', '用公会币兑换 250,000 金币', 200, 'gold', NULL, 250000, 2),
+    ('guild_stamina', '公会体力支援', '立即恢复 60 点体力', 30, 'stamina', NULL, 60, 3);
+
+-- Guild social ecosystem (P4): weekly inter-guild settlement snapshot.
+CREATE TABLE guild_weekly_result (
+    week_key VARCHAR(12) NOT NULL,
+    guild_id BIGINT NOT NULL,
+    rank_pos INT NOT NULL,
+    weekly_contribution BIGINT NOT NULL,
+    reward_coin INT NOT NULL DEFAULT 0,
+    settled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (week_key, guild_id),
+    CONSTRAINT fk_gwr_guild FOREIGN KEY (guild_id) REFERENCES guild (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE global_announcement (

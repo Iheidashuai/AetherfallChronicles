@@ -34,6 +34,7 @@ public class GuildBossService {
     private static final long BASE_HP_PER_MEMBER = 20_000L; // early-game tuning; scales with member count & tier
     private static final double DMG_COEFF = 6.0;
     private static final long MIN_HIT = 800L;
+    private static final long BOSS_DMG_PER_COIN = 5_000L;
     private static final int PLAYER_ATTACK_STAMINA = 1;
     private static final List<String> BOSS_NAMES = List.of(
         "公会守卫·蛛母",
@@ -45,12 +46,19 @@ public class GuildBossService {
     private final JdbcTemplate jdbcTemplate;
     private final InventoryService inventoryService;
     private final StaminaService staminaService;
+    private final GuildService guildService;
     private final ConcurrentHashMap<Long, Object> bossMonitors = new ConcurrentHashMap<>();
 
-    public GuildBossService(JdbcTemplate jdbcTemplate, InventoryService inventoryService, StaminaService staminaService) {
+    public GuildBossService(
+        JdbcTemplate jdbcTemplate,
+        InventoryService inventoryService,
+        StaminaService staminaService,
+        GuildService guildService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.inventoryService = inventoryService;
         this.staminaService = staminaService;
+        this.guildService = guildService;
     }
 
     public GuildBossView bossFor(PlayerRecord player) {
@@ -64,7 +72,8 @@ public class GuildBossService {
         long guildId = requireGuildId(player.id());
         ensureBoss(guildId);
         staminaService.consume(player.id(), PLAYER_ATTACK_STAMINA); // throws if not enough
-        long damage = rollDamage(inventoryService.combatPower(player), ThreadLocalRandom.current());
+        long base = rollDamage(inventoryService.combatPower(player), ThreadLocalRandom.current());
+        long damage = Math.max(1L, (long) (base * guildService.bossDamageMultiplier(guildId)));
         DamageOutcome outcome = applyDamage(guildId, player.id(), damage);
         GuildBossView view = buildView(guildId, outcome.boss(), player.id());
         return new AttackResult(outcome.applied(), outcome.killed(), outcome.spawnedTier(), view);
@@ -130,17 +139,8 @@ public class GuildBossService {
             playerId,
             applied
         );
-        jdbcTemplate.update(
-            "UPDATE guild_member SET weekly_contribution = weekly_contribution + ?, total_contribution = total_contribution + ? WHERE player_id = ?",
-            applied,
-            applied,
-            playerId
-        );
-        jdbcTemplate.update(
-            "UPDATE guild SET total_contribution = total_contribution + ? WHERE id = ?",
-            applied,
-            guildId
-        );
+        // Shared contribution sink: member/guild weekly+total, guild coin, and level recompute.
+        guildService.applyContribution(guildId, playerId, applied, applied / BOSS_DMG_PER_COIN);
     }
 
     private BossRow ensureBoss(long guildId) {

@@ -1299,6 +1299,12 @@ export const gameApi = {
     api<GuildChatMessage[]>('/api/guild/chat', { method: 'POST', body: JSON.stringify({ text }) }, token),
   guildBoss: (token: string) => api<GuildBossView>('/api/guild/boss', {}, token),
   attackGuildBoss: (token: string) => api<GuildBossAttackResult>('/api/guild/boss/attack', { method: 'POST' }, token),
+  donateGuild: (token: string, amount: number) =>
+    api<GuildDonateResult>('/api/guild/donate', { method: 'POST', body: JSON.stringify({ amount }) }, token),
+  guildShop: (token: string) => api<GuildShopView>('/api/guild/shop', {}, token),
+  buyGuildShop: (token: string, offerId: string) =>
+    api<GuildShopView>(`/api/guild/shop/${offerId}/buy`, { method: 'POST' }, token),
+  guildRanking: (token: string) => api<GuildRankEntry[]>('/api/guild/ranking', {}, token),
 };
 
 export type GuildSummary = {
@@ -1320,7 +1326,32 @@ export type GuildMember = {
   weeklyContribution: number;
   totalContribution: number;
 };
-export type GuildView = { guild: GuildSummary; myRole: string; members: GuildMember[] };
+export type GuildView = {
+  guild: GuildSummary;
+  myRole: string;
+  members: GuildMember[];
+  perks: string[];
+  myGuildCoin: number;
+  fund: number;
+};
+export type GuildDonateResult = { amount: number; coinGained: number; guildCoin: number; guild: GuildView };
+export type GuildShopOffer = {
+  id: string;
+  name: string;
+  description: string;
+  costGuildCoin: number;
+  rewardKind: string;
+  rewardAmount: number;
+};
+export type GuildShopView = { guildCoin: number; offers: GuildShopOffer[] };
+export type GuildRankEntry = {
+  id: number;
+  name: string;
+  level: number;
+  weeklyContribution: number;
+  rank: number;
+  mine: boolean;
+};
 export type GuildHomeResponse = { guild: GuildView | null };
 export type GuildChatMessage = { id: number; senderName: string; kind: string; text: string; createdAt: string };
 export type GuildBossInfo = {
