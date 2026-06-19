@@ -569,9 +569,36 @@ CREATE TABLE chat_message (
     sender_name VARCHAR(64) NOT NULL,
     kind VARCHAR(32) NOT NULL,
     text VARCHAR(500) NOT NULL,
+    channel VARCHAR(24) NOT NULL DEFAULT 'world',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_chat_created (created_at),
+    KEY idx_chat_channel (channel, id),
     CONSTRAINT fk_chat_player FOREIGN KEY (player_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Guild social ecosystem (P1): guild + membership.
+CREATE TABLE guild (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(64) NOT NULL UNIQUE,
+    leader_robot_id BIGINT NULL,
+    level INT NOT NULL DEFAULT 1,
+    fund BIGINT NOT NULL DEFAULT 0,
+    total_contribution BIGINT NOT NULL DEFAULT 0,
+    recruiting_blurb VARCHAR(200) NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_guild_leader FOREIGN KEY (leader_robot_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE guild_member (
+    guild_id BIGINT NOT NULL,
+    player_id BIGINT NOT NULL PRIMARY KEY,
+    role VARCHAR(16) NOT NULL DEFAULT 'member',
+    weekly_contribution BIGINT NOT NULL DEFAULT 0,
+    total_contribution BIGINT NOT NULL DEFAULT 0,
+    joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_guild_member_guild (guild_id),
+    CONSTRAINT fk_guild_member_guild FOREIGN KEY (guild_id) REFERENCES guild (id),
+    CONSTRAINT fk_guild_member_player FOREIGN KEY (player_id) REFERENCES player (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE global_announcement (
@@ -810,6 +837,37 @@ SELECT
         ELSE '偶尔在世界频道聊天。'
     END
 FROM robots;
+
+-- Guild social ecosystem (P1): seed 10 guilds and distribute the 200 robots (~20 each).
+INSERT INTO guild (name, recruiting_blurb) VALUES
+    ('暗影兵团', '缺个稳定打手，一起把进度推上去。'),
+    ('月光商会', '商会活跃，爱倒腾装备词条的进。'),
+    ('黎明誓约', '稳健作风，新人友好不卷。'),
+    ('铁壁要塞', '硬核刷本，目标服务器前三。'),
+    ('星陨之契', '佛系养老，开心就好。'),
+    ('荆棘王座', '内卷一点点，但奖励是真香。'),
+    ('银冠骑士', '老牌公会，底蕴深厚。'),
+    ('寒鸦盟约', '夜猫子集中营，半夜也热闹。'),
+    ('赤焰商队', '主打捡漏和倒卖，财迷快来。'),
+    ('翠羽游侠', '轻松刷本，互帮互助。');
+
+-- Distribute robots: first 20 robots -> guild 1, next 20 -> guild 2, ... (guild ids 1..10 on a fresh rebuild).
+INSERT INTO guild_member (guild_id, player_id, role)
+SELECT ((rn - 1) DIV 20) + 1, id, 'member'
+FROM (
+    SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS rn
+    FROM player WHERE controller_type = 'robot'
+) ranked;
+
+-- Pick each guild's lowest-id member as leader, and give the browse list some variety.
+UPDATE guild g
+SET leader_robot_id = (SELECT m.player_id FROM guild_member m WHERE m.guild_id = g.id ORDER BY m.player_id LIMIT 1),
+    level = 3 + (g.id MOD 6),
+    total_contribution = g.id * 1000000;
+UPDATE guild_member m
+JOIN guild g ON g.leader_robot_id = m.player_id
+SET m.role = 'leader';
+
 -- Seed game config is maintained directly in this latest schema file.
 DELETE FROM craft_recipe_cost;
 DELETE FROM craft_recipe;

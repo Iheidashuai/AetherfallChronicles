@@ -1289,4 +1289,35 @@ export const gameApi = {
   recharge: (token: string, rmbAmount: number) =>
     api<RechargeResult>('/api/recharge', { method: 'POST', body: JSON.stringify({ rmbAmount }) }, token),
   announcements: (token: string) => api<GlobalAnnouncement[]>('/api/announcements', {}, token),
+  guildBrowse: (token: string) => api<GuildSummary[]>('/api/guild/guilds', {}, token),
+  myGuild: (token: string) => api<GuildHomeResponse>('/api/guild', {}, token),
+  joinGuild: (token: string, guildId: number) =>
+    api<GuildHomeResponse>(`/api/guild/${guildId}/join`, { method: 'POST' }, token),
+  leaveGuild: (token: string) => api<GuildHomeResponse>('/api/guild/leave', { method: 'POST' }, token),
+  guildChat: (token: string) => api<GuildChatMessage[]>('/api/guild/chat', {}, token),
+  sendGuildChat: (token: string, text: string) =>
+    api<GuildChatMessage[]>('/api/guild/chat', { method: 'POST', body: JSON.stringify({ text }) }, token),
 };
+
+export type GuildSummary = {
+  id: number;
+  name: string;
+  level: number;
+  rank: number;
+  memberCount: number;
+  leaderName: string;
+  recruitingBlurb: string;
+};
+export type GuildMember = {
+  playerId: number;
+  name: string;
+  kind: string;
+  profession: string;
+  level: number;
+  role: string;
+  weeklyContribution: number;
+  totalContribution: number;
+};
+export type GuildView = { guild: GuildSummary; myRole: string; members: GuildMember[] };
+export type GuildHomeResponse = { guild: GuildView | null };
+export type GuildChatMessage = { id: number; senderName: string; kind: string; text: string; createdAt: string };

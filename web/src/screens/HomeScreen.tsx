@@ -213,6 +213,7 @@ export function HomeScreen({ token }: { token: string }) {
             <NavTile icon={<Swords size={20} />} title="副本" detail={`${data.config.dungeonCount} 个副本`} onClick={() => setScreen('dungeons')} />
             <NavTile icon={<Skull size={20} />} title="深渊" detail="Endgame 裂隙" onClick={() => setScreen('endgame')} />
             <NavTile icon={<Shield size={20} />} title="竞技场" detail="异步 PVP" onClick={() => setScreen('arena')} />
+            <NavTile icon={<Trophy size={20} />} title="公会" detail="社交 · 公会Boss" onClick={() => setScreen('guild')} />
             <NavTile icon={<Backpack size={20} />} title="背包" detail="穿戴 · 出售 · 强化" onClick={() => setScreen('inventory')} />
             <NavTile icon={<Boxes size={20} />} title="物品" detail={`${data.config.itemCount} 种图鉴`} onClick={() => setScreen('item-catalog')} />
             <NavTile icon={<Sparkles size={20} />} title="技能" detail={`技能战力 ${data.powerBreakdown.skillPower ?? 0}`} onClick={() => setScreen('skills')} />

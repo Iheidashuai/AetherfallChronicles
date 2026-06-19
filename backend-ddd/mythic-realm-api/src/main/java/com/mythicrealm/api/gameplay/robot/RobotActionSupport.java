@@ -23,6 +23,15 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class RobotActionSupport {
+    private static final List<String> GUILD_BANTER = List.of(
+        "公会里有人组队刷本吗？带带我。",
+        "刚给公会出了点力，等公会 Boss 上线一起干。",
+        "会长今天又上分了，咱们也别躺。",
+        "公会频道安静了，冒个泡，大家加油。",
+        "谁有多的强化石匀点，回头公会活动还你。",
+        "咱们公会排名又稳了一点，继续保持。"
+    );
+
     private final JdbcTemplate jdbcTemplate;
     private final RobotEquipmentService robotEquipmentService;
     private final RobotActivityLogService robotActivityLogService;
@@ -513,9 +522,30 @@ public class RobotActionSupport {
         return RobotActionResult.success("rest", text);
     }
 
+    public RobotActionResult guildChat(RobotDecisionContext context, RobotActionScore score) {
+        Long guildId = jdbcTemplate.query(
+            "SELECT guild_id FROM guild_member WHERE player_id = ?",
+            rs -> rs.next() ? rs.getLong("guild_id") : null,
+            context.actor().id()
+        );
+        if (guildId == null) {
+            return rest(context.actor(), "还没加入公会，先各刷各的。", score.reason());
+        }
+        String text = GUILD_BANTER.get(context.random().nextInt(GUILD_BANTER.size()));
+        jdbcTemplate.update(
+            "INSERT INTO chat_message (player_id, sender_name, kind, text, channel) VALUES (?, ?, 'robot', ?, ?)",
+            context.actor().id(),
+            context.actor().name(),
+            text,
+            "guild:" + guildId
+        );
+        record(context.actor(), "guild_chat", text, score.reason());
+        return RobotActionResult.success("guild_chat", text);
+    }
+
     public void trimChat() {
         jdbcTemplate.update(
-            "DELETE FROM chat_message WHERE id NOT IN (SELECT id FROM (SELECT id FROM chat_message ORDER BY created_at DESC, id DESC LIMIT 260) recent)"
+            "DELETE FROM chat_message WHERE channel = 'world' AND id NOT IN (SELECT id FROM (SELECT id FROM chat_message WHERE channel = 'world' ORDER BY created_at DESC, id DESC LIMIT 260) recent)"
         );
     }
 

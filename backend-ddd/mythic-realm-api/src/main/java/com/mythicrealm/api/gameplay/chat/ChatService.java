@@ -207,9 +207,11 @@ public class ChatService {
         jdbcTemplate.update(
             """
             DELETE FROM chat_message
-            WHERE id NOT IN (
+            WHERE channel = 'world'
+              AND id NOT IN (
                 SELECT id FROM (
                     SELECT id FROM chat_message
+                    WHERE channel = 'world'
                     ORDER BY id DESC
                     LIMIT 260
                 ) recent_messages
@@ -219,7 +221,7 @@ public class ChatService {
     }
 
     private void ensureOpeningMessages() {
-        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM chat_message", Integer.class);
+        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM chat_message WHERE channel = 'world'", Integer.class);
         if (count != null && count > 0) {
             return;
         }
@@ -243,6 +245,7 @@ public class ChatService {
             """
             SELECT id, player_id, sender_name, kind, text, created_at
             FROM chat_message
+            WHERE channel = 'world'
             ORDER BY id DESC
             LIMIT 80
             """,
@@ -256,7 +259,7 @@ public class ChatService {
             """
             SELECT id, player_id, sender_name, kind, text, created_at
             FROM chat_message
-            WHERE id > ?
+            WHERE id > ? AND channel = 'world'
             ORDER BY id ASC
             LIMIT 24
             """,

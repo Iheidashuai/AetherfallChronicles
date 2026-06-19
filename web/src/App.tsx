@@ -175,6 +175,7 @@ import { ShopScreen } from './screens/ShopScreen';
 import { BuildsScreen } from './screens/BuildsScreen';
 import { EndgameRiftScreen } from './screens/EndgameRiftScreen';
 import { ArenaScreen } from './screens/ArenaScreen';
+import { GuildScreen } from './screens/GuildScreen';
 import { RechargeScreen } from './screens/RechargeScreen';
 import { ChatScreen } from './screens/ChatScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
@@ -210,6 +211,7 @@ export function App() {
           {screen === 'builds' && token && <BuildsScreen token={token} />}
           {screen === 'endgame' && token && <EndgameRiftScreen token={token} />}
           {screen === 'arena' && token && <ArenaScreen token={token} />}
+          {screen === 'guild' && token && <GuildScreen token={token} />}
           {screen === 'chat' && token && <ChatScreen token={token} />}
           {screen === 'leaderboard' && token && <LeaderboardScreen token={token} />}
           {screen === 'robots' && token && <RobotActivityScreen token={token} />}
