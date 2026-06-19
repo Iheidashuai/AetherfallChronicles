@@ -1,9 +1,9 @@
 import { FormEvent, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Coins, LogOut, MessageCircle, Send, Shield, Trophy, UserRound } from 'lucide-react';
+import { ChevronRight, Coins, LogOut, MessageCircle, Send, Shield, Skull, Swords, Trophy, UserRound } from 'lucide-react';
 import { gameApi } from '../api';
-import type { GuildChatMessage, GuildSummary, GuildView } from '../api';
+import type { GuildBossView, GuildChatMessage, GuildSummary, GuildView } from '../api';
 import { useAppStore } from '../store';
 import { EmptyState, ErrorScreen, LoadingScreen, SectionTitle, TopBar } from '../components/ui';
 
@@ -104,6 +104,8 @@ function GuildHall({ token, view, onChanged }: { token: string; view: GuildView;
         <p className="guild-blurb">“{guild.recruitingBlurb}”</p>
       </div>
 
+      <GuildBoss token={token} />
+
       <div className="guild-hall-body">
         <div className="guild-members">
           <SectionTitle icon={<UserRound size={16} />} title="公会成员" />
@@ -125,6 +127,76 @@ function GuildHall({ token, view, onChanged }: { token: string; view: GuildView;
         </div>
 
         <GuildChat token={token} />
+      </div>
+    </div>
+  );
+}
+
+function GuildBoss({ token }: { token: string }) {
+  const queryClient = useQueryClient();
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const bossQuery = useQuery({
+    queryKey: ['guild', 'boss'],
+    queryFn: () => gameApi.guildBoss(token),
+    refetchInterval: 5000,
+  });
+  const attackMutation = useMutation({
+    mutationFn: () => gameApi.attackGuildBoss(token),
+    onSuccess: (result) => {
+      queryClient.setQueryData(['guild', 'boss'], result.view);
+      setFeedback(
+        result.killed
+          ? `击杀！造成 ${result.damage.toLocaleString()} 伤害，更强的 T${result.spawnedTier} Boss 已降临！`
+          : `造成 ${result.damage.toLocaleString()} 伤害！`,
+      );
+    },
+    onError: (error) => setFeedback((error as Error)?.message ?? '攻击失败'),
+  });
+
+  if (bossQuery.isLoading) {
+    return <div className="guild-boss"><SectionTitle icon={<Skull size={16} />} title="公会 Boss" /></div>;
+  }
+  const view: GuildBossView | undefined = bossQuery.data;
+  if (!view) {
+    return null;
+  }
+  const { boss, topContributors, myDamage, myRank } = view;
+  const pct = boss.hpMax > 0 ? Math.max(0, Math.min(100, (boss.hpCurrent / boss.hpMax) * 100)) : 0;
+
+  return (
+    <div className="guild-boss">
+      <div className="guild-boss-head">
+        <SectionTitle icon={<Skull size={16} />} title={`公会 Boss · ${boss.name}${boss.tier > 1 ? ` (T${boss.tier})` : ''}`} />
+        <span className="guild-boss-week">{boss.weekKey}</span>
+      </div>
+      <div className="guild-boss-bar">
+        <div className="guild-boss-fill" style={{ width: `${pct}%` }} />
+        <span className="guild-boss-hp">
+          {boss.hpCurrent.toLocaleString()} / {boss.hpMax.toLocaleString()}
+        </span>
+      </div>
+      <div className="guild-boss-actions">
+        <button className="guild-boss-attack" disabled={attackMutation.isPending} onClick={() => attackMutation.mutate()}>
+          <Swords size={16} /> 挑战 Boss（消耗 1 体力）
+        </button>
+        <span className="guild-boss-mine">
+          我的贡献 {myDamage.toLocaleString()}
+          {myRank > 0 ? ` · 第 ${myRank} 名` : ''}
+        </span>
+      </div>
+      {feedback ? <p className="guild-boss-feedback">{feedback}</p> : null}
+      <div className="guild-boss-ranks">
+        {topContributors.length === 0 ? (
+          <EmptyState text="还没人出手，第一刀就是你！" />
+        ) : (
+          topContributors.map((c) => (
+            <div key={c.playerId} className="guild-boss-rank-row">
+              <span className="guild-boss-rank-no">#{c.rank}</span>
+              <span className="guild-boss-rank-name">{c.name}</span>
+              <span className="guild-boss-rank-dmg">{c.damage.toLocaleString()}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

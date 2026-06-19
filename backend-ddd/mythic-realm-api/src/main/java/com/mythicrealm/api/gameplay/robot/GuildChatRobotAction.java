@@ -27,12 +27,12 @@ public class GuildChatRobotAction implements RobotDecisionAction {
 
     @Override
     public RobotActionScore score(RobotDecisionContext context) {
-        double value = 8 + context.random().nextDouble() * 8;
+        double value = 34 + context.random().nextDouble() * 14;
         if (context.isCurrentKind("guild_chat")) {
-            value -= 8;
+            value -= 12;
         }
         if (context.personalityContains("频道") || context.personalityContains("公会") || context.personalityContains("聊天")) {
-            value += 6;
+            value += 8;
         }
         return new RobotActionScore(value, "维持公会频道的活跃氛围");
     }

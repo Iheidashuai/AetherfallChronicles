@@ -601,6 +601,36 @@ CREATE TABLE guild_member (
     CONSTRAINT fk_guild_member_player FOREIGN KEY (player_id) REFERENCES player (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Guild social ecosystem (P2): weekly shared-HP-pool boss + per-member contribution.
+CREATE TABLE guild_boss (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    guild_id BIGINT NOT NULL,
+    week_key VARCHAR(12) NOT NULL,
+    tier INT NOT NULL DEFAULT 1,
+    name VARCHAR(64) NOT NULL,
+    hp_max BIGINT NOT NULL,
+    hp_current BIGINT NOT NULL,
+    status VARCHAR(12) NOT NULL DEFAULT 'alive',
+    spawned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    killed_at TIMESTAMP NULL,
+    UNIQUE KEY uk_guild_boss (guild_id, week_key, tier),
+    KEY idx_guild_boss_status (guild_id, status),
+    CONSTRAINT fk_guild_boss_guild FOREIGN KEY (guild_id) REFERENCES guild (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE guild_boss_contribution (
+    guild_id BIGINT NOT NULL,
+    week_key VARCHAR(12) NOT NULL,
+    player_id BIGINT NOT NULL,
+    damage BIGINT NOT NULL DEFAULT 0,
+    attempts INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (guild_id, week_key, player_id),
+    KEY idx_gbc_rank (guild_id, week_key, damage),
+    CONSTRAINT fk_gbc_guild FOREIGN KEY (guild_id) REFERENCES guild (id),
+    CONSTRAINT fk_gbc_player FOREIGN KEY (player_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE global_announcement (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     kind VARCHAR(32) NOT NULL,

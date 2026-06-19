@@ -3,6 +3,7 @@ package com.mythicrealm.api.gameplay.robot;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.build.BuildService;
 import com.mythicrealm.api.gameplay.dungeon.DungeonService;
+import com.mythicrealm.api.gameplay.guild.GuildBossService;
 import com.mythicrealm.api.gameplay.endgame.EndgameRiftService;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.inventory.EquipmentProcessingService;
@@ -44,6 +45,7 @@ public class RobotActionSupport {
     private final EndgameRiftService endgameRiftService;
     private final BuildService buildService;
     private final EquipmentProcessingService equipmentProcessingService;
+    private final GuildBossService guildBossService;
 
     public RobotActionSupport(
         JdbcTemplate jdbcTemplate,
@@ -57,7 +59,8 @@ public class RobotActionSupport {
         RechargeService rechargeService,
         EndgameRiftService endgameRiftService,
         BuildService buildService,
-        EquipmentProcessingService equipmentProcessingService
+        EquipmentProcessingService equipmentProcessingService,
+        GuildBossService guildBossService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.robotEquipmentService = robotEquipmentService;
@@ -71,6 +74,7 @@ public class RobotActionSupport {
         this.endgameRiftService = endgameRiftService;
         this.buildService = buildService;
         this.equipmentProcessingService = equipmentProcessingService;
+        this.guildBossService = guildBossService;
     }
 
     public RobotActionResult runDungeon(RobotDecisionContext context, RobotActionScore score) {
@@ -520,6 +524,16 @@ public class RobotActionSupport {
     public RobotActionResult rest(RobotAgent actor, String text, String reason) {
         record(actor, "rest", text, reason);
         return RobotActionResult.success("rest", text);
+    }
+
+    public RobotActionResult guildBoss(RobotDecisionContext context, RobotActionScore score) {
+        boolean hit = guildBossService.robotAttack(context.actor().id(), context.actor().power(), context.random());
+        if (!hit) {
+            return rest(context.actor(), "还没加入公会，先各刷各的。", score.reason());
+        }
+        String text = "给公会 Boss 输出了一轮，伤害已记入公会贡献。";
+        record(context.actor(), "guild_boss", text, score.reason());
+        return RobotActionResult.success("guild_boss", text);
     }
 
     public RobotActionResult guildChat(RobotDecisionContext context, RobotActionScore score) {

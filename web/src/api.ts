@@ -1297,6 +1297,8 @@ export const gameApi = {
   guildChat: (token: string) => api<GuildChatMessage[]>('/api/guild/chat', {}, token),
   sendGuildChat: (token: string, text: string) =>
     api<GuildChatMessage[]>('/api/guild/chat', { method: 'POST', body: JSON.stringify({ text }) }, token),
+  guildBoss: (token: string) => api<GuildBossView>('/api/guild/boss', {}, token),
+  attackGuildBoss: (token: string) => api<GuildBossAttackResult>('/api/guild/boss/attack', { method: 'POST' }, token),
 };
 
 export type GuildSummary = {
@@ -1321,3 +1323,20 @@ export type GuildMember = {
 export type GuildView = { guild: GuildSummary; myRole: string; members: GuildMember[] };
 export type GuildHomeResponse = { guild: GuildView | null };
 export type GuildChatMessage = { id: number; senderName: string; kind: string; text: string; createdAt: string };
+export type GuildBossInfo = {
+  id: number;
+  name: string;
+  tier: number;
+  hpCurrent: number;
+  hpMax: number;
+  status: string;
+  weekKey: string;
+};
+export type GuildBossContributor = { playerId: number; name: string; kind: string; damage: number; rank: number };
+export type GuildBossView = {
+  boss: GuildBossInfo;
+  topContributors: GuildBossContributor[];
+  myDamage: number;
+  myRank: number;
+};
+export type GuildBossAttackResult = { damage: number; killed: boolean; spawnedTier: number; view: GuildBossView };

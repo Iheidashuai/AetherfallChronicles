@@ -20,11 +20,18 @@ public class GuildController {
     private final SessionService sessionService;
     private final PlayerService playerService;
     private final GuildService guildService;
+    private final GuildBossService guildBossService;
 
-    public GuildController(SessionService sessionService, PlayerService playerService, GuildService guildService) {
+    public GuildController(
+        SessionService sessionService,
+        PlayerService playerService,
+        GuildService guildService,
+        GuildBossService guildBossService
+    ) {
         this.sessionService = sessionService;
         this.playerService = playerService;
         this.guildService = guildService;
+        this.guildBossService = guildBossService;
     }
 
     @GetMapping("/guilds")
@@ -50,6 +57,16 @@ public class GuildController {
     GuildHomeResponse leave(@RequestHeader(name = "Authorization", required = false) String authorization) {
         guildService.leave(requirePlayer(authorization));
         return new GuildHomeResponse(null);
+    }
+
+    @GetMapping("/boss")
+    GuildBossService.GuildBossView boss(@RequestHeader(name = "Authorization", required = false) String authorization) {
+        return guildBossService.bossFor(requirePlayer(authorization));
+    }
+
+    @PostMapping("/boss/attack")
+    GuildBossService.AttackResult attackBoss(@RequestHeader(name = "Authorization", required = false) String authorization) {
+        return guildBossService.attack(requirePlayer(authorization));
     }
 
     @GetMapping("/chat")
