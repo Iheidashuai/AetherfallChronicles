@@ -9,6 +9,7 @@ import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.inventory.ItemRecord;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.player.PlayerService;
+import com.mythicrealm.api.gameplay.skill.SkillService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
 import java.util.List;
@@ -27,6 +28,7 @@ public class HomeController {
     private final GameConfigService gameConfigService;
     private final CombatStatsService combatStatsService;
     private final CombatPowerService combatPowerService;
+    private final SkillService skillService;
     private final StaminaService staminaService;
 
     public HomeController(
@@ -36,6 +38,7 @@ public class HomeController {
         GameConfigService gameConfigService,
         CombatStatsService combatStatsService,
         CombatPowerService combatPowerService,
+        SkillService skillService,
         StaminaService staminaService
     ) {
         this.sessionService = sessionService;
@@ -44,6 +47,7 @@ public class HomeController {
         this.gameConfigService = gameConfigService;
         this.combatStatsService = combatStatsService;
         this.combatPowerService = combatPowerService;
+        this.skillService = skillService;
         this.staminaService = staminaService;
     }
 
@@ -57,7 +61,8 @@ public class HomeController {
         CombatStats baseStats = combatStatsService.playerStats(player, List.of());
         int equipmentPower = equipped.values().stream().mapToInt(inventoryService::equipmentPower).sum();
         int basePower = combatPowerService.basePower(baseStats);
-        int totalPower = combatPowerService.combatPower(stats, baseStats, equipmentPower);
+        int skillPower = skillService.skillPower(player);
+        int totalPower = combatPowerService.combatPower(stats, baseStats, equipmentPower) + skillPower;
         return new HomeSnapshot(
             player,
             totalPower,
@@ -67,7 +72,7 @@ public class HomeController {
             DerivedStats.from(baseStats),
             DerivedStats.difference(stats, baseStats),
             equipmentPower,
-            new PowerBreakdown(basePower, equipmentPower, Math.max(0, totalPower - basePower - equipmentPower), totalPower),
+            new PowerBreakdown(basePower, equipmentPower, skillPower, Math.max(0, totalPower - basePower - equipmentPower - skillPower), totalPower),
             equipped,
             inventory.size(),
             InventoryService.MAX_SLOTS,
@@ -140,6 +145,7 @@ public class HomeController {
     public record PowerBreakdown(
         int basePower,
         int equipmentPower,
+        int skillPower,
         int synergyPower,
         int totalPower
     ) {

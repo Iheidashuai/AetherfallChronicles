@@ -1,6 +1,7 @@
 package com.mythicrealm.api.gameplay.robot;
 
 import com.mythicrealm.api.gameplay.dungeon.DungeonService;
+import com.mythicrealm.api.gameplay.endgame.EndgameRiftService;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
 import com.mythicrealm.api.gameplay.quest.QuestService;
@@ -9,6 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +23,9 @@ public class RobotBrainService {
     private final RobotActionSupport actionSupport;
     private final StaminaService staminaService;
     private final QuestService questService;
+    private final EndgameRiftService endgameRiftService;
 
+    @Autowired
     public RobotBrainService(
         List<RobotDecisionAction> actions,
         JdbcTemplate jdbcTemplate,
@@ -30,6 +34,19 @@ public class RobotBrainService {
         RobotActionSupport actionSupport,
         StaminaService staminaService,
         QuestService questService
+    ) {
+        this(actions, jdbcTemplate, gameConfigService, robotEquipmentService, actionSupport, staminaService, questService, null);
+    }
+
+    public RobotBrainService(
+        List<RobotDecisionAction> actions,
+        JdbcTemplate jdbcTemplate,
+        GameConfigService gameConfigService,
+        RobotEquipmentService robotEquipmentService,
+        RobotActionSupport actionSupport,
+        StaminaService staminaService,
+        QuestService questService,
+        EndgameRiftService endgameRiftService
     ) {
         this.actions = actions.stream()
             .sorted(Comparator.comparingInt(RobotDecisionAction::priority).reversed())
@@ -40,6 +57,7 @@ public class RobotBrainService {
         this.actionSupport = actionSupport;
         this.staminaService = staminaService;
         this.questService = questService;
+        this.endgameRiftService = endgameRiftService;
     }
 
     public RobotActionResult thinkAndAct(RobotAgent actor, RobotAgent target) {
@@ -71,6 +89,14 @@ public class RobotBrainService {
         RobotEquipmentService.EnhancementOpportunity enhancementOpportunity = robotEquipmentService.enhancementOpportunity(actor.player());
         long spendableGold = actor.player().gold() + actor.player().realMoney() * 1_000L;
         long playerId = actor.id();
+        boolean riftUnlocked = endgameRiftService != null && endgameRiftService.unlocked(actor.player());
+        EndgameRiftService.RiftProgress riftProgress = endgameRiftService == null
+            ? new EndgameRiftService.RiftProgress(0, 0, null)
+            : endgameRiftService.progress(playerId);
+        int riftNextTier = riftUnlocked ? Math.max(1, riftProgress.bestTier() + 1) : 0;
+        EndgameRiftService.RiftMaterials riftMaterials = endgameRiftService == null
+            ? new EndgameRiftService.RiftMaterials(0, 0, 0)
+            : endgameRiftService.materials(playerId);
         return new RobotDecisionContext(
             actor,
             target,
@@ -89,6 +115,23 @@ public class RobotBrainService {
             templateQuantity(playerId, "mat_fragment_legendary"),
             templateQuantity(playerId, "mat_fragment_immortal"),
             usableEnhancementStoneCount(playerId, enhancementOpportunity),
+            riftUnlocked,
+            riftProgress.bestTier(),
+            riftNextTier,
+            riftNextTier <= 0 || endgameRiftService == null ? 0 : endgameRiftService.minimumPower(riftNextTier),
+            riftMaterials.essence(),
+            riftMaterials.shards(),
+            riftMaterials.orbs(),
+            templateQuantity(playerId, "mat_socket_core"),
+            templateQuantity(playerId, "mat_gem_dust"),
+            templateQuantity(playerId, "mat_affix_lock"),
+            templateQuantity(playerId, "mat_ascension_core"),
+            templateQuantity(playerId, "mat_ascension_guard"),
+            effectQuantity(playerId, "gem"),
+            buildCount(playerId),
+            activeBuildName(playerId),
+            activeBuildPresetId(playerId),
+            recommendedBuildPresetId(actor, riftNextTier),
             random
         );
     }
@@ -150,7 +193,10 @@ public class RobotBrainService {
             JOIN item_template it ON it.id = COALESCE(ii.template_id, ml.item_template_id)
             WHERE ml.status = 'listed'
               AND (ml.seller_player_id IS NULL OR ml.seller_player_id <> ?)
-              AND COALESCE(ii.quality, it.quality) IN ('rare', 'epic', 'legendary', 'immortal')
+              AND (
+                  COALESCE(ii.quality, it.quality) IN ('rare', 'epic', 'legendary', 'immortal')
+                  OR COALESCE(ml.item_category, it.market_category, it.item_category) IN ('material', 'gem', 'consumable', 'chest')
+              )
               AND ml.price <= ?
             """,
             Integer.class,
@@ -231,6 +277,52 @@ public class RobotBrainService {
             enhancementOpportunity.nextLevel()
         );
         return count == null ? 0 : count;
+    }
+
+    private int buildCount(long playerId) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM player_build WHERE player_id = ?",
+            Integer.class,
+            playerId
+        );
+        return count == null ? 0 : count;
+    }
+
+    private String activeBuildName(long playerId) {
+        return jdbcTemplate.queryForList(
+            "SELECT name FROM player_build WHERE player_id = ? AND active = TRUE ORDER BY updated_at DESC, id DESC LIMIT 1",
+            String.class,
+            playerId
+        ).stream().findFirst().orElse(null);
+    }
+
+    private String activeBuildPresetId(long playerId) {
+        return jdbcTemplate.queryForList(
+            "SELECT source_preset_id FROM player_build WHERE player_id = ? AND active = TRUE ORDER BY updated_at DESC, id DESC LIMIT 1",
+            String.class,
+            playerId
+        ).stream().findFirst().orElse(null);
+    }
+
+    private String recommendedBuildPresetId(RobotAgent actor, int riftNextTier) {
+        String preferred = switch (actor.player().profession()) {
+            case "warrior" -> riftNextTier >= 8 ? "preset_warrior_duelist"
+                : actor.power() < 35_000 ? "preset_warrior_guardian" : "preset_warrior_breaker";
+            case "ranger" -> riftNextTier >= 8 ? "preset_ranger_execute"
+                : actor.power() < 35_000 ? "preset_ranger_wind" : "preset_ranger_crit";
+            case "mage" -> riftNextTier >= 8 ? "preset_mage_renewal"
+                : actor.power() < 35_000 ? "preset_mage_ward" : "preset_mage_arcane";
+            default -> null;
+        };
+        if (preferred == null) {
+            return null;
+        }
+        return jdbcTemplate.queryForList(
+            "SELECT id FROM build_preset WHERE id = ? AND profession = ? AND enabled = TRUE",
+            String.class,
+            preferred,
+            actor.player().profession()
+        ).stream().findFirst().orElse(null);
     }
 
     private record ScoredAction(RobotDecisionAction action, RobotActionScore score, double finalScore) {

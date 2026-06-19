@@ -152,6 +152,10 @@ public class GameConfigService {
                 rs.getInt("max_stack"),
                 rs.getString("effect_type"),
                 rs.getString("effect_value_json"),
+                rs.getBoolean("tradeable"),
+                rs.getString("market_category"),
+                rs.getInt("market_min_unit_price"),
+                rs.getInt("market_max_unit_price"),
                 rs.getBigDecimal("enhance_bonus_rate").doubleValue(),
                 rs.getInt("min_enhance_level"),
                 rs.getInt("max_enhance_level")

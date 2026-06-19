@@ -33,47 +33,12 @@
         </dependency>
         <dependency>
             <groupId>com.mythicrealm</groupId>
-            <artifactId>mythic-realm-domain-inventory</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.mythicrealm</groupId>
             <artifactId>mythic-realm-domain-enhancement</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.mythicrealm</groupId>
-            <artifactId>mythic-realm-domain-dungeon</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.mythicrealm</groupId>
-            <artifactId>mythic-realm-domain-market</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.mythicrealm</groupId>
-            <artifactId>mythic-realm-domain-quest</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.mythicrealm</groupId>
-            <artifactId>mythic-realm-domain-robot</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.mythicrealm</groupId>
-            <artifactId>mythic-realm-domain-chat</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.mythicrealm</groupId>
-            <artifactId>mythic-realm-domain-leaderboard</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.mythicrealm</groupId>
-            <artifactId>mythic-realm-domain-announcement</artifactId>
+            <artifactId>mythic-realm-domain-arena</artifactId>
             <version>${project.version}</version>
         </dependency>
 

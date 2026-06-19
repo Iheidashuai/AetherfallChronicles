@@ -47,7 +47,7 @@ public class MarketSupplyRobotAction implements RobotDecisionAction {
         if (context.isCurrentKind("market_list")) {
             value -= 10;
         }
-        String reason = "个人寄售少于 4 件，刷本补货能给市场增加装备流动";
+        String reason = "个人寄售少于 4 单，刷本补货能给市场增加装备和成长材料流动";
         return new RobotActionScore(value, reason);
     }
 

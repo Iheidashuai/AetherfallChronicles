@@ -142,6 +142,19 @@ public class InventoryController {
         return result;
     }
 
+    @PostMapping("/{itemId}/refine")
+    InventoryService.RefineResult refine(
+        @RequestHeader(name = "Authorization", required = false) String authorization,
+        @PathVariable("itemId") long itemId,
+        @RequestBody(required = false) RefineRequest request
+    ) {
+        PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
+        var result = inventoryService.refine(player, itemId, request == null ? "balanced" : request.focus());
+        questService.recordEvent(player.id(), QuestEvent.of("equipmentRefined"));
+        questService.recordEvent(player.id(), new QuestEvent("combatPowerReached", null, result.inventory().combatPower()));
+        return result;
+    }
+
     @PostMapping("/bulk-sell")
     InventoryService.BulkSellResult bulkSell(
         @RequestHeader(name = "Authorization", required = false) String authorization,
@@ -167,6 +180,9 @@ public class InventoryController {
     }
 
     record EnhancementTransferRequest(long sourceItemId, long targetItemId) {
+    }
+
+    record RefineRequest(String focus) {
     }
 
     record EnhanceRequest(List<Long> stoneItemIds) {

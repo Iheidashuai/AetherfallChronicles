@@ -21,16 +21,18 @@ H5 + Java 后端的西方魔幻题材菜单 RPG。
 
 - [游戏总览](docs/specs/00-overview.md)
 - [角色系统](docs/specs/01-character-system.md)
-- [装备系统](docs/specs/02-equipment-system.md)
+- [装备 / 强化 / 加工系统](docs/specs/02-equipment-system.md)
 - [战斗系统](docs/specs/03-combat-system.md)
 - [副本 & 任务](docs/specs/04-dungeon-system.md)
 - [经济系统](docs/specs/05-economy-system.md)
 - [机器人模拟](docs/specs/06-bot-simulation.md)
 - [全服通告](docs/specs/07-announcement-system.md)
-- [商店 & 拍卖场](docs/specs/08-shop-auction.md)
-- [UI 设计规范](docs/specs/09-ui-design-guidelines.md)
+- [商店 & 商会系统](docs/specs/08-shop-auction.md)
+- [UI 设计规范（Web）](docs/specs/09-ui-design-guidelines.md)
+- [终局系统：竞技场 / 裂隙 / 构筑 / 排行榜](docs/specs/10-endgame-system.md)
 
-> 旧规格中仍有 iOS/Swift 原型描述，作为迁移历史保留；Swift 本地版工程已从仓库移除。
+> specs 已按当前 Web（React/Phaser + Java）产品重写；Swift 本地版工程已从仓库移除。
+> 前端工程改造参考：[App.tsx 拆分方案](docs/architecture/frontend-split-plan.md)。
 
 ## Spec Kit 上下文
 

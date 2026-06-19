@@ -34,6 +34,16 @@ public class MarketService {
     private static final int PRICE_CAP_MULTIPLIER = 3;
     private static final int MARKET_TAX_RATE = 8;
 
+    /** Gold the seller receives after the market tax, floored at 1. Pure for unit testing. */
+    static int netSellerProceeds(int price) {
+        return Math.max(1, price * (100 - MARKET_TAX_RATE) / 100);
+    }
+
+    /** Maximum allowed listing price given the appraised/recommended price. Pure for unit testing. */
+    static int maxListingPrice(int recommendedPrice) {
+        return recommendedPrice * PRICE_CAP_MULTIPLIER;
+    }
+
     private final JdbcTemplate jdbcTemplate;
     private final GameConfigService gameConfigService;
     private final InventoryService inventoryService;
@@ -91,37 +101,59 @@ public class MarketService {
     }
 
     @Transactional
-    public MarketListingView listItem(PlayerRecord player, long itemId, int price) {
-        if (price <= 0) {
-            throw ApiException.badRequest("寄售价格必须大于 0");
+    public MarketListingView listItem(PlayerRecord player, long itemId, int quantity, int unitPrice) {
+        if (unitPrice <= 0) {
+            throw ApiException.badRequest("寄售单价必须大于 0");
         }
         ItemRecord item = inventoryService.requireOwnedItem(player.id(), itemId);
-        inventoryService.inventorySlot(player.id(), itemId).orElseThrow(() -> ApiException.badRequest("只能寄售背包中的装备"));
-        ItemSnapshot snapshot = ItemSnapshot.from(item, originFor(item.templateId()));
+        ItemTemplate template = gameConfigService.requireItem(item.templateId());
+        if (!template.tradeable()) {
+            throw ApiException.badRequest("该物品不可寄售");
+        }
+        inventoryService.inventorySlot(player.id(), itemId).orElseThrow(() -> ApiException.badRequest("只能寄售背包中的物品"));
+        int listingQuantity = item.stackable() ? Math.max(1, quantity) : 1;
+        if (listingQuantity > Math.max(1, item.quantity())) {
+            throw ApiException.badRequest("寄售数量不足，当前只有 " + Math.max(1, item.quantity()) + " 件");
+        }
+        ItemSnapshot snapshot = ItemSnapshot.from(item, template, originFor(item.templateId()));
         int recommendedPrice = recommendedPrice(snapshot);
-        int maxPrice = recommendedPrice * PRICE_CAP_MULTIPLIER;
-        if (price > maxPrice) {
-            throw ApiException.badRequest("寄售价超过商会估值上限，最高 " + maxPrice + " 金");
+        int maxPrice = maxListingPrice(recommendedPrice);
+        if (unitPrice > maxPrice) {
+            throw ApiException.badRequest("寄售单价超过商会估值上限，最高 " + maxPrice + " 金");
+        }
+        if (unitPrice < Math.max(1, template.marketMinUnitPrice())) {
+            throw ApiException.badRequest("寄售单价低于商会最低价，最低 " + Math.max(1, template.marketMinUnitPrice()) + " 金");
         }
 
-        inventoryService.removeFromInventory(player.id(), itemId);
+        ItemRecord listedItem = inventoryService.splitItemForMarket(player.id(), itemId, listingQuantity);
+        snapshot = ItemSnapshot.from(listedItem, template, originFor(listedItem.templateId()));
+        int totalPrice = Math.toIntExact((long) unitPrice * listingQuantity);
         jdbcTemplate.update(
             """
             INSERT INTO market_listing
-            (seller_player_id, seller_name, item_id, item_template_id, item_enhancement_level, item_enhancement_luck,
-             snapshot_name, snapshot_item_type, snapshot_quality, snapshot_required_level, snapshot_attack_bonus,
+            (seller_player_id, seller_name, item_id, item_template_id, quantity, unit_price, item_category, stackable,
+             item_enhancement_level, item_enhancement_luck, item_refine_level, item_ascension_level,
+             snapshot_name, snapshot_item_type, snapshot_item_category, snapshot_quality, snapshot_required_level, snapshot_attack_bonus,
              snapshot_defense_bonus, snapshot_resistance_bonus, snapshot_hp_bonus, snapshot_mp_bonus,
-             snapshot_crit_bonus, snapshot_sell_price, price, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'listed')
+             snapshot_crit_bonus, snapshot_sell_price, snapshot_description, snapshot_effect_type, snapshot_effect_value,
+             snapshot_processing_summary, price, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'listed')
             """,
             player.id(),
             player.name(),
-            itemId,
-            item.templateId(),
-            item.enhancementLevel(),
-            item.enhancementLuck(),
+            listedItem.id(),
+            listedItem.templateId(),
+            listingQuantity,
+            unitPrice,
+            snapshot.marketCategory(),
+            snapshot.stackable(),
+            listedItem.enhancementLevel(),
+            listedItem.enhancementLuck(),
+            listedItem.refineLevel(),
+            listedItem.ascensionLevel(),
             snapshot.name(),
             snapshot.itemType(),
+            snapshot.itemCategory(),
             snapshot.quality(),
             snapshot.requiredLevel(),
             snapshot.attackBonus(),
@@ -131,17 +163,21 @@ public class MarketService {
             snapshot.mpBonus(),
             snapshot.critBonus(),
             snapshot.sellPrice(),
-            price
+            snapshot.description(),
+            snapshot.effectType(),
+            snapshot.effectValueJson(),
+            snapshot.processingSummary(),
+            totalPrice
         );
         long listingId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
-        return view(listingId, true, player.name(), itemId, snapshot, price, "listed");
+        return view(listingId, true, player.name(), listedItem.id(), snapshot, listingQuantity, unitPrice, totalPrice, "listed");
     }
 
     @Transactional
     public MarketListingView buy(PlayerRecord buyer, long listingId) {
         ListingRow row = requireListing(listingId);
         if (!"listed".equals(row.status())) {
-            throw ApiException.badRequest("这件装备已经无法购买");
+            throw ApiException.badRequest("这件商品已经无法购买");
         }
         if (row.sellerPlayerId() != null && row.sellerPlayerId() == buyer.id()) {
             throw ApiException.badRequest("不能购买自己的寄售");
@@ -151,7 +187,7 @@ public class MarketService {
         }
         jdbcTemplate.update("UPDATE player SET gold = gold - ? WHERE id = ?", row.price(), buyer.id());
         if (row.sellerPlayerId() != null) {
-            int sellerGold = Math.max(1, row.price() * (100 - MARKET_TAX_RATE) / 100);
+            int sellerGold = netSellerProceeds(row.price());
             jdbcTemplate.update("UPDATE player SET gold = gold + ? WHERE id = ?", sellerGold, row.sellerPlayerId());
             if (row.itemId() > 0 && itemExists(row.itemId())) {
                 inventoryService.transferItemOwner(row.itemId(), buyer.id());
@@ -173,7 +209,7 @@ public class MarketService {
         if (row.sellerPlayerId() != null && !"robot".equals(row.sellerKind())) {
             questService.recordEvent(row.sellerPlayerId(), QuestEvent.of("marketSold"));
         }
-        return view(listingId, !"robot".equals(row.sellerKind()), row.sellerName(), row.itemId(), row.item(), row.price(), "sold");
+        return view(listingId, !"robot".equals(row.sellerKind()), row.sellerName(), row.itemId(), row.item(), row.quantity(), row.unitPrice(), row.price(), "sold");
     }
 
     @Transactional
@@ -200,6 +236,10 @@ public class MarketService {
                    COALESCE(ii.template_id, ml.item_template_id) AS snapshot_template_id,
                    COALESCE(ii.name, ml.snapshot_name, it.name) AS snapshot_name,
                    COALESCE(ii.item_type, ml.snapshot_item_type, it.item_type) AS snapshot_item_type,
+                   ml.snapshot_item_category AS snapshot_item_category,
+                   ml.item_category AS market_category,
+                   COALESCE(ml.stackable, it.stackable) AS stackable,
+                   GREATEST(1, COALESCE(ml.quantity, ii.quantity, 1)) AS quantity,
                    COALESCE(ii.quality, ml.snapshot_quality, it.quality) AS snapshot_quality,
                    COALESCE(ii.required_level, ml.snapshot_required_level, it.required_level) AS snapshot_required_level,
                    COALESCE(ii.attack_bonus, ml.snapshot_attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
@@ -209,8 +249,15 @@ public class MarketService {
                    COALESCE(ii.mp_bonus, ml.snapshot_mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
                    COALESCE(ii.crit_bonus, ml.snapshot_crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
                    COALESCE(ii.sell_price, ml.snapshot_sell_price, it.sell_price) AS snapshot_sell_price,
+                   COALESCE(ml.snapshot_description, it.description) AS snapshot_description,
+                   COALESCE(ml.snapshot_effect_type, it.effect_type) AS snapshot_effect_type,
+                   COALESCE(ml.snapshot_effect_value, it.effect_value_json) AS snapshot_effect_value,
                    COALESCE(ii.enhancement_level, ml.item_enhancement_level) AS snapshot_enhancement_level,
                    COALESCE(ii.enhancement_luck, ml.item_enhancement_luck) AS snapshot_enhancement_luck,
+                   COALESCE(ii.refine_level, ml.item_refine_level) AS snapshot_refine_level,
+                   COALESCE(ii.ascension_level, ml.item_ascension_level) AS snapshot_ascension_level,
+                   COALESCE(ml.snapshot_processing_summary, '') AS snapshot_processing_summary,
+                   CASE WHEN ml.unit_price > 0 THEN ml.unit_price ELSE ml.price END AS unit_price,
                    ml.price, ml.status, ml.created_at,
                    COALESCE(seller.controller_type, 'player') AS seller_kind
             FROM market_listing ml
@@ -227,6 +274,8 @@ public class MarketService {
                 rs.getString("seller_name"),
                 rs.getObject("item_id") == null ? 0 : rs.getLong("item_id"),
                 snapshotFromRow(rs),
+                rs.getInt("quantity"),
+                rs.getInt("unit_price"),
                 rs.getInt("price"),
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant()
@@ -235,20 +284,22 @@ public class MarketService {
         );
     }
 
-    private MarketListingView view(long id, boolean playerListing, String sellerName, long itemId, ItemSnapshot item, int price, String status) {
-        return view(id, playerListing, sellerName, itemId, item, price, status, Instant.now());
+    private MarketListingView view(long id, boolean playerListing, String sellerName, long itemId, ItemSnapshot item, int quantity, int unitPrice, int price, String status) {
+        return view(id, playerListing, sellerName, itemId, item, quantity, unitPrice, price, status, Instant.now());
     }
 
-    private MarketListingView view(long id, boolean playerListing, String sellerName, long itemId, ItemSnapshot item, int price, String status, Instant listedAt) {
+    private MarketListingView view(long id, boolean playerListing, String sellerName, long itemId, ItemSnapshot item, int quantity, int unitPrice, int price, String status, Instant listedAt) {
         int recommendedPrice = recommendedPrice(item);
-        int priceRatio = Math.round(price * 100f / Math.max(1, recommendedPrice));
-        int dealChance = dealChance(price, recommendedPrice, item.quality(), playerListing);
+        int priceRatio = Math.round(unitPrice * 100f / Math.max(1, recommendedPrice));
+        int dealChance = dealChance(unitPrice, recommendedPrice, item.quality(), playerListing);
         return new MarketListingView(
             id,
             playerListing,
             sellerName,
             itemId,
             item,
+            Math.max(1, quantity),
+            Math.max(1, unitPrice),
             price,
             recommendedPrice,
             priceRatio,
@@ -392,6 +443,17 @@ public class MarketService {
                         robot.id()
                     );
                 }
+                if (shouldRobotListItem(item, random)) {
+                    MarketListingView listing = listRobotOwnedItem(updatedRobot, robot.title(), item, "机器人副本掉落 · " + runResult.dungeonName(), random, false);
+                    listed++;
+                    if (recordActivity) {
+                        robotActivityLogService.record(
+                            robot.id(),
+                            "market_list",
+                            "在【" + runResult.dungeonName() + "】获得【" + listing.item().name() + quantitySuffix(listing.quantity()) + "】，留下自用储备后挂到商会 " + listing.price() + " 金。"
+                        );
+                    }
+                }
                 continue;
             }
             RobotEquipmentService.DropResolution drop = robotEquipmentService.resolveDropIfUpgrade(updatedRobot, item, random);
@@ -455,6 +517,10 @@ public class MarketService {
                    COALESCE(ii.template_id, ml.item_template_id) AS snapshot_template_id,
                    COALESCE(ii.name, ml.snapshot_name, it.name) AS snapshot_name,
                    COALESCE(ii.item_type, ml.snapshot_item_type, it.item_type) AS snapshot_item_type,
+                   ml.snapshot_item_category AS snapshot_item_category,
+                   ml.item_category AS market_category,
+                   COALESCE(ml.stackable, it.stackable) AS stackable,
+                   GREATEST(1, COALESCE(ml.quantity, ii.quantity, 1)) AS quantity,
                    COALESCE(ii.quality, ml.snapshot_quality, it.quality) AS snapshot_quality,
                    COALESCE(ii.required_level, ml.snapshot_required_level, it.required_level) AS snapshot_required_level,
                    COALESCE(ii.attack_bonus, ml.snapshot_attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
@@ -464,8 +530,15 @@ public class MarketService {
                    COALESCE(ii.mp_bonus, ml.snapshot_mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
                    COALESCE(ii.crit_bonus, ml.snapshot_crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
                    COALESCE(ii.sell_price, ml.snapshot_sell_price, it.sell_price) AS snapshot_sell_price,
+                   COALESCE(ml.snapshot_description, it.description) AS snapshot_description,
+                   COALESCE(ml.snapshot_effect_type, it.effect_type) AS snapshot_effect_type,
+                   COALESCE(ml.snapshot_effect_value, it.effect_value_json) AS snapshot_effect_value,
                    COALESCE(ii.enhancement_level, ml.item_enhancement_level) AS snapshot_enhancement_level,
                    COALESCE(ii.enhancement_luck, ml.item_enhancement_luck) AS snapshot_enhancement_luck,
+                   COALESCE(ii.refine_level, ml.item_refine_level) AS snapshot_refine_level,
+                   COALESCE(ii.ascension_level, ml.item_ascension_level) AS snapshot_ascension_level,
+                   COALESCE(ml.snapshot_processing_summary, '') AS snapshot_processing_summary,
+                   CASE WHEN ml.unit_price > 0 THEN ml.unit_price ELSE ml.price END AS unit_price,
                    ml.price, ml.status,
                    COALESCE(seller.controller_type, 'player') AS seller_kind
             FROM market_listing ml
@@ -484,8 +557,8 @@ public class MarketService {
             (rs, rowNum) -> listingRow(rs)
         );
         List<ListingRow> candidates = rows.stream()
-            .filter(row -> row.price() <= recommendedPrice(row.item()) * 240 / 100)
-            .filter(row -> qualityRank(row.item().quality()) >= 2)
+            .filter(row -> row.unitPrice() <= recommendedPrice(row.item()) * 240 / 100)
+            .filter(this::robotMarketDesirable)
             .toList();
         if (candidates.isEmpty()) {
             return false;
@@ -540,7 +613,7 @@ public class MarketService {
                 return false;
             }
         }
-        int sellerGold = Math.max(1, listing.price() * (100 - MARKET_TAX_RATE) / 100);
+        int sellerGold = netSellerProceeds(listing.price());
         jdbcTemplate.update("UPDATE player SET gold = gold - ? WHERE id = ?", listing.price(), buyer.id());
         if (listing.sellerPlayerId() != null) {
             jdbcTemplate.update("UPDATE player SET gold = gold + ? WHERE id = ?", sellerGold, listing.sellerPlayerId());
@@ -555,10 +628,14 @@ public class MarketService {
             inventoryService.transferItemOwner(listing.itemId(), buyer.id());
             inventoryService.addExistingItemToInventory(buyer.id(), listing.itemId());
             ItemRecord item = inventoryService.requireItem(listing.itemId());
-            robotEquipmentService.resolveDropIfUpgrade(buyerPlayer, item, random);
+            if (item.equipment()) {
+                robotEquipmentService.resolveDropIfUpgrade(buyerPlayer, item, random);
+            }
         } else {
             ItemRecord item = createItemFromSnapshot(buyer.id(), listing.item());
-            robotEquipmentService.resolveDropIfUpgrade(buyerPlayer, item, random);
+            if (item.equipment()) {
+                robotEquipmentService.resolveDropIfUpgrade(buyerPlayer, item, random);
+            }
         }
         jdbcTemplate.update(
             "UPDATE market_listing SET status = 'sold', buyer_player_id = ?, sold_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -577,7 +654,52 @@ public class MarketService {
     private boolean acceptableForRobot(ListingRow listing, RobotSeller robot) {
         int recommended = recommendedPrice(listing.item());
         int tolerance = 100 + Math.min(140, robot.wealthTierLevel() * 9 + qualityRank(listing.item().quality()) * 8);
-        return listing.price() <= recommended * tolerance / 100;
+        return listing.unitPrice() <= recommended * tolerance / 100;
+    }
+
+    private boolean robotMarketDesirable(ListingRow listing) {
+        ItemSnapshot item = listing.item();
+        if (item.equipment()) {
+            return qualityRank(item.quality()) >= 2;
+        }
+        if ("gem".equals(item.marketCategory())) {
+            return qualityRank(item.quality()) >= 2;
+        }
+        if ("consumable".equals(item.marketCategory())) {
+            return "restoreStamina".equals(item.effectType()) || "grantGold".equals(item.effectType());
+        }
+        if ("material".equals(item.marketCategory())) {
+            return qualityRank(item.quality()) >= 2 || item.effectValueJson().contains("ascension") || item.effectValueJson().contains("reforge") || item.effectValueJson().contains("socket");
+        }
+        return "chest".equals(item.marketCategory()) && qualityRank(item.quality()) >= 3;
+    }
+
+    private boolean shouldRobotListItem(ItemRecord item, Random random) {
+        ItemTemplate template = gameConfigService.requireItem(item.templateId());
+        if (!template.tradeable()) {
+            return false;
+        }
+        if (item.equipment()) {
+            return true;
+        }
+        int reserve = switch (template.marketCategory()) {
+            case "material" -> qualityRank(item.quality()) >= 4 ? 12 : 24;
+            case "gem" -> 2;
+            case "consumable" -> 4;
+            case "chest" -> 1;
+            default -> 6;
+        };
+        if (item.stackable() && item.quantity() <= reserve) {
+            return false;
+        }
+        int chance = switch (template.marketCategory()) {
+            case "gem" -> 52;
+            case "material" -> 38 + qualityRank(item.quality()) * 4;
+            case "consumable" -> 32;
+            case "chest" -> 45;
+            default -> 22;
+        };
+        return random.nextInt(100) < chance;
     }
 
     private List<RobotSeller> robotSellers(int limit, Random random) {
@@ -643,27 +765,40 @@ public class MarketService {
         Random random,
         boolean recordActivity
     ) {
-        ItemSnapshot snapshot = ItemSnapshot.from(item, origin);
+        int targetQuantity = item.stackable() ? Math.max(1, Math.min(item.quantity(), 1 + random.nextInt(Math.min(20, Math.max(1, item.quantity()))))) : 1;
+        ItemRecord listedItem = inventoryService.splitItemForMarket(robot.id(), item.id(), targetQuantity);
+        ItemTemplate template = gameConfigService.requireItem(listedItem.templateId());
+        ItemSnapshot snapshot = ItemSnapshot.from(listedItem, template, origin);
+        int quantity = Math.max(1, listedItem.quantity());
         int recommended = recommendedPrice(snapshot);
-        int price = Math.max(snapshot.sellPrice(), recommended * (72 + random.nextInt(76)) / 100);
-        inventoryService.removeFromInventory(robot.id(), item.id());
+        int unitPrice = Math.max(snapshot.sellPrice(), recommended * (72 + random.nextInt(76)) / 100);
+        int price = Math.toIntExact((long) unitPrice * quantity);
         jdbcTemplate.update(
             """
             INSERT INTO market_listing
-            (seller_player_id, seller_name, item_id, item_template_id, item_enhancement_level, item_enhancement_luck,
-             snapshot_name, snapshot_item_type, snapshot_quality, snapshot_required_level, snapshot_attack_bonus,
+            (seller_player_id, seller_name, item_id, item_template_id, quantity, unit_price, item_category, stackable,
+             item_enhancement_level, item_enhancement_luck, item_refine_level, item_ascension_level,
+             snapshot_name, snapshot_item_type, snapshot_item_category, snapshot_quality, snapshot_required_level, snapshot_attack_bonus,
              snapshot_defense_bonus, snapshot_resistance_bonus, snapshot_hp_bonus, snapshot_mp_bonus,
-             snapshot_crit_bonus, snapshot_sell_price, price, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'listed')
+             snapshot_crit_bonus, snapshot_sell_price, snapshot_description, snapshot_effect_type, snapshot_effect_value,
+             snapshot_processing_summary, price, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'listed')
             """,
             robot.id(),
             robot.name(),
-            item.id(),
-            item.templateId(),
-            item.enhancementLevel(),
-            item.enhancementLuck(),
+            listedItem.id(),
+            listedItem.templateId(),
+            quantity,
+            unitPrice,
+            snapshot.marketCategory(),
+            snapshot.stackable(),
+            listedItem.enhancementLevel(),
+            listedItem.enhancementLuck(),
+            listedItem.refineLevel(),
+            listedItem.ascensionLevel(),
             snapshot.name(),
             snapshot.itemType(),
+            snapshot.itemCategory(),
             snapshot.quality(),
             snapshot.requiredLevel(),
             snapshot.attackBonus(),
@@ -673,6 +808,10 @@ public class MarketService {
             snapshot.mpBonus(),
             snapshot.critBonus(),
             snapshot.sellPrice(),
+            snapshot.description(),
+            snapshot.effectType(),
+            snapshot.effectValueJson(),
+            snapshot.processingSummary(),
             price
         );
         long listingId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
@@ -680,10 +819,10 @@ public class MarketService {
             robotActivityLogService.record(
                 robot.id(),
                 "market_list",
-                "寄售【" + snapshot.name() + "】，挂到商会 " + price + " 金。"
+                "寄售【" + snapshot.name() + quantitySuffix(quantity) + "】，挂到商会 " + price + " 金。"
             );
         }
-        return view(listingId, false, robot.name(), item.id(), snapshot, price, "listed");
+        return view(listingId, false, robot.name(), listedItem.id(), snapshot, quantity, unitPrice, price, "listed");
     }
 
     private PlayerRecord requireRobotPlayer(long robotId) {
@@ -701,6 +840,10 @@ public class MarketService {
     }
 
     private ItemRecord createItemFromSnapshot(long playerId, ItemSnapshot item) {
+        ItemTemplate template = gameConfigService.requireItem(item.templateId());
+        if (!template.equipment()) {
+            return inventoryService.grantItem(playerId, item.templateId(), Math.max(1, item.quantity()), new Random(Objects.hash(playerId, item.templateId(), System.nanoTime()))).getFirst();
+        }
         return inventoryService.addMarketItemToInventory(
             playerId,
             item.templateId(),
@@ -770,10 +913,10 @@ public class MarketService {
             MarketListingView listing = listings.get(i % listings.size());
             RobotSeller actor = robots.isEmpty() ? new RobotSeller(0, "银冠书记", "商会书记", "warrior", 1, 1, 0) : robots.get(random.nextInt(robots.size()));
             String text = switch (i % 5) {
-                case 0 -> "正在压价询问 " + qualityName(listing.item().quality()) + " " + typeName(listing.item().itemType()) + "。";
+                case 0 -> "正在压价询问 " + qualityName(listing.item().quality()) + " " + marketItemKindName(listing.item()) + "。";
                 case 1 -> "刚把 " + listing.item().name() + " 加入关注清单。";
                 case 2 -> "提醒商会：高于估值 3 倍的寄售不会进入机器人收购池。";
-                case 3 -> "与另一名冒险者完成了一笔装备换金交易。";
+                case 3 -> "与另一名冒险者完成了一笔成长物资换金交易。";
                 default -> "在看板前比较 " + listing.price() + " 金与商会估值 " + listing.recommendedPrice() + " 金。";
             };
             activities.add(new MarketActivity(
@@ -794,6 +937,10 @@ public class MarketService {
                    COALESCE(ii.template_id, ml.item_template_id) AS snapshot_template_id,
                    COALESCE(ii.name, ml.snapshot_name, it.name) AS snapshot_name,
                    COALESCE(ii.item_type, ml.snapshot_item_type, it.item_type) AS snapshot_item_type,
+                   ml.snapshot_item_category AS snapshot_item_category,
+                   ml.item_category AS market_category,
+                   COALESCE(ml.stackable, it.stackable) AS stackable,
+                   GREATEST(1, COALESCE(ml.quantity, ii.quantity, 1)) AS quantity,
                    COALESCE(ii.quality, ml.snapshot_quality, it.quality) AS snapshot_quality,
                    COALESCE(ii.required_level, ml.snapshot_required_level, it.required_level) AS snapshot_required_level,
                    COALESCE(ii.attack_bonus, ml.snapshot_attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
@@ -803,8 +950,15 @@ public class MarketService {
                    COALESCE(ii.mp_bonus, ml.snapshot_mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
                    COALESCE(ii.crit_bonus, ml.snapshot_crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
                    COALESCE(ii.sell_price, ml.snapshot_sell_price, it.sell_price) AS snapshot_sell_price,
+                   COALESCE(ml.snapshot_description, it.description) AS snapshot_description,
+                   COALESCE(ml.snapshot_effect_type, it.effect_type) AS snapshot_effect_type,
+                   COALESCE(ml.snapshot_effect_value, it.effect_value_json) AS snapshot_effect_value,
                    COALESCE(ii.enhancement_level, ml.item_enhancement_level) AS snapshot_enhancement_level,
                    COALESCE(ii.enhancement_luck, ml.item_enhancement_luck) AS snapshot_enhancement_luck,
+                   COALESCE(ii.refine_level, ml.item_refine_level) AS snapshot_refine_level,
+                   COALESCE(ii.ascension_level, ml.item_ascension_level) AS snapshot_ascension_level,
+                   COALESCE(ml.snapshot_processing_summary, '') AS snapshot_processing_summary,
+                   CASE WHEN ml.unit_price > 0 THEN ml.unit_price ELSE ml.price END AS unit_price,
                    ml.price,
                    ml.sold_at,
                    COALESCE(buyer_player.name, '匿名买家') AS buyer_name
@@ -824,7 +978,7 @@ public class MarketService {
                     rs.getLong("id"),
                     snapshotFromRow(rs),
                     price,
-                    Math.max(1, price * (100 - MARKET_TAX_RATE) / 100),
+                    netSellerProceeds(price),
                     rs.getString("buyer_name"),
                     soldAt == null ? Instant.now() : soldAt.toInstant()
                 );
@@ -834,13 +988,27 @@ public class MarketService {
     }
 
     private int recommendedPrice(ItemSnapshot item) {
+        if (!item.equipment()) {
+            int rank = qualityRank(item.quality());
+            int categoryMultiplier = switch (item.marketCategory()) {
+                case "gem" -> 18 + rank * 5;
+                case "material" -> 10 + rank * 3;
+                case "consumable" -> 9 + rank * 2;
+                case "chest" -> 16 + rank * 4;
+                default -> 8 + rank * 2;
+            };
+            int effectPremium = (item.effectType() == null || item.effectType().isBlank()) ? 0 : Math.max(10, item.sellPrice() * rank);
+            return Math.max(5, item.sellPrice() * categoryMultiplier / 2 + effectPremium + item.requiredLevel() * Math.max(1, rank));
+        }
         int statScore = item.attackBonus() * 16
             + item.defenseBonus() * 12
             + item.resistanceBonus() * 10
             + item.hpBonus() / 2
             + item.mpBonus() / 2
             + (int) Math.round(item.critBonus() * 1200)
-            + item.enhancementLevel() * 80;
+            + item.enhancementLevel() * 80
+            + item.refineLevel() * 140
+            + item.ascensionLevel() * 260;
         int qualityBonus = qualityRank(item.quality()) * qualityRank(item.quality()) * 55;
         return Math.max(30, item.sellPrice() * 8 + statScore * 2 + item.requiredLevel() * 35 + qualityBonus);
     }
@@ -893,6 +1061,10 @@ public class MarketService {
                    COALESCE(ii.template_id, ml.item_template_id) AS snapshot_template_id,
                    COALESCE(ii.name, ml.snapshot_name, it.name) AS snapshot_name,
                    COALESCE(ii.item_type, ml.snapshot_item_type, it.item_type) AS snapshot_item_type,
+                   ml.snapshot_item_category AS snapshot_item_category,
+                   ml.item_category AS market_category,
+                   COALESCE(ml.stackable, it.stackable) AS stackable,
+                   GREATEST(1, COALESCE(ml.quantity, ii.quantity, 1)) AS quantity,
                    COALESCE(ii.quality, ml.snapshot_quality, it.quality) AS snapshot_quality,
                    COALESCE(ii.required_level, ml.snapshot_required_level, it.required_level) AS snapshot_required_level,
                    COALESCE(ii.attack_bonus, ml.snapshot_attack_bonus, it.attack_bonus) AS snapshot_attack_bonus,
@@ -902,8 +1074,15 @@ public class MarketService {
                    COALESCE(ii.mp_bonus, ml.snapshot_mp_bonus, it.mp_bonus) AS snapshot_mp_bonus,
                    COALESCE(ii.crit_bonus, ml.snapshot_crit_bonus, it.crit_bonus) AS snapshot_crit_bonus,
                    COALESCE(ii.sell_price, ml.snapshot_sell_price, it.sell_price) AS snapshot_sell_price,
+                   COALESCE(ml.snapshot_description, it.description) AS snapshot_description,
+                   COALESCE(ml.snapshot_effect_type, it.effect_type) AS snapshot_effect_type,
+                   COALESCE(ml.snapshot_effect_value, it.effect_value_json) AS snapshot_effect_value,
                    COALESCE(ii.enhancement_level, ml.item_enhancement_level) AS snapshot_enhancement_level,
                    COALESCE(ii.enhancement_luck, ml.item_enhancement_luck) AS snapshot_enhancement_luck,
+                   COALESCE(ii.refine_level, ml.item_refine_level) AS snapshot_refine_level,
+                   COALESCE(ii.ascension_level, ml.item_ascension_level) AS snapshot_ascension_level,
+                   COALESCE(ml.snapshot_processing_summary, '') AS snapshot_processing_summary,
+                   CASE WHEN ml.unit_price > 0 THEN ml.unit_price ELSE ml.price END AS unit_price,
                    ml.price, ml.status,
                    COALESCE(seller.controller_type, 'player') AS seller_kind
             FROM market_listing ml
@@ -948,6 +1127,8 @@ public class MarketService {
             templateId,
             cleanName(rs.getString("snapshot_name")),
             rs.getString("snapshot_item_type"),
+            rs.getString("snapshot_item_category"),
+            rs.getString("market_category"),
             rs.getString("snapshot_quality"),
             requiredLevel > 0 ? requiredLevel : template.requiredLevel(),
             rs.getInt("snapshot_attack_bonus"),
@@ -959,6 +1140,14 @@ public class MarketService {
             sellPrice > 0 ? sellPrice : template.sellPrice(),
             rs.getInt("snapshot_enhancement_level"),
             rs.getInt("snapshot_enhancement_luck"),
+            rs.getInt("snapshot_refine_level"),
+            rs.getInt("snapshot_ascension_level"),
+            Math.max(1, rs.getInt("quantity")),
+            rs.getBoolean("stackable"),
+            rs.getString("snapshot_description") == null ? template.description() : rs.getString("snapshot_description"),
+            rs.getString("snapshot_effect_type") == null ? "" : rs.getString("snapshot_effect_type"),
+            rs.getString("snapshot_effect_value") == null ? "" : rs.getString("snapshot_effect_value"),
+            rs.getString("snapshot_processing_summary") == null ? "" : rs.getString("snapshot_processing_summary"),
             originFor(templateId)
         );
     }
@@ -1016,6 +1205,43 @@ public class MarketService {
         };
     }
 
+    private String marketItemKindName(ItemSnapshot item) {
+        return switch (item.marketCategory()) {
+            case "equipment" -> typeName(item.itemType());
+            case "gem" -> "宝石";
+            case "material" -> "材料";
+            case "consumable" -> "消耗品";
+            case "chest" -> "宝箱";
+            default -> item.marketCategory();
+        };
+    }
+
+    private static String processingSummary(ItemRecord item) {
+        List<String> parts = new ArrayList<>();
+        if (item.enhancementLevel() > 0) {
+            parts.add("强化+" + item.enhancementLevel());
+        }
+        if (item.refineLevel() > 0) {
+            parts.add("淬" + item.refineLevel());
+        }
+        if (item.ascensionLevel() > 0) {
+            parts.add("阶" + item.ascensionLevel());
+        }
+        long sockets = item.sockets() == null ? 0 : item.sockets().stream().filter(ItemRecord.EquipmentSocketView::unlocked).count();
+        if (sockets > 0) {
+            parts.add(sockets + "孔");
+        }
+        long affixes = item.affixes() == null ? 0 : item.affixes().stream().filter(affix -> affix.statKey() != null && !affix.statKey().isBlank()).count();
+        if (affixes > 0) {
+            parts.add(affixes + "词条");
+        }
+        return String.join(" · ", parts);
+    }
+
+    private String quantitySuffix(int quantity) {
+        return quantity > 1 ? " x" + quantity : "";
+    }
+
     private record ListingRow(
         long id,
         Long sellerPlayerId,
@@ -1023,6 +1249,8 @@ public class MarketService {
         String sellerName,
         long itemId,
         ItemSnapshot item,
+        int quantity,
+        int unitPrice,
         int price,
         String status
     ) {
@@ -1036,6 +1264,8 @@ public class MarketService {
             rs.getString("seller_name"),
             rs.getObject("item_id") == null ? 0 : rs.getLong("item_id"),
             snapshotFromRow(rs),
+            rs.getInt("quantity"),
+            rs.getInt("unit_price"),
             rs.getInt("price"),
             rs.getString("status")
         );
@@ -1054,6 +1284,8 @@ public class MarketService {
         String templateId,
         String name,
         String itemType,
+        String itemCategory,
+        String marketCategory,
         String quality,
         int requiredLevel,
         int attackBonus,
@@ -1065,13 +1297,27 @@ public class MarketService {
         int sellPrice,
         int enhancementLevel,
         int enhancementLuck,
+        int refineLevel,
+        int ascensionLevel,
+        int quantity,
+        boolean stackable,
+        String description,
+        String effectType,
+        String effectValueJson,
+        String processingSummary,
         String origin
     ) {
-        static ItemSnapshot from(ItemRecord item, String origin) {
+        boolean equipment() {
+            return "equipment".equals(itemCategory);
+        }
+
+        static ItemSnapshot from(ItemRecord item, ItemTemplate template, String origin) {
             return new ItemSnapshot(
                 item.templateId(),
                 item.name(),
                 item.itemType(),
+                item.itemCategory(),
+                template.marketCategory(),
                 item.quality(),
                 item.requiredLevel(),
                 item.attackBonus(),
@@ -1083,6 +1329,14 @@ public class MarketService {
                 item.sellPrice(),
                 item.enhancementLevel(),
                 item.enhancementLuck(),
+                item.refineLevel(),
+                item.ascensionLevel(),
+                Math.max(1, item.quantity()),
+                item.stackable(),
+                template.description(),
+                item.effectType() == null ? "" : item.effectType(),
+                item.effectValueJson() == null ? "" : item.effectValueJson(),
+                MarketService.processingSummary(item),
                 origin
             );
         }
@@ -1116,6 +1370,8 @@ public class MarketService {
         String sellerName,
         long itemId,
         ItemSnapshot item,
+        int quantity,
+        int unitPrice,
         int price,
         int recommendedPrice,
         int priceRatio,

@@ -48,7 +48,7 @@ public class MarketController {
         @Valid @RequestBody ListItemRequest request
     ) {
         PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
-        var listing = marketService.listItem(player, request.itemId(), request.price());
+        var listing = marketService.listItem(player, request.itemId(), request.quantity(), request.effectiveUnitPrice());
         questService.recordEvent(player.id(), QuestEvent.of("marketListed"));
         return listing;
     }
@@ -73,6 +73,9 @@ public class MarketController {
         marketService.cancel(player, listingId);
     }
 
-    record ListItemRequest(long itemId, @Min(1) int price) {
+    record ListItemRequest(long itemId, int quantity, Integer unitPrice, @Min(1) Integer price) {
+        int effectiveUnitPrice() {
+            return unitPrice == null ? (price == null ? 0 : price) : unitPrice;
+        }
     }
 }

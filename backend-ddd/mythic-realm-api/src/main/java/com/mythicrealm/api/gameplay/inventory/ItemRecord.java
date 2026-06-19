@@ -1,6 +1,7 @@
 package com.mythicrealm.api.gameplay.inventory;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public record ItemRecord(
     long id,
@@ -26,7 +27,25 @@ public record ItemRecord(
     int minEnhanceLevel,
     int maxEnhanceLevel,
     int enhancementLevel,
-    int enhancementLuck
+    int enhancementLuck,
+    int refineLevel,
+    String refineFocus,
+    int ascensionLevel,
+    int ascensionLuck,
+    int socketAttackBonus,
+    int socketDefenseBonus,
+    int socketResistanceBonus,
+    int socketHpBonus,
+    int socketMpBonus,
+    double socketCritBonus,
+    int affixAttackBonus,
+    int affixDefenseBonus,
+    int affixResistanceBonus,
+    int affixHpBonus,
+    int affixMpBonus,
+    double affixCritBonus,
+    List<EquipmentSocketView> sockets,
+    List<EquipmentAffixView> affixes
 ) {
     public ItemRecord(
         long id,
@@ -70,12 +89,32 @@ public record ItemRecord(
             1,
             15,
             enhancementLevel,
-            enhancementLuck
+            enhancementLuck,
+            0,
+            "balanced",
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            List.of(),
+            List.of()
         );
     }
 
     public String displayName() {
-        return enhancementLevel > 0 ? name + " +" + enhancementLevel : name;
+        String enhanced = enhancementLevel > 0 ? name + " +" + enhancementLevel : name;
+        String refined = refineLevel > 0 ? enhanced + " · 淬" + refineLevel : enhanced;
+        return ascensionLevel > 0 ? refined + " · 阶" + ascensionLevel : refined;
     }
 
     public boolean equipment() {
@@ -95,23 +134,23 @@ public record ItemRecord(
     }
 
     public int enhancedAttackBonus() {
-        return enhancedValue(attackBonus);
+        return postProcessedValue(attackBonus, "attack", socketAttackBonus + affixAttackBonus);
     }
 
     public int enhancedDefenseBonus() {
-        return enhancedValue(defenseBonus);
+        return postProcessedValue(defenseBonus, "defense", socketDefenseBonus + affixDefenseBonus);
     }
 
     public int enhancedResistanceBonus() {
-        return enhancedValue(resistanceBonus);
+        return postProcessedValue(resistanceBonus, "resistance", socketResistanceBonus + affixResistanceBonus);
     }
 
     public int enhancedHpBonus() {
-        return enhancedValue(hpBonus);
+        return postProcessedValue(hpBonus, "hp", socketHpBonus + affixHpBonus);
     }
 
     public int enhancedMpBonus() {
-        return enhancedValue(mpBonus);
+        return postProcessedValue(mpBonus, "mp", socketMpBonus + affixMpBonus);
     }
 
     public double enhancedCritBonus() {
@@ -122,14 +161,14 @@ public record ItemRecord(
         if (enhancementLevel >= 15) {
             milestone += 0.02;
         }
-        return critBonus.doubleValue() * enhancementMultiplier() + milestone;
+        return (critBonus.doubleValue() * multiplierFor("crit") + milestone + socketCritBonus + affixCritBonus) * ascensionMultiplier();
     }
 
-    private int enhancedValue(int value) {
-        if (value <= 0) {
+    private int postProcessedValue(int value, String attribute, int postBonus) {
+        if (value <= 0 && postBonus <= 0) {
             return 0;
         }
-        int result = (int) Math.round(value * enhancementMultiplier());
+        int result = value <= 0 ? 0 : (int) Math.round(value * multiplierFor(attribute));
         if (enhancementLevel >= 5) {
             result += Math.max(1, value / 10);
         }
@@ -139,10 +178,39 @@ public record ItemRecord(
         if (enhancementLevel >= 15) {
             result += Math.max(1, value / 5);
         }
-        return result;
+        return (int) Math.round((result + Math.max(0, postBonus)) * ascensionMultiplier());
     }
 
-    private double enhancementMultiplier() {
-        return 1 + enhancementLevel * 0.03;
+    private double multiplierFor(String attribute) {
+        double refineMultiplier = "balanced".equals(refineFocus)
+            ? refineLevel * 0.018
+            : attribute.equals(refineFocus) ? refineLevel * 0.04 : refineLevel * 0.01;
+        return 1 + enhancementLevel * 0.03 + refineMultiplier;
+    }
+
+    private double ascensionMultiplier() {
+        return 1 + Math.max(0, ascensionLevel) * 0.02;
+    }
+
+    public record EquipmentSocketView(
+        int socketIndex,
+        boolean unlocked,
+        Long gemItemId,
+        String gemTemplateId,
+        String gemName,
+        String gemQuality,
+        String statKey,
+        double statValue,
+        int rank
+    ) {
+    }
+
+    public record EquipmentAffixView(
+        int affixIndex,
+        String statKey,
+        double statValue,
+        int tier,
+        boolean locked
+    ) {
     }
 }

@@ -19,6 +19,7 @@ import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.player.PlayerService;
 import com.mythicrealm.api.gameplay.quest.QuestService;
 import com.mythicrealm.api.gameplay.quest.QuestService.QuestEvent;
+import com.mythicrealm.api.gameplay.skill.SkillService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
 import java.sql.PreparedStatement;
@@ -48,6 +49,7 @@ public class DungeonService {
     private final CombatStatsService combatStatsService;
     private final EncounterGate encounterGate;
     private final CombatEngine combatEngine;
+    private final SkillService skillService;
     private final String configVersion;
 
     public static boolean isSpecialDungeon(String dungeonId) {
@@ -65,6 +67,7 @@ public class DungeonService {
         CombatStatsService combatStatsService,
         EncounterGate encounterGate,
         CombatEngine combatEngine,
+        SkillService skillService,
         @Value("${mythic.config.version}") String configVersion
     ) {
         this.jdbcTemplate = jdbcTemplate;
@@ -77,6 +80,7 @@ public class DungeonService {
         this.combatStatsService = combatStatsService;
         this.encounterGate = encounterGate;
         this.combatEngine = combatEngine;
+        this.skillService = skillService;
         this.configVersion = configVersion;
     }
 
@@ -135,6 +139,7 @@ public class DungeonService {
         int rareOrBetterLoot = 0;
         var equipment = inventoryService.equippedItems(player.id()).values();
         var playerCombatant = combatStatsService.playerCombatant(player, equipment);
+        var playerSkills = skillService.playerCombatSkills(player);
         int playerMaxHp = playerCombatant.stats().maxHp();
         int playerHp = Math.max(1, playerMaxHp);
         double powerRatio = combatPower / (double) Math.max(1, dungeon.recommendedPower());
@@ -192,7 +197,7 @@ public class DungeonService {
                         monsterMaxHp,
                         monsterMaxHp
                     );
-                    EncounterOutcome encounter = combatEngine.fight(playerCombatant, enemy, playerHp, roundLimit, random);
+                    EncounterOutcome encounter = combatEngine.fight(playerCombatant, enemy, playerHp, playerSkills, skillService.monsterCombatSkills(enemy), roundLimit, random);
                     for (CombatEvent event : encounter.events()) {
                         appendCombatEvent(logs, frames, event, roomLabel);
                     }
@@ -583,7 +588,7 @@ public class DungeonService {
         int enemyHp,
         int enemyMaxHp
     ) {
-        appendFrame(logs, frames, text, tone, roomLabel, enemyName, playerHp, playerMaxHp, enemyHp, enemyMaxHp, "system", "phase", 0, false, false);
+        appendFrame(logs, frames, text, tone, roomLabel, enemyName, playerHp, playerMaxHp, enemyHp, enemyMaxHp, "system", "phase", 0, false, false, null, null, null, "system", 0);
     }
 
     private void appendFrame(
@@ -603,6 +608,31 @@ public class DungeonService {
         boolean critical,
         boolean missed
     ) {
+        appendFrame(logs, frames, text, tone, roomLabel, enemyName, playerHp, playerMaxHp, enemyHp, enemyMaxHp, actor, eventType, damage, critical, missed, null, null, null, actor, 0);
+    }
+
+    private void appendFrame(
+        List<String> logs,
+        List<BattleFrame> frames,
+        String text,
+        String tone,
+        String roomLabel,
+        String enemyName,
+        int playerHp,
+        int playerMaxHp,
+        int enemyHp,
+        int enemyMaxHp,
+        String actor,
+        String eventType,
+        int damage,
+        boolean critical,
+        boolean missed,
+        String skillId,
+        String skillName,
+        String visualKey,
+        String targetSide,
+        int effectValue
+    ) {
         logs.add(text);
         frames.add(new BattleFrame(
             frames.size() + 1,
@@ -618,7 +648,12 @@ public class DungeonService {
             eventType,
             damage,
             critical,
-            missed
+            missed,
+            skillId,
+            skillName,
+            visualKey,
+            targetSide,
+            effectValue
         ));
     }
 
@@ -638,7 +673,12 @@ public class DungeonService {
             event.eventType(),
             event.damage(),
             event.critical(),
-            event.missed()
+            event.missed(),
+            event.skillId(),
+            event.skillName(),
+            event.visualKey(),
+            event.targetSide(),
+            event.effectValue()
         );
     }
 
@@ -815,8 +855,9 @@ public class DungeonService {
             """
             INSERT INTO dungeon_run_frame
             (dungeon_run_id, frame_index, text, tone, room_label, enemy_name,
-             player_hp, player_max_hp, enemy_hp, enemy_max_hp, actor, event_type, damage, critical, missed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             player_hp, player_max_hp, enemy_hp, enemy_max_hp, actor, event_type, damage, critical, missed,
+             skill_id, skill_name, visual_key, target_side, effect_value)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             frames,
             200,
@@ -836,6 +877,11 @@ public class DungeonService {
                 ps.setInt(13, frame.damage());
                 ps.setBoolean(14, frame.critical());
                 ps.setBoolean(15, frame.missed());
+                ps.setString(16, frame.skillId());
+                ps.setString(17, frame.skillName());
+                ps.setString(18, frame.visualKey());
+                ps.setString(19, frame.targetSide());
+                ps.setInt(20, frame.effectValue());
             }
         );
     }
@@ -905,7 +951,12 @@ public class DungeonService {
                 rs.getString("event_type"),
                 rs.getInt("damage"),
                 rs.getBoolean("critical"),
-                rs.getBoolean("missed")
+                rs.getBoolean("missed"),
+                rs.getString("skill_id"),
+                rs.getString("skill_name"),
+                rs.getString("visual_key"),
+                rs.getString("target_side"),
+                rs.getInt("effect_value")
             ),
             runId
         );
@@ -967,7 +1018,12 @@ public class DungeonService {
         String eventType,
         int damage,
         boolean critical,
-        boolean missed
+        boolean missed,
+        String skillId,
+        String skillName,
+        String visualKey,
+        String targetSide,
+        int effectValue
     ) {
     }
 

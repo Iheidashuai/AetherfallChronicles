@@ -18,15 +18,8 @@
         <module>mythic-realm-infrastructure</module>
         <module>mythic-realm-domain-player</module>
         <module>mythic-realm-domain-equipment</module>
-        <module>mythic-realm-domain-inventory</module>
         <module>mythic-realm-domain-enhancement</module>
-        <module>mythic-realm-domain-dungeon</module>
-        <module>mythic-realm-domain-market</module>
-        <module>mythic-realm-domain-quest</module>
-        <module>mythic-realm-domain-robot</module>
-        <module>mythic-realm-domain-chat</module>
-        <module>mythic-realm-domain-leaderboard</module>
-        <module>mythic-realm-domain-announcement</module>
+        <module>mythic-realm-domain-arena</module>
         <module>mythic-realm-api</module>
         <module>mythic-realm-starter</module>
     </modules>
@@ -81,6 +74,12 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
+                </plugin>
+                <!-- Override Maven's ancient built-in surefire (2.12.4) which cannot run JUnit 5 tests. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.5</version>
                 </plugin>
             </plugins>
         </pluginManagement>

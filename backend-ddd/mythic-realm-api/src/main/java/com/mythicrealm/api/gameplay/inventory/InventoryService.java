@@ -10,6 +10,7 @@ import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.ItemTemplate;
 import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
+import com.mythicrealm.api.gameplay.skill.SkillService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
 import java.math.BigDecimal;
@@ -57,6 +58,7 @@ public class InventoryService {
     private final AnnouncementService announcementService;
     private final CombatStatsService combatStatsService;
     private final CombatPowerService combatPowerService;
+    private final SkillService skillService;
     private final StaminaService staminaService;
     private final ObjectMapper objectMapper;
     private final Object slotAllocationMonitor = new Object();
@@ -67,6 +69,7 @@ public class InventoryService {
         AnnouncementService announcementService,
         CombatStatsService combatStatsService,
         CombatPowerService combatPowerService,
+        SkillService skillService,
         StaminaService staminaService,
         ObjectMapper objectMapper
     ) {
@@ -75,6 +78,7 @@ public class InventoryService {
         this.announcementService = announcementService;
         this.combatStatsService = combatStatsService;
         this.combatPowerService = combatPowerService;
+        this.skillService = skillService;
         this.staminaService = staminaService;
         this.objectMapper = objectMapper;
     }
@@ -305,6 +309,7 @@ public class InventoryService {
     }
 
     public List<ItemRecord> inventoryItems(long playerId) {
+        restoreOrphanedInventoryItems(playerId);
         return jdbcTemplate.query(
             """
             SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
@@ -381,7 +386,11 @@ public class InventoryService {
     @Transactional
     public InventorySnapshot equipBest(PlayerRecord player) {
         synchronized (slotAllocationMonitor) {
-            List<ItemRecord> candidates = new ArrayList<>(inventoryItems(player.id()).stream().filter(ItemRecord::equipment).toList());
+            List<ItemRecord> currentInventory = inventoryItems(player.id());
+            List<ItemRecord> nonEquipmentInventory = currentInventory.stream()
+                .filter(item -> !item.equipment())
+                .toList();
+            List<ItemRecord> candidates = new ArrayList<>(currentInventory.stream().filter(ItemRecord::equipment).toList());
             candidates.addAll(equippedItems(player.id()).values());
             if (candidates.isEmpty()) {
                 return snapshot(player);
@@ -402,10 +411,11 @@ public class InventoryService {
                 );
             }
 
-            List<ItemRecord> remaining = candidates.stream()
+            List<ItemRecord> remaining = new ArrayList<>(nonEquipmentInventory);
+            remaining.addAll(candidates.stream()
                 .filter(item -> !equippedIds.contains(item.id()))
                 .sorted(sortComparator("quality"))
-                .toList();
+                .toList());
             for (int i = 0; i < remaining.size(); i++) {
                 insertInventorySlot(player.id(), i, remaining.get(i).id());
             }
@@ -637,6 +647,63 @@ public class InventoryService {
     }
 
     @Transactional
+    public RefineResult refine(PlayerRecord player, long itemId, String focus) {
+        ItemRecord item = requireOwnedItem(player.id(), itemId);
+        if (!item.equipment()) {
+            throw ApiException.badRequest("Only equipment can be refined");
+        }
+        if (item.refineLevel() >= 5) {
+            throw ApiException.badRequest("装备已达到深渊淬炼上限");
+        }
+        String normalizedFocus = normalizeRefineFocus(focus);
+        int nextLevel = item.refineLevel() + 1;
+        int essenceCost = 12 * nextLevel * nextLevel;
+        int shardCost = Math.max(0, nextLevel - 2) * 3;
+        int orbCost = nextLevel >= 5 ? 1 : 0;
+        long goldCost = Math.max(1, item.requiredLevel()) * 800L * nextLevel;
+        if (player.gold() < goldCost) {
+            throw ApiException.badRequest("金币不足，需要 " + goldCost + " 金");
+        }
+        if (stackableQuantity(player.id(), "mat_abyss_essence") < essenceCost) {
+            throw ApiException.badRequest("深渊精华不足");
+        }
+        if (shardCost > 0 && stackableQuantity(player.id(), "mat_tempering_shard") < shardCost) {
+            throw ApiException.badRequest("淬炼碎片不足");
+        }
+        if (orbCost > 0 && stackableQuantity(player.id(), "mat_reforge_orb") < orbCost) {
+            throw ApiException.badRequest("重铸宝珠不足");
+        }
+
+        consumeQuantityByTemplate(player.id(), "mat_abyss_essence", essenceCost);
+        if (shardCost > 0) {
+            consumeQuantityByTemplate(player.id(), "mat_tempering_shard", shardCost);
+        }
+        if (orbCost > 0) {
+            consumeQuantityByTemplate(player.id(), "mat_reforge_orb", orbCost);
+        }
+        jdbcTemplate.update("UPDATE player SET gold = gold - ? WHERE id = ?", goldCost, player.id());
+        jdbcTemplate.update(
+            "UPDATE item_instance SET refine_level = ?, refine_focus = ? WHERE id = ? AND player_id = ?",
+            nextLevel,
+            normalizedFocus,
+            itemId,
+            player.id()
+        );
+        PlayerRecord updatedPlayer = playerById(player.id());
+        ItemRecord refinedItem = requireItem(itemId);
+        return new RefineResult(
+            refinedItem,
+            nextLevel,
+            normalizedFocus,
+            goldCost,
+            essenceCost,
+            shardCost,
+            orbCost,
+            snapshot(updatedPlayer)
+        );
+    }
+
+    @Transactional
     public BulkSellResult bulkSell(PlayerRecord player, List<String> qualities, List<String> itemTypes) {
         Set<String> qualitySet = qualities == null ? Set.of() : qualities.stream().filter(value -> value != null && !value.isBlank()).collect(Collectors.toSet());
         Set<String> typeSet = itemTypes == null ? Set.of() : itemTypes.stream().filter(value -> value != null && !value.isBlank()).collect(Collectors.toSet());
@@ -690,7 +757,7 @@ public class InventoryService {
             combatStatsService.playerStats(player, equipment),
             combatStatsService.playerStats(player, List.of()),
             equipment.stream().mapToInt(this::equipmentPower).sum()
-        );
+        ) + skillService.skillPower(player);
     }
 
     public ItemRecord requireItem(long itemId) {
@@ -707,13 +774,13 @@ public class InventoryService {
             )
             .stream()
             .findFirst()
-            .orElseThrow(() -> ApiException.notFound("装备不存在"));
+            .orElseThrow(() -> ApiException.notFound("物品不存在"));
     }
 
     public ItemRecord requireOwnedItem(long playerId, long itemId) {
         ItemRecord item = requireItem(itemId);
         if (item.playerId() != playerId) {
-            throw ApiException.badRequest("装备不属于当前角色");
+            throw ApiException.badRequest("物品不属于当前角色");
         }
         return item;
     }
@@ -756,12 +823,90 @@ public class InventoryService {
     }
 
     public void removeFromInventory(long playerId, long itemId) {
-        inventorySlot(playerId, itemId).orElseThrow(() -> ApiException.badRequest("装备不在背包中"));
+        inventorySlot(playerId, itemId).orElseThrow(() -> ApiException.badRequest("物品不在背包中"));
         jdbcTemplate.update("DELETE FROM inventory_slot WHERE player_id = ? AND item_id = ?", playerId, itemId);
     }
 
     public void addExistingItemToInventory(long playerId, long itemId) {
         addItemToNextFreeSlot(playerId, itemId);
+    }
+
+    public ItemRecord splitItemForMarket(long playerId, long itemId, int quantity) {
+        ItemRecord item = requireOwnedItem(playerId, itemId);
+        inventorySlot(playerId, itemId).orElseThrow(() -> ApiException.badRequest("只能寄售背包中的物品"));
+        int listingQuantity = item.stackable() ? Math.max(1, quantity) : 1;
+        if (listingQuantity > Math.max(1, item.quantity())) {
+            throw ApiException.badRequest("寄售数量不足，当前只有 " + Math.max(1, item.quantity()) + " 件");
+        }
+        if (!item.stackable() || listingQuantity >= Math.max(1, item.quantity())) {
+            removeFromInventory(playerId, itemId);
+            return item;
+        }
+        jdbcTemplate.update(
+            "UPDATE item_instance SET quantity = quantity - ? WHERE id = ? AND player_id = ?",
+            listingQuantity,
+            itemId,
+            playerId
+        );
+        var keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                """
+                INSERT INTO item_instance
+                (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
+                 defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity,
+                 enhancement_level, enhancement_luck, refine_level, refine_focus, ascension_level, ascension_luck)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                Statement.RETURN_GENERATED_KEYS
+            );
+            ps.setLong(1, playerId);
+            ps.setString(2, item.templateId());
+            ps.setString(3, item.name());
+            ps.setString(4, item.itemType());
+            ps.setString(5, item.quality());
+            ps.setInt(6, item.requiredLevel());
+            ps.setInt(7, item.attackBonus());
+            ps.setInt(8, item.defenseBonus());
+            ps.setInt(9, item.resistanceBonus());
+            ps.setInt(10, item.hpBonus());
+            ps.setInt(11, item.mpBonus());
+            ps.setBigDecimal(12, item.critBonus());
+            ps.setInt(13, item.sellPrice());
+            ps.setInt(14, listingQuantity);
+            ps.setInt(15, item.enhancementLevel());
+            ps.setInt(16, item.enhancementLuck());
+            ps.setInt(17, item.refineLevel());
+            ps.setString(18, item.refineFocus());
+            ps.setInt(19, item.ascensionLevel());
+            ps.setInt(20, item.ascensionLuck());
+            return ps;
+        }, keyHolder);
+        return requireItem(keyHolder.getKey().longValue());
+    }
+
+    private void restoreOrphanedInventoryItems(long playerId) {
+        List<Long> orphanedItemIds = jdbcTemplate.queryForList(
+            """
+            SELECT ii.id
+            FROM item_instance ii
+            LEFT JOIN inventory_slot inv ON inv.item_id = ii.id
+            LEFT JOIN equipment_slot eq ON eq.item_id = ii.id
+            LEFT JOIN equipment_socket sock ON sock.gem_item_id = ii.id
+            LEFT JOIN market_listing listed_market ON listed_market.item_id = ii.id AND listed_market.status = 'listed'
+            WHERE ii.player_id = ?
+              AND inv.item_id IS NULL
+              AND eq.item_id IS NULL
+              AND sock.gem_item_id IS NULL
+              AND listed_market.item_id IS NULL
+            ORDER BY ii.id
+            """,
+            Long.class,
+            playerId
+        );
+        for (Long itemId : orphanedItemIds) {
+            addItemToNextFreeSlot(playerId, itemId);
+        }
     }
 
     public void transferItemOwner(long itemId, long playerId) {
@@ -826,6 +971,18 @@ public class InventoryService {
             templateId
         );
         return total == null ? 0 : total;
+    }
+
+    public int materialQuantity(long playerId, String templateId) {
+        return stackableQuantity(playerId, templateId);
+    }
+
+    private String normalizeRefineFocus(String focus) {
+        String value = focus == null || focus.isBlank() ? "balanced" : focus.trim();
+        return switch (value) {
+            case "attack", "defense", "resistance", "hp", "mp", "crit", "balanced" -> value;
+            default -> throw ApiException.badRequest("Unsupported refine focus: " + value);
+        };
     }
 
     private JsonNode effectNode(ItemRecord item) {
@@ -1031,8 +1188,10 @@ public class InventoryService {
     }
 
     private ItemRecord mapItem(java.sql.ResultSet rs) throws java.sql.SQLException {
+        long itemId = rs.getLong("id");
+        ProcessingStats processingStats = processingStats(itemId);
         return new ItemRecord(
-            rs.getLong("id"),
+            itemId,
             rs.getLong("player_id"),
             rs.getString("template_id"),
             rs.getString("name"),
@@ -1055,8 +1214,136 @@ public class InventoryService {
             rs.getInt("min_enhance_level"),
             rs.getInt("max_enhance_level"),
             rs.getInt("enhancement_level"),
-            rs.getInt("enhancement_luck")
+            rs.getInt("enhancement_luck"),
+            rs.getInt("refine_level"),
+            rs.getString("refine_focus"),
+            rs.getInt("ascension_level"),
+            rs.getInt("ascension_luck"),
+            processingStats.socketAttack(),
+            processingStats.socketDefense(),
+            processingStats.socketResistance(),
+            processingStats.socketHp(),
+            processingStats.socketMp(),
+            processingStats.socketCrit(),
+            processingStats.affixAttack(),
+            processingStats.affixDefense(),
+            processingStats.affixResistance(),
+            processingStats.affixHp(),
+            processingStats.affixMp(),
+            processingStats.affixCrit(),
+            processingStats.sockets(),
+            processingStats.affixes()
         );
+    }
+
+    private ProcessingStats processingStats(long itemId) {
+        List<ItemRecord.EquipmentSocketView> sockets = jdbcTemplate.query(
+            """
+            SELECT s.socket_index, s.unlocked, s.gem_item_id, gt.template_id, it.name, it.quality,
+                   gt.stat_key, gt.stat_value, gt.rank_level
+            FROM equipment_socket s
+            LEFT JOIN item_instance gem ON gem.id = s.gem_item_id
+            LEFT JOIN item_template it ON it.id = gem.template_id
+            LEFT JOIN gem_template gt ON gt.template_id = gem.template_id
+            WHERE s.item_id = ?
+            ORDER BY s.socket_index
+            """,
+            (rs, rowNum) -> new ItemRecord.EquipmentSocketView(
+                rs.getInt("socket_index"),
+                rs.getBoolean("unlocked"),
+                rs.getObject("gem_item_id") == null ? null : rs.getLong("gem_item_id"),
+                rs.getString("template_id"),
+                rs.getString("name"),
+                rs.getString("quality"),
+                rs.getString("stat_key"),
+                rs.getDouble("stat_value"),
+                rs.getInt("rank_level")
+            ),
+            itemId
+        );
+        List<ItemRecord.EquipmentAffixView> affixes = jdbcTemplate.query(
+            """
+            SELECT affix_index, stat_key, stat_value, tier, locked
+            FROM equipment_affix
+            WHERE item_id = ?
+            ORDER BY affix_index
+            """,
+            (rs, rowNum) -> new ItemRecord.EquipmentAffixView(
+                rs.getInt("affix_index"),
+                rs.getString("stat_key"),
+                rs.getDouble("stat_value"),
+                rs.getInt("tier"),
+                rs.getBoolean("locked")
+            ),
+            itemId
+        );
+        StatBucket socketStats = new StatBucket();
+        for (ItemRecord.EquipmentSocketView socket : sockets) {
+            socketStats.add(socket.statKey(), socket.statValue());
+        }
+        StatBucket affixStats = new StatBucket();
+        for (ItemRecord.EquipmentAffixView affix : affixes) {
+            affixStats.add(affix.statKey(), affix.statValue());
+        }
+        return new ProcessingStats(
+            socketStats.attack,
+            socketStats.defense,
+            socketStats.resistance,
+            socketStats.hp,
+            socketStats.mp,
+            socketStats.crit,
+            affixStats.attack,
+            affixStats.defense,
+            affixStats.resistance,
+            affixStats.hp,
+            affixStats.mp,
+            affixStats.crit,
+            sockets,
+            affixes
+        );
+    }
+
+    private static class StatBucket {
+        private int attack;
+        private int defense;
+        private int resistance;
+        private int hp;
+        private int mp;
+        private double crit;
+
+        private void add(String statKey, double statValue) {
+            if (statKey == null || statValue <= 0) {
+                return;
+            }
+            switch (statKey) {
+                case "attack" -> attack += (int) Math.round(statValue);
+                case "defense" -> defense += (int) Math.round(statValue);
+                case "resistance" -> resistance += (int) Math.round(statValue);
+                case "hp" -> hp += (int) Math.round(statValue);
+                case "mp" -> mp += (int) Math.round(statValue);
+                case "crit" -> crit += statValue;
+                default -> {
+                }
+            }
+        }
+    }
+
+    private record ProcessingStats(
+        int socketAttack,
+        int socketDefense,
+        int socketResistance,
+        int socketHp,
+        int socketMp,
+        double socketCrit,
+        int affixAttack,
+        int affixDefense,
+        int affixResistance,
+        int affixHp,
+        int affixMp,
+        double affixCrit,
+        List<ItemRecord.EquipmentSocketView> sockets,
+        List<ItemRecord.EquipmentAffixView> affixes
+    ) {
     }
 
     public record InventorySnapshot(
@@ -1087,6 +1374,18 @@ public class InventoryService {
     }
 
     public record EnhancementTransferResult(ItemRecord sourceItem, ItemRecord targetItem, InventorySnapshot inventory) {
+    }
+
+    public record RefineResult(
+        ItemRecord item,
+        int refineLevel,
+        String refineFocus,
+        long goldCost,
+        int essenceCost,
+        int shardCost,
+        int orbCost,
+        InventorySnapshot inventory
+    ) {
     }
 
     public record UseItemResult(

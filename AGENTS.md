@@ -21,6 +21,11 @@ When adding new gameplay, check whether robot decisions should perceive or use i
 - Primary target: desktop-first responsive web menu RPG.
 - Robot population target: 200 active fantasy-named robots.
 
+## Desktop Layout Rule
+
+- Desktop workbench pages must never trap overflowing content. Any panel/list/log that can exceed the viewport must have an explicit scroll container with a computable height, usually via `height: 100%`/`flex: 1`/`minmax(0, 1fr)` plus `min-height: 0` and `overflow: auto`.
+- When adding or changing a desktop page, verify scroll behavior for the main content area and both side rails at 1366x768 and 1920x1080. This is required for pages such as dungeon, market, blacksmith, builds, endgame, arena, chat, leaderboard, and robot activity.
+
 ## Local Tooling
 
 - In a fresh Windows/Codex shell, load project tool wrappers before running validation commands:

@@ -18,13 +18,24 @@ public class DamageCalculator {
         double mechanicMultiplier,
         Random random
     ) {
+        return attack(attacker, defender, skillMultiplier, mechanicMultiplier, attacker.damageType(), random);
+    }
+
+    public DamageResult attack(
+        CombatStats attacker,
+        CombatStats defender,
+        double skillMultiplier,
+        double mechanicMultiplier,
+        String damageType,
+        Random random
+    ) {
         double hitChance = hitChance(attacker, defender);
         if (random.nextDouble() > hitChance) {
             return new DamageResult(false, false, 0, hitChance, 0, skillMultiplier * mechanicMultiplier);
         }
         boolean critical = random.nextDouble() < effectiveCritChance(attacker, defender);
         double critMultiplier = critical ? attacker.critDamage() : 1.0;
-        int defense = defender.defenseFor(attacker.damageType());
+        int defense = defender.defenseFor(damageType == null || damageType.isBlank() ? attacker.damageType() : damageType);
         double reduction = damageReduction(defense, attacker.level());
         double variance = 0.94 + random.nextDouble() * 0.12;
         double raw = attacker.attackPower() * skillMultiplier * mechanicMultiplier * (1 - reduction) * variance * critMultiplier;

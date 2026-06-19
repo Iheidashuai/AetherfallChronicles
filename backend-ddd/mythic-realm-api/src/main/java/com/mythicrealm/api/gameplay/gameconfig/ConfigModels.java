@@ -27,6 +27,10 @@ public final class ConfigModels {
         int maxStack,
         String effectType,
         String effectValueJson,
+        boolean tradeable,
+        String marketCategory,
+        int marketMinUnitPrice,
+        int marketMaxUnitPrice,
         double enhanceBonusRate,
         int minEnhanceLevel,
         int maxEnhanceLevel

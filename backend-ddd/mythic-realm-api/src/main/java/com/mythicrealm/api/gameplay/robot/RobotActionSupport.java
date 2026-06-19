@@ -1,14 +1,19 @@
 package com.mythicrealm.api.gameplay.robot;
 
 import com.mythicrealm.api.gameplay.common.ApiException;
+import com.mythicrealm.api.gameplay.build.BuildService;
 import com.mythicrealm.api.gameplay.dungeon.DungeonService;
+import com.mythicrealm.api.gameplay.endgame.EndgameRiftService;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
+import com.mythicrealm.api.gameplay.inventory.EquipmentProcessingService;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.inventory.ItemRecord;
 import com.mythicrealm.api.gameplay.market.MarketService;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.quest.QuestService;
 import com.mythicrealm.api.gameplay.quest.QuestService.QuestEvent;
+import com.mythicrealm.api.gameplay.recharge.RechargeService;
+import com.mythicrealm.api.gameplay.skill.SkillService;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -25,6 +30,11 @@ public class RobotActionSupport {
     private final DungeonService dungeonService;
     private final InventoryService inventoryService;
     private final QuestService questService;
+    private final SkillService skillService;
+    private final RechargeService rechargeService;
+    private final EndgameRiftService endgameRiftService;
+    private final BuildService buildService;
+    private final EquipmentProcessingService equipmentProcessingService;
 
     public RobotActionSupport(
         JdbcTemplate jdbcTemplate,
@@ -33,7 +43,12 @@ public class RobotActionSupport {
         MarketService marketService,
         DungeonService dungeonService,
         InventoryService inventoryService,
-        QuestService questService
+        QuestService questService,
+        SkillService skillService,
+        RechargeService rechargeService,
+        EndgameRiftService endgameRiftService,
+        BuildService buildService,
+        EquipmentProcessingService equipmentProcessingService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.robotEquipmentService = robotEquipmentService;
@@ -42,6 +57,11 @@ public class RobotActionSupport {
         this.dungeonService = dungeonService;
         this.inventoryService = inventoryService;
         this.questService = questService;
+        this.skillService = skillService;
+        this.rechargeService = rechargeService;
+        this.endgameRiftService = endgameRiftService;
+        this.buildService = buildService;
+        this.equipmentProcessingService = equipmentProcessingService;
     }
 
     public RobotActionResult runDungeon(RobotDecisionContext context, RobotActionScore score) {
@@ -118,6 +138,236 @@ public class RobotActionSupport {
         chat(context.actor(), text);
         record(context.actor(), "enhance", text, score.reason());
         return RobotActionResult.success("enhance", text);
+    }
+
+    public RobotActionResult runRift(RobotDecisionContext context, RobotActionScore score) {
+        int tier = Math.max(1, context.riftNextTier());
+        EndgameRiftService.RiftRunResult result;
+        try {
+            result = endgameRiftService.run(context.player(), tier, null);
+        } catch (ApiException error) {
+            return rest(context.actor(), "深渊裂隙状态不理想，先回大厅调整装备。", score.reason());
+        }
+        String text = result.success()
+            ? "刚打穿深渊 T" + result.tier() + "，评级 " + result.rating() + "，带回 " + result.rewards().essence() + " 个深渊精华。"
+            : "深渊 T" + result.tier() + " 没打过，看来还得补一轮强化和淬炼。";
+        chat(context.actor(), text);
+        record(context.actor(), "rift", text, score.reason());
+        return RobotActionResult.success("rift", text);
+    }
+
+    public RobotActionResult refineRiftEquipment(RobotDecisionContext context, RobotActionScore score) {
+        List<ItemRecord> candidates = inventoryService.equippedItems(context.player().id()).values().stream()
+            .filter(ItemRecord::equipment)
+            .filter(item -> item.refineLevel() < 5)
+            .sorted(Comparator
+                .comparingInt(ItemRecord::refineLevel)
+                .thenComparingInt(inventoryService::equipmentPower)
+                .reversed())
+            .toList();
+        if (candidates.isEmpty()) {
+            return rest(context.actor(), "深渊材料先存着，当前装备暂时没有适合淬炼的目标。", score.reason());
+        }
+        ItemRecord target = candidates.getFirst();
+        String focus = switch (context.player().profession()) {
+            case "mage" -> "mp";
+            case "ranger" -> "crit";
+            default -> "attack";
+        };
+        try {
+            InventoryService.RefineResult result = inventoryService.refine(context.player(), target.id(), focus);
+            questService.recordEvent(context.player().id(), QuestEvent.of("equipmentRefined"));
+            questService.recordEvent(context.player().id(), new QuestEvent("combatPowerReached", null, result.inventory().combatPower()));
+            String text = "用深渊材料把【" + result.item().displayName() + "】淬炼到 " + result.refineLevel() + " 阶，战力又往上拧了一圈。";
+            chat(context.actor(), text);
+            record(context.actor(), "rift_refine", text, score.reason());
+            return RobotActionResult.success("rift_refine", text);
+        } catch (ApiException error) {
+            return rest(context.actor(), "深渊材料还差一点，先继续刷裂隙。", score.reason());
+        }
+    }
+
+    public RobotActionResult processSockets(RobotDecisionContext context, RobotActionScore score) {
+        try {
+            EquipmentProcessingService.ProcessingSnapshot snapshot = equipmentProcessingService.snapshot(context.player());
+            List<EquipmentProcessingService.ProcessingItemView> equippedTargets = snapshot.equipment().stream()
+                .filter(entry -> inventoryService.equippedItems(context.player().id()).values().stream().anyMatch(item -> item.id() == entry.item().id()))
+                .sorted(Comparator.comparingInt((EquipmentProcessingService.ProcessingItemView entry) -> inventoryService.equipmentPower(entry.item())).reversed())
+                .toList();
+            for (EquipmentProcessingService.ProcessingItemView target : equippedTargets) {
+                var emptySocket = target.item().sockets().stream()
+                    .filter(socket -> socket.unlocked() && socket.gemItemId() == null)
+                    .findFirst();
+                if (emptySocket.isPresent() && !snapshot.gems().isEmpty()) {
+                    EquipmentProcessingService.ProcessingResult result = equipmentProcessingService.socketGem(
+                        context.player(),
+                        target.item().id(),
+                        emptySocket.get().socketIndex(),
+                        snapshot.gems().getFirst().id()
+                    );
+                    String text = "给【" + result.item().displayName() + "】镶上一颗宝石，战力 " + result.powerBefore() + " -> " + result.powerAfter() + "。";
+                    chat(context.actor(), text);
+                    record(context.actor(), "processing_socket", text, score.reason());
+                    return RobotActionResult.success("processing_socket", text);
+                }
+                if (target.unlockedSocketCount() < target.socketLimit()) {
+                    EquipmentProcessingService.ProcessingResult result = equipmentProcessingService.unlockSocket(context.player(), target.item().id());
+                    String text = result.success()
+                        ? "给【" + result.item().displayName() + "】开了新孔位，准备上宝石。"
+                        : "给【" + target.item().displayName() + "】开孔失败，材料消耗了但装备没掉级。";
+                    chat(context.actor(), text);
+                    record(context.actor(), "processing_socket", text, score.reason());
+                    return RobotActionResult.success("processing_socket", text);
+                }
+            }
+            return rest(context.actor(), "宝石和孔位暂时对不上，先继续刷深渊材料。", score.reason());
+        } catch (ApiException error) {
+            return rest(context.actor(), "宝石加工条件还差一点，先不硬上。", score.reason());
+        }
+    }
+
+    public RobotActionResult reforgeEquipment(RobotDecisionContext context, RobotActionScore score) {
+        try {
+            EquipmentProcessingService.ProcessingSnapshot snapshot = equipmentProcessingService.snapshot(context.player());
+            EquipmentProcessingService.ProcessingItemView target = snapshot.equipment().stream()
+                .filter(entry -> entry.affixLimit() > 0)
+                .filter(entry -> inventoryService.equippedItems(context.player().id()).values().stream().anyMatch(item -> item.id() == entry.item().id()))
+                .max(Comparator.comparingInt((EquipmentProcessingService.ProcessingItemView entry) -> inventoryService.equipmentPower(entry.item())))
+                .orElse(null);
+            if (target == null) {
+                return rest(context.actor(), "当前装备还没到适合重铸词条的阶段。", score.reason());
+            }
+            List<Integer> locked = target.item().affixes().stream()
+                .filter(affix -> affix.tier() >= 4)
+                .map(ItemRecord.EquipmentAffixView::affixIndex)
+                .limit(Math.max(0, context.affixLockCount()))
+                .toList();
+            EquipmentProcessingService.ProcessingResult result = equipmentProcessingService.reforge(context.player(), target.item().id(), locked);
+            String text = result.success()
+                ? "重铸【" + result.item().displayName() + "】词条成功，战力 " + result.powerBefore() + " -> " + result.powerAfter() + "。"
+                : "重铸【" + target.item().displayName() + "】翻车了，未锁定词条降了一档。";
+            chat(context.actor(), text);
+            record(context.actor(), "processing_reforge", text, score.reason());
+            return RobotActionResult.success("processing_reforge", text);
+        } catch (ApiException error) {
+            return rest(context.actor(), "重铸材料还不够稳定，先攒一轮。", score.reason());
+        }
+    }
+
+    public RobotActionResult ascendEquipment(RobotDecisionContext context, RobotActionScore score) {
+        try {
+            EquipmentProcessingService.ProcessingSnapshot snapshot = equipmentProcessingService.snapshot(context.player());
+            EquipmentProcessingService.ProcessingItemView target = snapshot.equipment().stream()
+                .filter(entry -> entry.item().ascensionLevel() < 5)
+                .filter(entry -> inventoryService.equippedItems(context.player().id()).values().stream().anyMatch(item -> item.id() == entry.item().id()))
+                .max(Comparator.comparingInt((EquipmentProcessingService.ProcessingItemView entry) -> inventoryService.equipmentPower(entry.item()) + inventoryService.qualityRank(entry.item().quality()) * 120))
+                .orElse(null);
+            if (target == null) {
+                return rest(context.actor(), "当前装备暂时没有升阶目标。", score.reason());
+            }
+            boolean useProtector = target.item().ascensionLevel() >= 3 && context.ascensionGuardCount() > 0;
+            EquipmentProcessingService.ProcessingResult result = equipmentProcessingService.ascend(context.player(), target.item().id(), useProtector);
+            String text = result.success()
+                ? "把【" + result.item().displayName() + "】升阶成功，后期加工上限打开了。"
+                : "升阶【" + target.item().displayName() + "】失败，" + (useProtector ? "护阶符保住了等级。" : "风险还是有点凶。");
+            chat(context.actor(), text);
+            record(context.actor(), "processing_ascend", text, score.reason());
+            return RobotActionResult.success("processing_ascend", text);
+        } catch (ApiException error) {
+            return rest(context.actor(), "升阶材料还没攒齐，继续刷裂隙。", score.reason());
+        }
+    }
+
+    public RobotActionResult exchangeGold(RobotDecisionContext context, RobotActionScore score) {
+        long targetGold = context.tacticalGoldReserveTarget();
+        var recharge = rechargeService.rechargeForGoldNeed(
+            context.player().id(),
+            targetGold,
+            "robot_gold_reserve",
+            score.reason()
+        ).orElse(null);
+        if (recharge == null) {
+            return rest(context.actor(), "金币储备暂时够用，先观察下一步成长路线。", score.reason());
+        }
+        jdbcTemplate.update(
+            "UPDATE player SET last_activity_at = CURRENT_TIMESTAMP WHERE id = ?",
+            context.actor().id()
+        );
+        String text = "换了 " + recharge.rmbAmount() + " 元，补进 " + recharge.goldAmount() + " 金，先留作强化、技能和商会预算。";
+        chat(context.actor(), text);
+        record(context.actor(), "recharge", text, score.reason());
+        return RobotActionResult.success("recharge", text);
+    }
+
+    public RobotActionResult trainSkill(RobotDecisionContext context, RobotActionScore score) {
+        SkillService.TrainingOption planned = skillService.bestTrainingOption(context.player());
+        RechargeService.RechargeResult recharge = null;
+        PlayerRecord fundedPlayer = context.player();
+        if (planned != null && !planned.affordable()) {
+            recharge = rechargeService.rechargeForGoldNeed(
+                context.player().id(),
+                planned.cost(),
+                "robot_skill_training",
+                "修炼技能【" + planned.skillName() + "】"
+            ).orElse(null);
+            if (recharge != null) {
+                fundedPlayer = recharge.player();
+            }
+        }
+        SkillService.TrainingOption option = skillService.trainBestAffordable(fundedPlayer);
+        if (option == null) {
+            return rest(context.actor(), "技能导师那边暂时没有合适课程，先换个目标。", score.reason());
+        }
+        jdbcTemplate.update(
+            "UPDATE player SET last_activity_at = CURRENT_TIMESTAMP WHERE id = ?",
+            context.actor().id()
+        );
+        questService.recordEvent(context.player().id(), new QuestEvent("combatPowerReached", null, inventoryService.combatPower(context.player())));
+        String actionText = option.learn() ? "学会" : "升级";
+        String rankText = option.learn() ? "1 阶" : option.nextRank() + " 阶";
+        String rechargeText = recharge == null ? "" : "先换 " + recharge.rmbAmount() + " 元成 " + recharge.goldAmount() + " 金，";
+        String text = rechargeText + "刚花 " + option.cost() + " 金" + actionText + "技能【" + option.skillName() + "】到 " + rankText + "，下次刷本试试自动循环。";
+        chat(context.actor(), text);
+        record(context.actor(), "skill", text, score.reason());
+        return RobotActionResult.success("skill", text);
+    }
+
+    public RobotActionResult configureBuild(RobotDecisionContext context, RobotActionScore score) {
+        String presetId = context.recommendedBuildPresetId();
+        if (presetId == null || presetId.isBlank()) {
+            return rest(context.actor(), "暂时没有合适的流派预设，先按当前配置推进。", score.reason());
+        }
+        try {
+            BuildService.BuildSnapshot snapshot = buildService.snapshot(context.player());
+            BuildService.PlayerBuildView build = snapshot.builds().stream()
+                .filter(candidate -> presetId.equals(candidate.sourcePresetId()))
+                .findFirst()
+                .orElse(null);
+            if (build == null) {
+                snapshot = buildService.copyPreset(context.player(), presetId);
+                build = snapshot.builds().stream()
+                    .filter(candidate -> presetId.equals(candidate.sourcePresetId()))
+                    .findFirst()
+                    .orElse(null);
+            }
+            if (build == null) {
+                return rest(context.actor(), "流派档案还没准备好，先保留当前战斗计划。", score.reason());
+            }
+            BuildService.BuildActivationResult result = buildService.activate(context.player(), build.id());
+            jdbcTemplate.update(
+                "UPDATE player SET last_activity_at = CURRENT_TIMESTAMP WHERE id = ?",
+                context.actor().id()
+            );
+            String warningText = result.warnings().isEmpty() ? "" : "，缺口：" + String.join("；", result.warnings());
+            String text = "切换到构筑【" + result.buildName() + "】，装备 " + result.appliedEquipmentCount()
+                + " 件，技能轮转 " + result.configuredSkillCount() + " 个，战力 "
+                + result.beforePower() + " -> " + result.afterPower() + warningText + "。";
+            chat(context.actor(), text);
+            record(context.actor(), "build", text, score.reason());
+            return RobotActionResult.success("build", text);
+        } catch (ApiException error) {
+            return rest(context.actor(), "构筑调整暂时失败，先继续原路线。", score.reason());
+        }
     }
 
     public RobotActionResult claimQuestReward(RobotDecisionContext context, RobotActionScore score) {

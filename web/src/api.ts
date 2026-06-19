@@ -41,7 +41,45 @@ export type Item = {
   maxEnhanceLevel: number;
   enhancementLevel: number;
   enhancementLuck: number;
+  refineLevel?: number;
+  refineFocus?: string;
+  ascensionLevel?: number;
+  ascensionLuck?: number;
+  socketAttackBonus?: number;
+  socketDefenseBonus?: number;
+  socketResistanceBonus?: number;
+  socketHpBonus?: number;
+  socketMpBonus?: number;
+  socketCritBonus?: number;
+  affixAttackBonus?: number;
+  affixDefenseBonus?: number;
+  affixResistanceBonus?: number;
+  affixHpBonus?: number;
+  affixMpBonus?: number;
+  affixCritBonus?: number;
+  sockets?: EquipmentSocket[];
+  affixes?: EquipmentAffix[];
   displayName?: string;
+};
+
+export type EquipmentSocket = {
+  socketIndex: number;
+  unlocked: boolean;
+  gemItemId?: number | null;
+  gemTemplateId?: string | null;
+  gemName?: string | null;
+  gemQuality?: string | null;
+  statKey?: string | null;
+  statValue?: number;
+  rank?: number;
+};
+
+export type EquipmentAffix = {
+  affixIndex: number;
+  statKey: string;
+  statValue: number;
+  tier: number;
+  locked: boolean;
 };
 
 export type ItemCatalogItem = {
@@ -122,6 +160,86 @@ export type EnhancementTransferResult = {
   inventory: InventorySnapshot;
 };
 
+export type RefineResult = {
+  item: Item;
+  refineLevel: number;
+  refineFocus: string;
+  goldCost: number;
+  essenceCost: number;
+  shardCost: number;
+  orbCost: number;
+  inventory: InventorySnapshot;
+};
+
+export type MaterialCost = {
+  templateId: string;
+  quantity: number;
+};
+
+export type SocketUnlockCost = {
+  goldCost: number;
+  socketCores: number;
+  gemDust: number;
+  essence: number;
+  chance: number;
+};
+
+export type ReforgeCost = {
+  goldCost: number;
+  orbs: number;
+  essence: number;
+  lockStones: number;
+  chance: number;
+};
+
+export type AscensionCost = {
+  goldCost: number;
+  ascensionCores: number;
+  essence: number;
+  shards: number;
+  guards: number;
+  chance: number;
+};
+
+export type ProcessingItemView = {
+  item: Item;
+  socketLimit: number;
+  affixLimit: number;
+  unlockedSocketCount: number;
+  affixCount: number;
+  nextSocketCost: SocketUnlockCost;
+  reforgeCost: ReforgeCost;
+  ascensionCost: AscensionCost;
+};
+
+export type ProcessingLogView = {
+  actionType: string;
+  success: boolean;
+  summary: string;
+  powerBefore: number;
+  powerAfter: number;
+  createdAt: string;
+};
+
+export type EquipmentProcessingSnapshot = {
+  equipment: ProcessingItemView[];
+  gems: Item[];
+  materials: Record<string, number>;
+  recentLogs: ProcessingLogView[];
+  inventory: InventorySnapshot;
+};
+
+export type EquipmentProcessingResult = {
+  actionType: string;
+  success: boolean;
+  message: string;
+  item: Item;
+  consumed: MaterialCost[];
+  powerBefore: number;
+  powerAfter: number;
+  snapshot: EquipmentProcessingSnapshot;
+};
+
 export type QuestRow = {
   id: string;
   title: string;
@@ -169,6 +287,8 @@ export type MarketListing = {
     templateId: string;
     name: string;
     itemType: string;
+    itemCategory: string;
+    marketCategory: string;
     quality: string;
     requiredLevel: number;
     attackBonus: number;
@@ -180,8 +300,18 @@ export type MarketListing = {
     sellPrice: number;
     enhancementLevel: number;
     enhancementLuck: number;
+    refineLevel?: number;
+    ascensionLevel?: number;
+    quantity: number;
+    stackable: boolean;
+    description?: string;
+    effectType?: string;
+    effectValueJson?: string;
+    processingSummary?: string;
     origin: string;
   };
+  quantity: number;
+  unitPrice: number;
   price: number;
   recommendedPrice: number;
   priceRatio: number;
@@ -298,6 +428,121 @@ export type LeaderboardEquipment = {
   origin: string;
 };
 
+export type ArenaProfile = {
+  playerId: number;
+  name: string;
+  profession: string;
+  level: number;
+  controllerType: string;
+  combatPower: number;
+  rating: number;
+  tier: string;
+  rank: number;
+  arenaCoins: number;
+  todayAttemptsUsed: number;
+  dailyAttempts: number;
+  wins: number;
+  losses: number;
+  winStreak: number;
+};
+
+export type ArenaOpponent = {
+  playerId: number;
+  name: string;
+  profession: string;
+  level: number;
+  controllerType: string;
+  combatPower: number;
+  rating: number;
+  tier: string;
+  rank: number;
+  wins: number;
+  losses: number;
+  challengeHint: string;
+  challengeable: boolean;
+  disabledReason?: string | null;
+};
+
+export type ArenaMatchSummary = {
+  matchId: number;
+  attackerId: number;
+  attackerName: string;
+  defenderId: number;
+  defenderName: string;
+  attackerWon: boolean;
+  attackerRatingChange: number;
+  defenderRatingChange: number;
+  arenaCoins: number;
+  resultText: string;
+  createdAt: string;
+};
+
+export type ArenaBattleEvent = {
+  sequenceNo: number;
+  actor: string;
+  eventType: string;
+  tone: string;
+  text: string;
+  attackerHp: number;
+  defenderHp: number;
+  damage: number;
+  critical: boolean;
+  missed: boolean;
+  skillName?: string | null;
+};
+
+export type ArenaFighterSnapshot = {
+  playerId: number;
+  name: string;
+  profession: string;
+  level: number;
+  combatPower: number;
+  maxHp: number;
+  attackPower: number;
+  armor: number;
+  resistance: number;
+  buildName: string;
+  strategy: string;
+  equipmentSummary: string[];
+  skills: string[];
+};
+
+export type ArenaMatchDetail = {
+  summary: ArenaMatchSummary;
+  profile: ArenaProfile;
+  attacker: ArenaFighterSnapshot;
+  defender: ArenaFighterSnapshot;
+  events: ArenaBattleEvent[];
+};
+
+export type ArenaShopOffer = {
+  id: string;
+  name: string;
+  description: string;
+  itemTemplateId: string;
+  itemQuantity: number;
+  priceCoins: number;
+  requiredRating: number;
+  sortOrder: number;
+  affordable: boolean;
+  unlocked: boolean;
+  disabledReason?: string | null;
+};
+
+export type ArenaShopPurchaseResult = {
+  offer: ArenaShopOffer;
+  profile: ArenaProfile;
+  rewards: string[];
+};
+
+export type ArenaOverview = {
+  profile: ArenaProfile;
+  opponents: ArenaOpponent[];
+  recentMatches: ArenaMatchSummary[];
+  shop: ArenaShopOffer[];
+  rankings: ArenaProfile[];
+};
+
 export type HomeSnapshot = {
   player: Player;
   combatPower: number;
@@ -322,9 +567,205 @@ export type HomeSnapshot = {
   stamina: StaminaSnapshot;
 };
 
+export type RiftModifier = {
+  id: string;
+  name: string;
+  description: string;
+  difficultyScore: number;
+  rewardBonus: number;
+  enabled: boolean;
+};
+
+export type RiftReward = {
+  essence: number;
+  shards: number;
+  orbs: number;
+  multiplier: number;
+};
+
+export type RiftMaterials = {
+  essence: number;
+  shards: number;
+  orbs: number;
+};
+
+export type RiftBattleEvent = {
+  index: number;
+  turn: number;
+  roomIndex: number;
+  eventType: string;
+  actorName?: string | null;
+  targetName?: string | null;
+  text: string;
+  value: number;
+  actorHp: number;
+  targetHp: number;
+  tone: string;
+};
+
+export type RiftLeaderboardEntry = {
+  rank: number;
+  playerId: number;
+  playerName: string;
+  controllerType: string;
+  tier: number;
+  rating: string;
+  score: number;
+  turnsTaken: number;
+  createdAt: string;
+};
+
+export type RiftSnapshot = {
+  unlocked: boolean;
+  unlockHint: string;
+  requiredLevel: number;
+  requiredDungeonId: string;
+  bestTier: number;
+  bestScore: number;
+  bestRating?: string | null;
+  weeklyBestTier: number;
+  challengeTiers: number[];
+  nextTier: number;
+  staminaCost: number;
+  recommendedPower: number;
+  minimumPower: number;
+  modifiers: RiftModifier[];
+  rewardPreview: RiftReward;
+  materials: RiftMaterials;
+  stamina: StaminaSnapshot;
+  leaderboard: RiftLeaderboardEntry[];
+  weeklyRewardAvailable: boolean;
+};
+
+export type RiftRunResult = {
+  runId: number;
+  tier: number;
+  success: boolean;
+  rating: string;
+  score: number;
+  turnsTaken: number;
+  monstersKilled: number;
+  combatPower: number;
+  recommendedPower: number;
+  modifierIds: string[];
+  rewards: RiftReward;
+  playerFinalHp: number;
+  playerMaxHp: number;
+  events: RiftBattleEvent[];
+  materials: RiftMaterials;
+  stamina: StaminaSnapshot;
+};
+
+export type RiftWeeklyRewardResult = {
+  weekKey: string;
+  bestTier: number;
+  essence: number;
+  shards: number;
+  orbs: number;
+  chest: Item;
+  materials: RiftMaterials;
+};
+
+export type BuildTalent = {
+  nodeId: string;
+  name: string;
+  description: string;
+  statKey: string;
+  statValue: number;
+};
+
+export type BuildSkillSlot = {
+  slotIndex: number;
+  triggerKind: string;
+  skillId?: string | null;
+  skillName?: string | null;
+  learned: boolean;
+};
+
+export type BuildEquipmentSlot = {
+  slotName: string;
+  itemId?: number | null;
+  itemName?: string | null;
+  itemType?: string | null;
+  quality?: string | null;
+  power: number;
+};
+
+export type BuildScore = {
+  damage: number;
+  defense: number;
+  sustain: number;
+  speed: number;
+  rift: number;
+  completion: number;
+};
+
+export type BuildPreset = {
+  id: string;
+  name: string;
+  profession: string;
+  archetype: string;
+  strategy: string;
+  description: string;
+  refineFocus: string;
+  talents: BuildTalent[];
+  skillSlots: BuildSkillSlot[];
+};
+
+export type PlayerBuild = {
+  id: number;
+  name: string;
+  sourcePresetId?: string | null;
+  profession: string;
+  archetype: string;
+  strategy: string;
+  refineFocus: string;
+  active: boolean;
+  equipmentSlots: BuildEquipmentSlot[];
+  skillSlots: BuildSkillSlot[];
+  talents: string[];
+  score: BuildScore;
+};
+
+export type BuildSnapshot = {
+  player: Player;
+  presets: BuildPreset[];
+  builds: PlayerBuild[];
+  activeBuild?: PlayerBuild | null;
+  availableEquipment: Item[];
+  availableSkills: SkillView[];
+  suggestedTier: number;
+  suggestedMinimumPower: number;
+};
+
+export type BuildMutationRequest = {
+  name?: string;
+  strategy?: string;
+  refineFocus?: string;
+  equipmentSlots?: { slotName: string; itemId?: number | null; preferredItemType?: string | null }[];
+  skillSlots?: { slotIndex: number; triggerKind: string; skillId?: string | null }[];
+  talents?: string[];
+};
+
+export type BuildActivationResult = {
+  buildId: number;
+  buildName: string;
+  appliedEquipmentCount: number;
+  configuredSkillCount: number;
+  beforePower: number;
+  afterPower: number;
+  warnings: string[];
+  snapshot: BuildSnapshot;
+};
+
+export type RiftSimulationResult = RiftRunResult & {
+  buildId: number;
+};
+
 export type PowerBreakdown = {
   basePower: number;
   equipmentPower: number;
+  skillPower: number;
   synergyPower: number;
   totalPower: number;
 };
@@ -424,10 +865,61 @@ export type BattleFrame = {
   enemyHp: number;
   enemyMaxHp: number;
   actor: 'player' | 'enemy' | 'system';
-  eventType: 'hit' | 'miss' | 'crit' | 'phase' | 'heal' | 'death';
+  eventType: 'hit' | 'miss' | 'crit' | 'phase' | 'heal' | 'shield' | 'death';
   damage: number;
   critical: boolean;
   missed: boolean;
+  skillId?: string | null;
+  skillName?: string | null;
+  visualKey?: string | null;
+  targetSide?: 'player' | 'enemy' | 'system' | string | null;
+  effectValue?: number;
+};
+
+export type SkillSnapshot = {
+  player: Player;
+  skills: SkillView[];
+  skillPower: number;
+  learnedCount: number;
+  affordableCount: number;
+  rankLevelStep: number;
+};
+
+export type SkillView = {
+  id: string;
+  name: string;
+  ownerScope: string;
+  profession: string;
+  archetype: string;
+  unlockLevel: number;
+  maxRank: number;
+  rankCap: number;
+  rank: number;
+  category: string;
+  targetType: string;
+  damageType: string;
+  baseMultiplier: number;
+  rankMultiplierGrowth: number;
+  cooldown: number;
+  mpCostBase: number;
+  mpCostGrowth: number;
+  effectType: string;
+  effectPowerBase: number;
+  effectPowerGrowth: number;
+  durationRounds: number;
+  triggerKind: string;
+  priority: number;
+  visualKey: string;
+  description: string;
+  tierCoef: number;
+  learned: boolean;
+  unlocked: boolean;
+  canLearn: boolean;
+  canUpgrade: boolean;
+  learnCost: number;
+  nextRankCost: number;
+  currentValue: number;
+  nextValue: number;
 };
 
 export type AuthResponse = {
@@ -562,6 +1054,42 @@ export type RechargeResult = {
   wallet: RechargeWallet;
 };
 
+export type ShopOffer = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  priceRmb: number;
+  itemTemplateId: string | null;
+  itemName: string | null;
+  itemType: string | null;
+  itemCategory: string | null;
+  quality: string | null;
+  itemQuantity: number;
+  goldAmount: number;
+  requiredLevel: number;
+  unlocked: boolean;
+  affordable: boolean;
+  sortOrder: number;
+};
+
+export type ShopSnapshot = {
+  wallet: RechargeWallet;
+  offers: ShopOffer[];
+  categories: string[];
+};
+
+export type ShopPurchaseResult = {
+  offer: ShopOffer;
+  quantity: number;
+  totalPriceRmb: number;
+  goldGained: number;
+  rewards: Item[];
+  wallet: RechargeWallet;
+  inventory: InventorySnapshot;
+  player: Player;
+};
+
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);
@@ -635,6 +1163,9 @@ export const gameApi = {
       token,
     ),
   home: (token: string) => api<HomeSnapshot>('/api/game/home', {}, token),
+  skills: (token: string) => api<SkillSnapshot>('/api/skills', {}, token),
+  learnSkill: (token: string, skillId: string) => api<SkillSnapshot>(`/api/skills/${skillId}/learn`, { method: 'POST' }, token),
+  upgradeSkill: (token: string, skillId: string) => api<SkillSnapshot>(`/api/skills/${skillId}/upgrade`, { method: 'POST' }, token),
   itemCatalog: (token: string) => api<ItemCatalogItem[]>('/api/config/items', {}, token),
   dungeons: (token: string) => api<Dungeon[]>('/api/dungeons', {}, token),
   runDungeon: (token: string, dungeonId: string) =>
@@ -677,6 +1208,34 @@ export const gameApi = {
     api<CraftResult>(`/api/inventory/recipes/${recipeId}/craft`, { method: 'POST' }, token),
   transferEnhancement: (token: string, sourceItemId: number, targetItemId: number) =>
     api<EnhancementTransferResult>('/api/inventory/transfer-enhancement', { method: 'POST', body: JSON.stringify({ sourceItemId, targetItemId }) }, token),
+  refine: (token: string, itemId: number, focus: string) =>
+    api<RefineResult>(`/api/inventory/${itemId}/refine`, { method: 'POST', body: JSON.stringify({ focus }) }, token),
+  equipmentProcessing: (token: string) =>
+    api<EquipmentProcessingSnapshot>('/api/equipment-processing', {}, token),
+  unlockSocket: (token: string, itemId: number) =>
+    api<EquipmentProcessingResult>(`/api/equipment-processing/${itemId}/sockets/unlock`, { method: 'POST' }, token),
+  socketGem: (token: string, itemId: number, socketIndex: number, gemItemId: number) =>
+    api<EquipmentProcessingResult>(
+      `/api/equipment-processing/${itemId}/sockets/${socketIndex}/socket`,
+      { method: 'POST', body: JSON.stringify({ gemItemId }) },
+      token,
+    ),
+  unsocketGem: (token: string, itemId: number, socketIndex: number) =>
+    api<EquipmentProcessingResult>(`/api/equipment-processing/${itemId}/sockets/${socketIndex}/unsocket`, { method: 'POST' }, token),
+  upgradeGems: (token: string, gemItemIds: number[]) =>
+    api<EquipmentProcessingResult>('/api/equipment-processing/gems/upgrade', { method: 'POST', body: JSON.stringify({ gemItemIds }) }, token),
+  reforgeEquipment: (token: string, itemId: number, lockedAffixIndexes: number[]) =>
+    api<EquipmentProcessingResult>(
+      `/api/equipment-processing/${itemId}/reforge`,
+      { method: 'POST', body: JSON.stringify({ lockedAffixIndexes }) },
+      token,
+    ),
+  ascendEquipment: (token: string, itemId: number, useProtector: boolean) =>
+    api<EquipmentProcessingResult>(
+      `/api/equipment-processing/${itemId}/ascend`,
+      { method: 'POST', body: JSON.stringify({ useProtector }) },
+      token,
+    ),
   bulkSell: (token: string, qualities: string[], itemTypes: string[] = []) =>
     api<BulkSellResult>('/api/inventory/bulk-sell', { method: 'POST', body: JSON.stringify({ qualities, itemTypes }) }, token),
   organizeInventory: (token: string, sort: string) =>
@@ -684,12 +1243,42 @@ export const gameApi = {
   quests: (token: string) => api<QuestRow[]>('/api/quests', {}, token),
   claimQuest: (token: string, questId: string) => api(`/api/quests/${questId}/claim`, { method: 'POST' }, token),
   marketListings: (token: string) => api<MarketSnapshot>('/api/market/listings', {}, token),
-  listItem: (token: string, itemId: number, price: number) =>
-    api<MarketListing>('/api/market/listings', { method: 'POST', body: JSON.stringify({ itemId, price }) }, token),
+  listItem: (token: string, itemId: number, quantity: number, unitPrice: number) =>
+    api<MarketListing>('/api/market/listings', { method: 'POST', body: JSON.stringify({ itemId, quantity, unitPrice }) }, token),
   buyListing: (token: string, listingId: number) =>
     api<MarketListing>(`/api/market/listings/${listingId}/buy`, { method: 'POST' }, token),
   cancelListing: (token: string, listingId: number) =>
     api<void>(`/api/market/listings/${listingId}/cancel`, { method: 'POST' }, token),
+  shop: (token: string) => api<ShopSnapshot>('/api/shop', {}, token),
+  buyShopOffer: (token: string, offerId: string, quantity: number) =>
+    api<ShopPurchaseResult>(`/api/shop/offers/${offerId}/buy`, { method: 'POST', body: JSON.stringify({ quantity }) }, token),
+  rifts: (token: string) => api<RiftSnapshot>('/api/endgame/rifts', {}, token),
+  runRift: (token: string, tier: number) =>
+    api<RiftRunResult>(
+      `/api/endgame/rifts/${tier}/runs`,
+      { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      token,
+    ),
+  claimRiftWeeklyReward: (token: string) =>
+    api<RiftWeeklyRewardResult>('/api/endgame/rifts/weekly-reward', { method: 'POST' }, token),
+  arena: (token: string) => api<ArenaOverview>('/api/arena', {}, token),
+  challengeArena: (token: string, targetId: number) =>
+    api<ArenaMatchDetail>(`/api/arena/challenge/${targetId}`, { method: 'POST' }, token),
+  arenaMatch: (token: string, matchId: number) => api<ArenaMatchDetail>(`/api/arena/matches/${matchId}`, {}, token),
+  arenaRankings: (token: string) => api<ArenaProfile[]>('/api/arena/rankings', {}, token),
+  buyArenaOffer: (token: string, offerId: string) =>
+    api<ArenaShopPurchaseResult>(`/api/arena/shop/${offerId}/buy`, { method: 'POST' }, token),
+  builds: (token: string) => api<BuildSnapshot>('/api/builds', {}, token),
+  copyBuildPreset: (token: string, presetId: string) =>
+    api<BuildSnapshot>(`/api/builds/presets/${presetId}/copy`, { method: 'POST' }, token),
+  createBuild: (token: string, request: BuildMutationRequest) =>
+    api<BuildSnapshot>('/api/builds', { method: 'POST', body: JSON.stringify(request) }, token),
+  updateBuild: (token: string, buildId: number, request: BuildMutationRequest) =>
+    api<BuildSnapshot>(`/api/builds/${buildId}`, { method: 'PUT', body: JSON.stringify(request) }, token),
+  activateBuild: (token: string, buildId: number) =>
+    api<BuildActivationResult>(`/api/builds/${buildId}/activate`, { method: 'POST' }, token),
+  simulateBuild: (token: string, buildId: number, tier: number) =>
+    api<RiftSimulationResult>(`/api/builds/${buildId}/simulate`, { method: 'POST', body: JSON.stringify({ tier }) }, token),
   chatMessages: (token: string) => api<ChatMessage[]>('/api/chat/messages', {}, token),
   sendChat: (token: string, text: string) => api<ChatMessage>('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text }) }, token),
   chatStreamUrl: (token: string, afterId = 0) => `/api/chat/stream?${new URLSearchParams({ token, afterId: String(afterId) }).toString()}`,

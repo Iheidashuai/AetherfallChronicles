@@ -81,6 +81,10 @@ CREATE TABLE item_template (
     max_stack INT NOT NULL DEFAULT 1,
     effect_type VARCHAR(64) NULL,
     effect_value_json VARCHAR(1000) NULL,
+    tradeable BOOLEAN NOT NULL DEFAULT TRUE,
+    market_category VARCHAR(32) NOT NULL DEFAULT 'equipment',
+    market_min_unit_price INT NOT NULL DEFAULT 1,
+    market_max_unit_price INT NOT NULL DEFAULT 0,
     enhance_bonus_rate DECIMAL(6, 4) NOT NULL DEFAULT 0,
     min_enhance_level INT NOT NULL DEFAULT 1,
     max_enhance_level INT NOT NULL DEFAULT 15,
@@ -246,6 +250,10 @@ CREATE TABLE item_instance (
     quantity INT NOT NULL DEFAULT 1,
     enhancement_level INT NOT NULL DEFAULT 0,
     enhancement_luck INT NOT NULL DEFAULT 0,
+    refine_level INT NOT NULL DEFAULT 0,
+    refine_focus VARCHAR(32) NOT NULL DEFAULT 'balanced',
+    ascension_level INT NOT NULL DEFAULT 0,
+    ascension_luck INT NOT NULL DEFAULT 0,
     market_lock_until TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -275,6 +283,60 @@ CREATE TABLE equipment_slot (
     UNIQUE KEY uk_equipment_item (item_id),
     CONSTRAINT fk_equipment_player FOREIGN KEY (player_id) REFERENCES player (id),
     CONSTRAINT fk_equipment_item FOREIGN KEY (item_id) REFERENCES item_instance (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE gem_template (
+    template_id VARCHAR(64) PRIMARY KEY,
+    gem_kind VARCHAR(32) NOT NULL,
+    rank_level INT NOT NULL,
+    stat_key VARCHAR(32) NOT NULL,
+    stat_value DECIMAL(12, 4) NOT NULL,
+    slot_kind VARCHAR(32) NOT NULL DEFAULT 'any',
+    next_template_id VARCHAR(64) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_gem_template_item FOREIGN KEY (template_id) REFERENCES item_template (id),
+    CONSTRAINT fk_gem_template_next FOREIGN KEY (next_template_id) REFERENCES item_template (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE equipment_socket (
+    item_id BIGINT NOT NULL,
+    socket_index INT NOT NULL,
+    unlocked BOOLEAN NOT NULL DEFAULT TRUE,
+    gem_item_id BIGINT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (item_id, socket_index),
+    UNIQUE KEY uk_socket_gem_item (gem_item_id),
+    CONSTRAINT fk_socket_item FOREIGN KEY (item_id) REFERENCES item_instance (id) ON DELETE CASCADE,
+    CONSTRAINT fk_socket_gem FOREIGN KEY (gem_item_id) REFERENCES item_instance (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE equipment_affix (
+    item_id BIGINT NOT NULL,
+    affix_index INT NOT NULL,
+    stat_key VARCHAR(32) NOT NULL,
+    stat_value DECIMAL(12, 4) NOT NULL,
+    tier INT NOT NULL,
+    locked BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (item_id, affix_index),
+    CONSTRAINT fk_affix_item FOREIGN KEY (item_id) REFERENCES item_instance (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE equipment_processing_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    player_id BIGINT NOT NULL,
+    item_id BIGINT NOT NULL,
+    action_type VARCHAR(32) NOT NULL,
+    success BOOLEAN NOT NULL,
+    summary VARCHAR(512) NOT NULL,
+    power_before INT NOT NULL DEFAULT 0,
+    power_after INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_processing_player (player_id, created_at),
+    KEY idx_processing_item (item_id, created_at),
+    CONSTRAINT fk_processing_player FOREIGN KEY (player_id) REFERENCES player (id),
+    CONSTRAINT fk_processing_item FOREIGN KEY (item_id) REFERENCES item_instance (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE dungeon_run (
@@ -349,8 +411,55 @@ CREATE TABLE dungeon_run_frame (
     damage INT NOT NULL DEFAULT 0,
     critical BOOLEAN NOT NULL DEFAULT FALSE,
     missed BOOLEAN NOT NULL DEFAULT FALSE,
+    skill_id VARCHAR(96) NULL,
+    skill_name VARCHAR(128) NULL,
+    visual_key VARCHAR(64) NULL,
+    target_side VARCHAR(16) NULL,
+    effect_value INT NOT NULL DEFAULT 0,
     KEY idx_run_frame_run (dungeon_run_id, frame_index),
     CONSTRAINT fk_run_frame_run FOREIGN KEY (dungeon_run_id) REFERENCES dungeon_run (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE skill_template (
+    id VARCHAR(96) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    owner_scope VARCHAR(16) NOT NULL,
+    profession VARCHAR(32) NOT NULL DEFAULT 'any',
+    archetype VARCHAR(32) NOT NULL DEFAULT 'any',
+    unlock_level INT NOT NULL DEFAULT 1,
+    max_rank INT NOT NULL DEFAULT 1,
+    category VARCHAR(32) NOT NULL,
+    target_type VARCHAR(32) NOT NULL DEFAULT 'enemy',
+    damage_type VARCHAR(32) NOT NULL DEFAULT '',
+    base_multiplier DECIMAL(8, 4) NOT NULL DEFAULT 0,
+    rank_multiplier_growth DECIMAL(8, 4) NOT NULL DEFAULT 0,
+    cooldown INT NOT NULL DEFAULT 0,
+    mp_cost_base INT NOT NULL DEFAULT 0,
+    mp_cost_growth INT NOT NULL DEFAULT 0,
+    effect_type VARCHAR(32) NOT NULL DEFAULT 'damage',
+    effect_power_base DECIMAL(8, 4) NOT NULL DEFAULT 0,
+    effect_power_growth DECIMAL(8, 4) NOT NULL DEFAULT 0,
+    duration_rounds INT NOT NULL DEFAULT 0,
+    trigger_kind VARCHAR(32) NOT NULL DEFAULT 'default',
+    priority INT NOT NULL DEFAULT 0,
+    visual_key VARCHAR(64) NOT NULL DEFAULT 'basic-slash',
+    description VARCHAR(500) NOT NULL,
+    tier_coef DECIMAL(8, 4) NOT NULL DEFAULT 1,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_skill_owner_profession (owner_scope, profession, unlock_level),
+    KEY idx_skill_owner_archetype (owner_scope, archetype, unlock_level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE player_skill (
+    player_id BIGINT NOT NULL,
+    skill_id VARCHAR(96) NOT NULL,
+    skill_rank INT NOT NULL DEFAULT 1,
+    learned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (player_id, skill_id),
+    KEY idx_player_skill_skill (skill_id),
+    CONSTRAINT fk_player_skill_player FOREIGN KEY (player_id) REFERENCES player (id) ON DELETE CASCADE,
+    CONSTRAINT fk_player_skill_template FOREIGN KEY (skill_id) REFERENCES skill_template (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE economy_audit_event (
@@ -415,10 +524,17 @@ CREATE TABLE market_listing (
     seller_name VARCHAR(64) NOT NULL,
     item_id BIGINT NULL,
     item_template_id VARCHAR(64) NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    unit_price BIGINT NOT NULL DEFAULT 0,
+    item_category VARCHAR(32) NOT NULL DEFAULT 'equipment',
+    stackable BOOLEAN NOT NULL DEFAULT FALSE,
     item_enhancement_level INT NOT NULL DEFAULT 0,
     item_enhancement_luck INT NOT NULL DEFAULT 0,
+    item_refine_level INT NOT NULL DEFAULT 0,
+    item_ascension_level INT NOT NULL DEFAULT 0,
     snapshot_name VARCHAR(128) NULL,
     snapshot_item_type VARCHAR(32) NULL,
+    snapshot_item_category VARCHAR(32) NOT NULL DEFAULT 'equipment',
     snapshot_quality VARCHAR(32) NULL,
     snapshot_required_level INT NOT NULL DEFAULT 1,
     snapshot_attack_bonus INT NOT NULL DEFAULT 0,
@@ -428,6 +544,10 @@ CREATE TABLE market_listing (
     snapshot_mp_bonus INT NOT NULL DEFAULT 0,
     snapshot_crit_bonus DECIMAL(10, 6) NOT NULL DEFAULT 0,
     snapshot_sell_price INT NOT NULL DEFAULT 1,
+    snapshot_description VARCHAR(1000) NULL,
+    snapshot_effect_type VARCHAR(64) NULL,
+    snapshot_effect_value VARCHAR(1000) NULL,
+    snapshot_processing_summary VARCHAR(1000) NULL,
     price BIGINT NOT NULL,
     status VARCHAR(24) NOT NULL,
     buyer_player_id BIGINT NULL,
@@ -477,6 +597,105 @@ CREATE TABLE robot_activity_log (
     KEY idx_robot_activity_robot (robot_id, created_at),
     KEY idx_robot_activity_kind (kind, created_at),
     CONSTRAINT fk_robot_activity_player FOREIGN KEY (robot_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE arena_profile (
+    player_id BIGINT PRIMARY KEY,
+    rating INT NOT NULL DEFAULT 1000,
+    arena_coins INT NOT NULL DEFAULT 0,
+    today_attempts_used INT NOT NULL DEFAULT 0,
+    last_attempt_day DATE NOT NULL,
+    wins INT NOT NULL DEFAULT 0,
+    losses INT NOT NULL DEFAULT 0,
+    win_streak INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_arena_rating (rating, wins, updated_at),
+    CONSTRAINT fk_arena_profile_player FOREIGN KEY (player_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE arena_match (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    attacker_id BIGINT NOT NULL,
+    defender_id BIGINT NOT NULL,
+    attacker_won BOOLEAN NOT NULL,
+    round_limit_reached BOOLEAN NOT NULL DEFAULT FALSE,
+    attacker_hp INT NOT NULL DEFAULT 0,
+    defender_hp INT NOT NULL DEFAULT 0,
+    attacker_rating_change INT NOT NULL DEFAULT 0,
+    defender_rating_change INT NOT NULL DEFAULT 0,
+    arena_coins INT NOT NULL DEFAULT 0,
+    result_text VARCHAR(240) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_arena_match_attacker (attacker_id, created_at),
+    KEY idx_arena_match_defender (defender_id, created_at),
+    CONSTRAINT fk_arena_match_attacker FOREIGN KEY (attacker_id) REFERENCES player (id),
+    CONSTRAINT fk_arena_match_defender FOREIGN KEY (defender_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE arena_match_participant (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    match_id BIGINT NOT NULL,
+    side VARCHAR(16) NOT NULL,
+    player_id BIGINT NOT NULL,
+    name VARCHAR(64) NOT NULL,
+    profession VARCHAR(32) NOT NULL,
+    level INT NOT NULL,
+    combat_power INT NOT NULL,
+    max_hp INT NOT NULL,
+    attack_power INT NOT NULL,
+    armor INT NOT NULL,
+    resistance INT NOT NULL,
+    build_name VARCHAR(128) NOT NULL,
+    strategy VARCHAR(32) NOT NULL,
+    equipment_summary VARCHAR(1200) NOT NULL,
+    skill_summary VARCHAR(1200) NOT NULL,
+    UNIQUE KEY uk_arena_participant_side (match_id, side),
+    CONSTRAINT fk_arena_participant_match FOREIGN KEY (match_id) REFERENCES arena_match (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE arena_match_event (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    match_id BIGINT NOT NULL,
+    sequence_no INT NOT NULL,
+    actor VARCHAR(32) NOT NULL,
+    event_type VARCHAR(32) NOT NULL,
+    tone VARCHAR(32) NOT NULL,
+    text VARCHAR(500) NOT NULL,
+    attacker_hp INT NOT NULL DEFAULT 0,
+    defender_hp INT NOT NULL DEFAULT 0,
+    damage INT NOT NULL DEFAULT 0,
+    critical BOOLEAN NOT NULL DEFAULT FALSE,
+    missed BOOLEAN NOT NULL DEFAULT FALSE,
+    skill_name VARCHAR(128) NULL,
+    KEY idx_arena_event_match (match_id, sequence_no),
+    CONSTRAINT fk_arena_event_match FOREIGN KEY (match_id) REFERENCES arena_match (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE arena_shop_offer (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description VARCHAR(500) NOT NULL,
+    item_template_id VARCHAR(64) NOT NULL,
+    item_quantity INT NOT NULL DEFAULT 1,
+    price_coins INT NOT NULL,
+    required_rating INT NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT fk_arena_shop_item FOREIGN KEY (item_template_id) REFERENCES item_template (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE arena_shop_purchase (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    player_id BIGINT NOT NULL,
+    offer_id VARCHAR(64) NOT NULL,
+    price_coins INT NOT NULL,
+    item_template_id VARCHAR(64) NOT NULL,
+    item_quantity INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_arena_purchase_player (player_id, created_at),
+    CONSTRAINT fk_arena_purchase_player FOREIGN KEY (player_id) REFERENCES player (id),
+    CONSTRAINT fk_arena_purchase_offer FOREIGN KEY (offer_id) REFERENCES arena_shop_offer (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed robots as level-1 starters. User accounts are intentionally not seeded.
@@ -601,6 +820,37 @@ DELETE FROM quest_prerequisite;
 DELETE FROM dungeon_room_monster;
 DELETE FROM dungeon_room;
 DELETE FROM monster_loot;
+DELETE FROM player_skill;
+DELETE FROM skill_template;
+DELETE FROM market_listing;
+
+INSERT INTO skill_template
+    (id, name, owner_scope, profession, archetype, unlock_level, max_rank, category, target_type,
+     damage_type, base_multiplier, rank_multiplier_growth, cooldown, mp_cost_base, mp_cost_growth,
+     effect_type, effect_power_base, effect_power_growth, duration_rounds, trigger_kind, priority,
+     visual_key, description, tier_coef)
+VALUES
+    ('skill_warrior_cleave', '裂风斩', 'player', 'warrior', 'any', 1, 12, 'damage', 'enemy', 'physical', 1.1800, 0.0180, 2, 6, 1, 'damage', 0.0000, 0.0000, 0, 'default', 45, 'slash-cleave', '稳定的近战斩击，自动战斗中作为战士的基础技能。', 1.0000),
+    ('skill_warrior_break', '破甲重击', 'player', 'warrior', 'any', 8, 12, 'damage', 'enemy', 'physical', 1.3400, 0.0220, 3, 12, 1, 'damage', 0.0000, 0.0000, 0, 'burst', 62, 'armor-break', '敌人血线下降后优先使用，提供一段可控爆发。', 1.1200),
+    ('skill_warrior_guard', '铁壁守势', 'player', 'warrior', 'any', 18, 10, 'support', 'self', '', 0.0000, 0.0000, 5, 14, 1, 'shield', 0.1000, 0.0060, 2, 'defensive', 78, 'iron-guard', '生命承压时获得短回合减伤，让战士更能扛住 Boss 技能。', 1.0800),
+    ('skill_warrior_execute', '断魂斩', 'player', 'warrior', 'any', 30, 10, 'damage', 'enemy', 'physical', 1.4800, 0.0280, 4, 18, 1, 'damage', 0.0000, 0.0000, 0, 'execute', 86, 'execute', '敌人低血量时触发的终结技能，倍率高但冷却更长。', 1.2500),
+    ('skill_warrior_rally', '战吼复苏', 'player', 'warrior', 'any', 45, 8, 'support', 'self', '', 0.0000, 0.0000, 6, 22, 1, 'heal', 0.0900, 0.0050, 0, 'heal', 80, 'rally-heal', '高等级战士的续航技能，恢复量按自身最大生命计算。', 1.1800),
+    ('skill_ranger_quickshot', '连珠箭', 'player', 'ranger', 'any', 1, 12, 'damage', 'enemy', 'physical', 1.1600, 0.0180, 2, 6, 1, 'damage', 0.0000, 0.0000, 0, 'default', 45, 'arrow-shot', '游侠的基础连射技能，消耗低、循环稳定。', 1.0000),
+    ('skill_ranger_flurry', '疾风连击', 'player', 'ranger', 'any', 8, 12, 'damage', 'enemy', 'physical', 1.2800, 0.0200, 3, 11, 1, 'damage', 0.0000, 0.0000, 0, 'burst', 62, 'flurry', '目标血量进入中段后触发，强化游侠的节奏感。', 1.1000),
+    ('skill_ranger_windstep', '风行身法', 'player', 'ranger', 'any', 18, 10, 'support', 'self', '', 0.0000, 0.0000, 5, 14, 1, 'shield', 0.0800, 0.0050, 2, 'defensive', 76, 'wind-shield', '血量承压时用风盾规避一部分伤害。', 1.0500),
+    ('skill_ranger_heartseeker', '穿心箭', 'player', 'ranger', 'any', 30, 10, 'damage', 'enemy', 'physical', 1.5000, 0.0260, 4, 18, 1, 'damage', 0.0000, 0.0000, 0, 'execute', 86, 'heartseeker', '低血量斩杀技能，适合游侠补足终结能力。', 1.2300),
+    ('skill_ranger_moonmend', '月息回春', 'player', 'ranger', 'any', 45, 8, 'support', 'self', '', 0.0000, 0.0000, 6, 22, 1, 'heal', 0.0850, 0.0050, 0, 'heal', 80, 'moon-heal', '高等级游侠的自然系恢复技能。', 1.1600),
+    ('skill_mage_spark', '奥术星火', 'player', 'mage', 'any', 1, 12, 'damage', 'enemy', 'magic', 1.1900, 0.0180, 2, 7, 1, 'damage', 0.0000, 0.0000, 0, 'default', 45, 'arcane-spark', '法师的基础魔法弹，魔法伤害会优先对抗抗性。', 1.0000),
+    ('skill_mage_frostlance', '霜棱枪', 'player', 'mage', 'any', 8, 12, 'damage', 'enemy', 'magic', 1.3400, 0.0210, 3, 13, 1, 'damage', 0.0000, 0.0000, 0, 'burst', 64, 'frost-lance', '中血线爆发技能，倍率高于基础循环。', 1.1200),
+    ('skill_mage_ward', '法力护幕', 'player', 'mage', 'any', 18, 10, 'support', 'self', '', 0.0000, 0.0000, 5, 16, 1, 'shield', 0.0950, 0.0060, 2, 'defensive', 78, 'mana-ward', '法师在危险血线自动展开护幕，降低接下来受到的伤害。', 1.0800),
+    ('skill_mage_meteor', '陨星术', 'player', 'mage', 'any', 30, 10, 'damage', 'enemy', 'magic', 1.5400, 0.0280, 4, 22, 1, 'damage', 0.0000, 0.0000, 0, 'execute', 88, 'meteor', '法师的终结爆发技能，低血量敌人会优先吃到陨星。', 1.2600),
+    ('skill_mage_renewal', '星辉复苏', 'player', 'mage', 'any', 45, 8, 'support', 'self', '', 0.0000, 0.0000, 6, 24, 1, 'heal', 0.0900, 0.0050, 0, 'heal', 80, 'renewal', '高等级法师的续航技能，弥补脆弱身板。', 1.1800),
+    ('skill_monster_pounce', '撕咬突袭', 'monster', 'any', 'skirmisher', 6, 8, 'damage', 'enemy', 'physical', 1.1800, 0.0150, 2, 0, 0, 'damage', 0.0000, 0.0000, 0, 'opener', 52, 'monster-pounce', '高等级敏捷怪物会用突袭抢先压血。', 1.0000),
+    ('skill_monster_crush', '蛮力碎击', 'monster', 'any', 'brute', 12, 8, 'damage', 'enemy', 'physical', 1.3200, 0.0180, 3, 0, 0, 'damage', 0.0000, 0.0000, 0, 'burst', 66, 'monster-crush', '蛮力怪物的中段爆发技能。', 1.1000),
+    ('skill_monster_bulwark', '厚壳护卫', 'monster', 'any', 'guardian', 14, 8, 'support', 'self', '', 0.0000, 0.0000, 5, 0, 0, 'shield', 0.0800, 0.0050, 2, 'defensive', 72, 'monster-shield', '守卫型怪物在低血线获得短暂减伤。', 1.0400),
+    ('skill_monster_hex', '蚀魂咒', 'monster', 'any', 'caster', 16, 8, 'damage', 'enemy', 'magic', 1.3600, 0.0200, 3, 0, 0, 'damage', 0.0000, 0.0000, 0, 'burst', 68, 'monster-hex', '施法型怪物的魔法爆发。', 1.1200),
+    ('skill_monster_boss_ruin', '王者裂隙', 'monster', 'any', 'boss', 30, 8, 'damage', 'enemy', '', 1.5200, 0.0240, 4, 0, 0, 'damage', 0.0000, 0.0000, 0, 'burst', 88, 'boss-rupture', 'Boss 中高等级后解锁的压迫技能。', 1.2600),
+    ('skill_monster_bloodmoon', '血月终裁', 'monster', 'any', 'boss', 65, 6, 'damage', 'enemy', '', 1.7200, 0.0280, 5, 0, 0, 'damage', 0.0000, 0.0000, 0, 'execute', 95, 'bloodmoon', '高等级 Boss 的斩杀技能，要求玩家技能和装备都跟上。', 1.4200);
 
 INSERT INTO item_template (id, name, item_type, quality, required_level, attack_bonus, defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, random_range, description, sell_price) VALUES
     ('eq_t01_weapon_01', '旧制蛛影素痕战刃', 'weapon', 'common', 1, 8, 1, 1, 6, 1, 0.0089, 1, '蛛影林地出产的旧制战刃，低等级高品质装备有机会压过后续低品质装备。', 8),
@@ -9342,15 +9592,23 @@ INSERT INTO item_template
     ('potion_stamina_small', '小瓶疲劳药水', 'staminaPotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 20 点疲劳，疲劳值不会超过 200。', 15, TRUE, 99, 'staminaPotion', '{"amount":20}', 0, 1, 15),
     ('potion_stamina_medium', '中瓶疲劳药水', 'staminaPotion', 'consumable', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 50 点疲劳，疲劳值不会超过 200。', 35, TRUE, 99, 'staminaPotion', '{"amount":50}', 0, 1, 15),
     ('potion_stamina_large', '大瓶疲劳药水', 'staminaPotion', 'consumable', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 100 点疲劳，疲劳值不会超过 200。', 80, TRUE, 99, 'staminaPotion', '{"amount":100}', 0, 1, 15),
+    ('potion_stamina_elite', '远征疲劳药水', 'staminaPotion', 'consumable', 'legendary', 20, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 150 点疲劳，适合长线刷本前补满状态。', 140, TRUE, 99, 'staminaPotion', '{"amount":150}', 0, 1, 15),
     ('potion_strength_low', '初级力量药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点力量，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_agility_low', '初级敏捷药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点敏捷，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"agility","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_constitution_low', '初级体质药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点体质，适合低等级阶段补强生存属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_intelligence_low', '初级智力药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点智力，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"intelligence","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_spirit_low', '初级精神药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点精神，适合低等级阶段补强续航属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"spirit","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_strength_mid', '中级力量药水', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 2 点力量，适合中等级阶段继续补强主属性。', 42, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":2,"maxLevel":60}', 0, 1, 15),
+    ('potion_agility_mid', '中级敏捷药水', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 2 点敏捷，适合中等级阶段继续补强先手与命中。', 42, TRUE, 99, 'attributePotion', '{"attribute":"agility","amount":2,"maxLevel":60}', 0, 1, 15),
     ('potion_constitution_mid', '中级体质药水', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 2 点体质，适合中等级阶段继续补强生存属性。', 42, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":2,"maxLevel":60}', 0, 1, 15),
+    ('potion_intelligence_mid', '中级智力药水', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 2 点智力，适合法师和技能循环角色补强输出。', 42, TRUE, 99, 'attributePotion', '{"attribute":"intelligence","amount":2,"maxLevel":60}', 0, 1, 15),
+    ('potion_spirit_mid', '中级精神药水', 'attributePotion', 'consumable', 'rare', 25, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 2 点精神，适合补强续航与抗压能力。', 42, TRUE, 99, 'attributePotion', '{"attribute":"spirit","amount":2,"maxLevel":60}', 0, 1, 15),
     ('potion_strength_high', '高级力量药水', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 3 点力量，是高等级角色的重要属性补剂。', 90, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":3,"maxLevel":90}', 0, 1, 15),
+    ('potion_agility_high', '高级敏捷药水', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 3 点敏捷，是高等级射手和先手流派的重要补剂。', 90, TRUE, 99, 'attributePotion', '{"attribute":"agility","amount":3,"maxLevel":90}', 0, 1, 15),
     ('potion_constitution_high', '高级体质药水', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 3 点体质，是高等级角色的重要生存补剂。', 90, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":3,"maxLevel":90}', 0, 1, 15),
+    ('potion_intelligence_high', '高级智力药水', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 3 点智力，是高等级法师的重要输出补剂。', 90, TRUE, 99, 'attributePotion', '{"attribute":"intelligence","amount":3,"maxLevel":90}', 0, 1, 15),
+    ('potion_spirit_high', '高级精神药水', 'attributePotion', 'consumable', 'epic', 55, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 3 点精神，是高等级续航流派的重要补剂。', 90, TRUE, 99, 'attributePotion', '{"attribute":"spirit","amount":3,"maxLevel":90}', 0, 1, 15),
+    ('chest_growth_cache', '远征成长宝箱', 'chest', 'chest', 'epic', 15, 0, 0, 0, 0, 0, 0, 0, '开启后可获得属性药水、疲劳药水或强化石，是中期成长补给。', 120, TRUE, 99, 'chest', NULL, 0, 1, 15),
     ('chest_guild_supply', '公会补给宝箱', 'chest', 'chest', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, '开启后可获得疲劳药水、低阶强化石或少量装备碎片。', 45, TRUE, 99, 'chest', NULL, 0, 1, 15),
     ('chest_forge_cache', '锻炉秘藏宝箱', 'chest', 'chest', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '开启后可获得强化石和装备碎片，是铁匠铺成长的重要补给。', 90, TRUE, 99, 'chest', NULL, 0, 1, 15),
     ('chest_spider_trove', '蛛影秘宝箱', 'chest', 'chest', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '蛛影林地出产的副本宝箱，内含补给和早期稀有装备。', 120, TRUE, 99, 'chest', NULL, 0, 1, 15),
@@ -9367,6 +9625,13 @@ INSERT INTO chest_loot (chest_template_id, reward_template_id, min_quantity, max
     ('chest_forge_cache', 'stone_mithril', 1, 1, 14),
     ('chest_forge_cache', 'mat_fragment_legendary', 1, 2, 16),
     ('chest_forge_cache', 'potion_stamina_medium', 1, 1, 10),
+    ('chest_growth_cache', 'potion_stamina_large', 1, 1, 18),
+    ('chest_growth_cache', 'potion_strength_mid', 1, 1, 12),
+    ('chest_growth_cache', 'potion_agility_mid', 1, 1, 12),
+    ('chest_growth_cache', 'potion_constitution_mid', 1, 1, 12),
+    ('chest_growth_cache', 'potion_intelligence_mid', 1, 1, 12),
+    ('chest_growth_cache', 'potion_spirit_mid', 1, 1, 12),
+    ('chest_growth_cache', 'stone_mithril', 1, 1, 14),
     ('chest_spider_trove', 'eq_t01_weapon_04', 1, 1, 12),
     ('chest_spider_trove', 'eq_t01_armor_04', 1, 1, 12),
     ('chest_spider_trove', 'stone_refined', 1, 2, 30),
@@ -9437,3 +9702,449 @@ CREATE TABLE cash_income_event (
     KEY idx_income_tier (wealth_tier_level, created_at),
     CONSTRAINT fk_income_player FOREIGN KEY (player_id) REFERENCES player (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE shop_offer (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description VARCHAR(512) NOT NULL,
+    category VARCHAR(32) NOT NULL,
+    price_rmb BIGINT NOT NULL,
+    item_template_id VARCHAR(64) NULL,
+    item_quantity INT NOT NULL DEFAULT 0,
+    gold_amount BIGINT NOT NULL DEFAULT 0,
+    required_level INT NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_shop_offer_category (category, sort_order),
+    CONSTRAINT fk_shop_offer_item FOREIGN KEY (item_template_id) REFERENCES item_template (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE shop_purchase_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    player_id BIGINT NOT NULL,
+    player_name VARCHAR(64) NOT NULL,
+    offer_id VARCHAR(64) NOT NULL,
+    offer_name VARCHAR(128) NOT NULL,
+    category VARCHAR(32) NOT NULL,
+    price_rmb BIGINT NOT NULL,
+    quantity INT NOT NULL,
+    total_price_rmb BIGINT NOT NULL,
+    item_template_id VARCHAR(64) NULL,
+    item_quantity INT NOT NULL DEFAULT 0,
+    gold_amount BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_shop_purchase_player (player_id, created_at),
+    KEY idx_shop_purchase_offer (offer_id, created_at),
+    CONSTRAINT fk_shop_purchase_player FOREIGN KEY (player_id) REFERENCES player (id),
+    CONSTRAINT fk_shop_purchase_offer FOREIGN KEY (offer_id) REFERENCES shop_offer (id),
+    CONSTRAINT fk_shop_purchase_item FOREIGN KEY (item_template_id) REFERENCES item_template (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE rift_modifier_config (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    description VARCHAR(500) NOT NULL,
+    difficulty_score INT NOT NULL,
+    reward_bonus DECIMAL(6, 4) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE player_rift_progress (
+    player_id BIGINT PRIMARY KEY,
+    best_tier INT NOT NULL DEFAULT 0,
+    best_score INT NOT NULL DEFAULT 0,
+    best_rating VARCHAR(8) NULL,
+    best_run_id BIGINT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_rift_progress_player FOREIGN KEY (player_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE rift_run (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    player_id BIGINT NOT NULL,
+    player_name VARCHAR(64) NOT NULL,
+    controller_type VARCHAR(16) NOT NULL,
+    request_id VARCHAR(96) NULL,
+    tier INT NOT NULL,
+    success BOOLEAN NOT NULL,
+    rating VARCHAR(8) NOT NULL,
+    score INT NOT NULL,
+    turns_taken INT NOT NULL,
+    monsters_killed INT NOT NULL,
+    combat_power INT NOT NULL,
+    recommended_power INT NOT NULL,
+    difficulty_score INT NOT NULL,
+    reward_multiplier DECIMAL(8, 4) NOT NULL,
+    modifier_ids VARCHAR(500) NOT NULL,
+    essence_gained INT NOT NULL DEFAULT 0,
+    shard_gained INT NOT NULL DEFAULT 0,
+    orb_gained INT NOT NULL DEFAULT 0,
+    player_final_hp INT NOT NULL DEFAULT 0,
+    player_max_hp INT NOT NULL DEFAULT 0,
+    seed BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_rift_run_request (player_id, request_id),
+    KEY idx_rift_run_player (player_id, created_at),
+    KEY idx_rift_run_leaderboard (success, tier, score, created_at),
+    CONSTRAINT fk_rift_run_player FOREIGN KEY (player_id) REFERENCES player (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE rift_run_event (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    rift_run_id BIGINT NOT NULL,
+    event_index INT NOT NULL,
+    turn INT NOT NULL,
+    room_index INT NOT NULL,
+    event_type VARCHAR(32) NOT NULL,
+    actor_name VARCHAR(128) NULL,
+    target_name VARCHAR(128) NULL,
+    text VARCHAR(1000) NOT NULL,
+    value INT NOT NULL DEFAULT 0,
+    actor_hp INT NOT NULL DEFAULT 0,
+    target_hp INT NOT NULL DEFAULT 0,
+    tone VARCHAR(32) NOT NULL DEFAULT 'system',
+    KEY idx_rift_event_run (rift_run_id, event_index),
+    CONSTRAINT fk_rift_event_run FOREIGN KEY (rift_run_id) REFERENCES rift_run (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE player_rift_weekly_reward (
+    player_id BIGINT NOT NULL,
+    week_key VARCHAR(16) NOT NULL,
+    best_tier INT NOT NULL,
+    claimed_run_id BIGINT NOT NULL,
+    essence_gained INT NOT NULL DEFAULT 0,
+    shard_gained INT NOT NULL DEFAULT 0,
+    orb_gained INT NOT NULL DEFAULT 0,
+    chest_item_id BIGINT NULL,
+    claimed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (player_id, week_key),
+    CONSTRAINT fk_rift_weekly_player FOREIGN KEY (player_id) REFERENCES player (id),
+    CONSTRAINT fk_rift_weekly_run FOREIGN KEY (claimed_run_id) REFERENCES rift_run (id),
+    CONSTRAINT fk_rift_weekly_chest FOREIGN KEY (chest_item_id) REFERENCES item_instance (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE build_preset (
+    id VARCHAR(96) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    profession VARCHAR(32) NOT NULL,
+    archetype VARCHAR(64) NOT NULL,
+    strategy VARCHAR(32) NOT NULL DEFAULT 'balanced',
+    description VARCHAR(700) NOT NULL,
+    refine_focus VARCHAR(32) NOT NULL DEFAULT 'balanced',
+    sort_order INT NOT NULL DEFAULT 0,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_build_preset_profession (profession, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE build_preset_skill_slot (
+    preset_id VARCHAR(96) NOT NULL,
+    slot_index INT NOT NULL,
+    trigger_kind VARCHAR(32) NOT NULL,
+    skill_id VARCHAR(96) NOT NULL,
+    PRIMARY KEY (preset_id, slot_index),
+    CONSTRAINT fk_build_preset_skill_preset FOREIGN KEY (preset_id) REFERENCES build_preset (id) ON DELETE CASCADE,
+    CONSTRAINT fk_build_preset_skill_template FOREIGN KEY (skill_id) REFERENCES skill_template (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE build_preset_talent (
+    preset_id VARCHAR(96) NOT NULL,
+    node_id VARCHAR(96) NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    description VARCHAR(500) NOT NULL,
+    stat_key VARCHAR(32) NOT NULL,
+    stat_value DECIMAL(10, 4) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (preset_id, node_id),
+    CONSTRAINT fk_build_preset_talent_preset FOREIGN KEY (preset_id) REFERENCES build_preset (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE player_build (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    player_id BIGINT NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    source_preset_id VARCHAR(96) NULL,
+    profession VARCHAR(32) NOT NULL,
+    archetype VARCHAR(64) NOT NULL,
+    strategy VARCHAR(32) NOT NULL DEFAULT 'balanced',
+    refine_focus VARCHAR(32) NOT NULL DEFAULT 'balanced',
+    active BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_player_build_player (player_id, active, updated_at),
+    CONSTRAINT fk_player_build_player FOREIGN KEY (player_id) REFERENCES player (id) ON DELETE CASCADE,
+    CONSTRAINT fk_player_build_preset FOREIGN KEY (source_preset_id) REFERENCES build_preset (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE player_build_equipment_slot (
+    build_id BIGINT NOT NULL,
+    slot_name VARCHAR(32) NOT NULL,
+    item_id BIGINT NULL,
+    preferred_item_type VARCHAR(32) NOT NULL DEFAULT '',
+    PRIMARY KEY (build_id, slot_name),
+    KEY idx_build_equipment_item (item_id),
+    CONSTRAINT fk_build_equipment_build FOREIGN KEY (build_id) REFERENCES player_build (id) ON DELETE CASCADE,
+    CONSTRAINT fk_build_equipment_item FOREIGN KEY (item_id) REFERENCES item_instance (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE player_build_skill_slot (
+    build_id BIGINT NOT NULL,
+    slot_index INT NOT NULL,
+    trigger_kind VARCHAR(32) NOT NULL,
+    skill_id VARCHAR(96) NULL,
+    PRIMARY KEY (build_id, slot_index),
+    KEY idx_build_skill_skill (skill_id),
+    CONSTRAINT fk_build_skill_build FOREIGN KEY (build_id) REFERENCES player_build (id) ON DELETE CASCADE,
+    CONSTRAINT fk_build_skill_template FOREIGN KEY (skill_id) REFERENCES skill_template (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE player_build_talent (
+    build_id BIGINT NOT NULL,
+    node_id VARCHAR(96) NOT NULL,
+    PRIMARY KEY (build_id, node_id),
+    CONSTRAINT fk_build_talent_build FOREIGN KEY (build_id) REFERENCES player_build (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE build_simulation_run (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    build_id BIGINT NOT NULL,
+    player_id BIGINT NOT NULL,
+    tier INT NOT NULL,
+    success BOOLEAN NOT NULL,
+    rating VARCHAR(8) NOT NULL,
+    score INT NOT NULL,
+    turns_taken INT NOT NULL,
+    combat_power INT NOT NULL,
+    player_final_hp INT NOT NULL DEFAULT 0,
+    player_max_hp INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_build_simulation_build (build_id, created_at),
+    KEY idx_build_simulation_player (player_id, created_at),
+    CONSTRAINT fk_build_simulation_build FOREIGN KEY (build_id) REFERENCES player_build (id) ON DELETE CASCADE,
+    CONSTRAINT fk_build_simulation_player FOREIGN KEY (player_id) REFERENCES player (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO build_preset
+(id, name, profession, archetype, strategy, description, refine_focus, sort_order, enabled) VALUES
+    ('preset_warrior_breaker', '破甲爆发', 'warrior', 'burst', 'aggressive', '围绕破甲重击和断魂斩构建的爆发流派，适合快速压低 Boss 血线。', 'attack', 10, TRUE),
+    ('preset_warrior_guardian', '铁壁续航', 'warrior', 'survival', 'survival', '用铁壁守势和高生命装备撑住长线战斗，适合高压词缀。', 'hp', 20, TRUE),
+    ('preset_warrior_duelist', '深渊决斗', 'warrior', 'duelist', 'balanced', '均衡输出和承伤，专门面向深渊单体 Boss 推进。', 'balanced', 30, TRUE),
+    ('preset_ranger_crit', '暴击连射', 'ranger', 'crit', 'aggressive', '提高暴击和连续行动收益，依靠连珠箭与穿心箭打出节奏。', 'crit', 110, TRUE),
+    ('preset_ranger_wind', '疾风闪避', 'ranger', 'speed', 'speed', '强调速度、闪避和风行身法，适合迅捷词缀下抢行动。', 'crit', 120, TRUE),
+    ('preset_ranger_execute', '斩杀穿心', 'ranger', 'execute', 'aggressive', '围绕穿心箭的低血量斩杀，追求更高评分和收尾速度。', 'attack', 130, TRUE),
+    ('preset_mage_arcane', '奥术爆发', 'mage', 'burst', 'aggressive', '以霜棱枪和陨星术为核心，追求高魔法爆发。', 'mp', 210, TRUE),
+    ('preset_mage_ward', '法力护幕', 'mage', 'survival', 'survival', '法力护幕和星辉复苏形成稳定容错，适合高层消耗战。', 'mp', 220, TRUE),
+    ('preset_mage_renewal', '星辉续航', 'mage', 'sustain', 'balanced', '兼顾输出、恢复和魔法资源，适合未知词缀试探。', 'balanced', 230, TRUE)
+ON DUPLICATE KEY UPDATE name = VALUES(name), profession = VALUES(profession), archetype = VALUES(archetype), strategy = VALUES(strategy), description = VALUES(description), refine_focus = VALUES(refine_focus), sort_order = VALUES(sort_order), enabled = VALUES(enabled);
+
+INSERT INTO build_preset_skill_slot (preset_id, slot_index, trigger_kind, skill_id) VALUES
+    ('preset_warrior_breaker', 0, 'default', 'skill_warrior_cleave'),
+    ('preset_warrior_breaker', 1, 'burst', 'skill_warrior_break'),
+    ('preset_warrior_breaker', 2, 'execute', 'skill_warrior_execute'),
+    ('preset_warrior_breaker', 3, 'defensive', 'skill_warrior_guard'),
+    ('preset_warrior_guardian', 0, 'default', 'skill_warrior_cleave'),
+    ('preset_warrior_guardian', 1, 'defensive', 'skill_warrior_guard'),
+    ('preset_warrior_guardian', 2, 'heal', 'skill_warrior_rally'),
+    ('preset_warrior_guardian', 3, 'burst', 'skill_warrior_break'),
+    ('preset_warrior_duelist', 0, 'default', 'skill_warrior_cleave'),
+    ('preset_warrior_duelist', 1, 'burst', 'skill_warrior_break'),
+    ('preset_warrior_duelist', 2, 'defensive', 'skill_warrior_guard'),
+    ('preset_warrior_duelist', 3, 'execute', 'skill_warrior_execute'),
+    ('preset_ranger_crit', 0, 'default', 'skill_ranger_quickshot'),
+    ('preset_ranger_crit', 1, 'burst', 'skill_ranger_flurry'),
+    ('preset_ranger_crit', 2, 'execute', 'skill_ranger_heartseeker'),
+    ('preset_ranger_crit', 3, 'defensive', 'skill_ranger_windstep'),
+    ('preset_ranger_wind', 0, 'default', 'skill_ranger_quickshot'),
+    ('preset_ranger_wind', 1, 'defensive', 'skill_ranger_windstep'),
+    ('preset_ranger_wind', 2, 'burst', 'skill_ranger_flurry'),
+    ('preset_ranger_wind', 3, 'heal', 'skill_ranger_moonmend'),
+    ('preset_ranger_execute', 0, 'default', 'skill_ranger_quickshot'),
+    ('preset_ranger_execute', 1, 'burst', 'skill_ranger_flurry'),
+    ('preset_ranger_execute', 2, 'execute', 'skill_ranger_heartseeker'),
+    ('preset_ranger_execute', 3, 'heal', 'skill_ranger_moonmend'),
+    ('preset_mage_arcane', 0, 'default', 'skill_mage_spark'),
+    ('preset_mage_arcane', 1, 'burst', 'skill_mage_frostlance'),
+    ('preset_mage_arcane', 2, 'execute', 'skill_mage_meteor'),
+    ('preset_mage_arcane', 3, 'defensive', 'skill_mage_ward'),
+    ('preset_mage_ward', 0, 'default', 'skill_mage_spark'),
+    ('preset_mage_ward', 1, 'defensive', 'skill_mage_ward'),
+    ('preset_mage_ward', 2, 'heal', 'skill_mage_renewal'),
+    ('preset_mage_ward', 3, 'burst', 'skill_mage_frostlance'),
+    ('preset_mage_renewal', 0, 'default', 'skill_mage_spark'),
+    ('preset_mage_renewal', 1, 'heal', 'skill_mage_renewal'),
+    ('preset_mage_renewal', 2, 'defensive', 'skill_mage_ward'),
+    ('preset_mage_renewal', 3, 'execute', 'skill_mage_meteor')
+ON DUPLICATE KEY UPDATE trigger_kind = VALUES(trigger_kind), skill_id = VALUES(skill_id);
+
+INSERT INTO build_preset_talent
+(preset_id, node_id, name, description, stat_key, stat_value, sort_order) VALUES
+    ('preset_warrior_breaker', 't1', '碎甲', '输出提高 4%。', 'damage', 0.0400, 1),
+    ('preset_warrior_breaker', 't2', '重创', '暴击提高 3%。', 'crit', 0.0300, 2),
+    ('preset_warrior_breaker', 't3', '断魂', '斩杀技能提高 7%。', 'execute', 0.0700, 3),
+    ('preset_warrior_breaker', 't4', '压迫', 'Boss 适配提高。', 'rift', 0.0500, 4),
+    ('preset_warrior_breaker', 't5', '攻势', '策略偏向爆发。', 'damage', 0.0300, 5),
+    ('preset_warrior_breaker', 't6', '余威', '速度提高 2%。', 'speed', 0.0200, 6),
+    ('preset_warrior_breaker', 't7', '铁刃', '攻击淬炼收益提高。', 'damage', 0.0200, 7),
+    ('preset_warrior_breaker', 't8', '血线嗅觉', '低血量目标收益提高。', 'execute', 0.0400, 8),
+    ('preset_warrior_breaker', 't9', '破阵', '深渊评分提高。', 'rift', 0.0400, 9)
+ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), stat_key = VALUES(stat_key), stat_value = VALUES(stat_value), sort_order = VALUES(sort_order);
+
+INSERT INTO build_preset_talent
+(preset_id, node_id, name, description, stat_key, stat_value, sort_order)
+SELECT p.id, CONCAT('t', n.n), CONCAT(p.name, '节点', n.n),
+       CASE n.n
+           WHEN 1 THEN '输出提高。'
+           WHEN 2 THEN '承伤提高。'
+           WHEN 3 THEN '续航提高。'
+           WHEN 4 THEN '速度提高。'
+           WHEN 5 THEN '深渊适配提高。'
+           WHEN 6 THEN '主技能收益提高。'
+           WHEN 7 THEN '防御技能收益提高。'
+           WHEN 8 THEN '资源循环更稳定。'
+           ELSE '完成度评分提高。'
+       END,
+       CASE n.n
+           WHEN 1 THEN 'damage'
+           WHEN 2 THEN 'defense'
+           WHEN 3 THEN 'sustain'
+           WHEN 4 THEN 'speed'
+           WHEN 5 THEN 'rift'
+           WHEN 6 THEN 'damage'
+           WHEN 7 THEN 'defense'
+           WHEN 8 THEN 'sustain'
+           ELSE 'completion'
+       END,
+       CASE n.n
+           WHEN 1 THEN 0.0300
+           WHEN 2 THEN 0.0300
+           WHEN 3 THEN 0.0300
+           WHEN 4 THEN 0.0200
+           WHEN 5 THEN 0.0400
+           WHEN 6 THEN 0.0300
+           WHEN 7 THEN 0.0250
+           WHEN 8 THEN 0.0250
+           ELSE 0.0300
+       END,
+       n.n
+FROM build_preset p
+JOIN (
+    SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9
+) n
+WHERE p.id <> 'preset_warrior_breaker'
+ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), stat_key = VALUES(stat_key), stat_value = VALUES(stat_value), sort_order = VALUES(sort_order);
+
+INSERT INTO rift_modifier_config
+(id, name, description, difficulty_score, reward_bonus, enabled, sort_order) VALUES
+    ('bloodthirst', '嗜血', '敌人造成伤害后获得短暂吸血，拖得越久越危险。', 12, 0.1000, TRUE, 10),
+    ('ironwall', '铁壁', '敌人护甲和抗性提高，考验持续输出能力。', 10, 0.0800, TRUE, 20),
+    ('swift', '迅捷', '敌人速度提高，行动频率更高。', 9, 0.0700, TRUE, 30),
+    ('withered', '枯竭', '房间间恢复降低，长线续航压力提高。', 11, 0.0900, TRUE, 40),
+    ('greed', '贪婪', '奖励大幅提高，但 Boss 生命和攻击同步提高。', 16, 0.1800, TRUE, 50),
+    ('voidlord', '虚空领主', 'Boss 获得额外阶段和虚空护盾。', 18, 0.2000, TRUE, 60)
+ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), difficulty_score = VALUES(difficulty_score), reward_bonus = VALUES(reward_bonus), enabled = VALUES(enabled), sort_order = VALUES(sort_order);
+
+INSERT INTO item_template
+(id, name, item_type, item_category, quality, required_level, attack_bonus, defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, random_range, description, sell_price, stackable, max_stack, effect_type, effect_value_json, enhance_bonus_rate, min_enhance_level, max_enhance_level) VALUES
+    ('mat_abyss_essence', '深渊精华', 'material', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '深渊裂隙中凝结的稳定能量，用于装备淬炼。', 80, TRUE, 9999, 'riftMaterial', '{"kind":"essence"}', 0.0000, 1, 15),
+    ('mat_tempering_shard', '淬炼碎片', 'material', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '高层深渊中剥离出的装备淬炼媒介。', 240, TRUE, 9999, 'riftMaterial', '{"kind":"shard"}', 0.0000, 1, 15),
+    ('mat_reforge_orb', '重铸宝珠', 'material', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '蕴含深渊回响的稀有宝珠，后续可用于词条重铸。', 800, TRUE, 9999, 'riftMaterial', '{"kind":"orb"}', 0.0000, 1, 15),
+    ('mat_socket_core', '打孔核心', 'material', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '稳定装备孔位结构的深渊核心，用于开启高阶宝石孔。', 420, TRUE, 9999, 'processingMaterial', '{"kind":"socketCore"}', 0.0000, 1, 15),
+    ('mat_gem_dust', '宝石尘', 'material', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '碎裂宝石研磨出的粉尘，用于开孔和宝石升级。', 120, TRUE, 9999, 'processingMaterial', '{"kind":"gemDust"}', 0.0000, 1, 15),
+    ('mat_affix_lock', '锁词石', 'material', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '用于固定装备优秀后期词条，避免重铸时被替换。', 900, TRUE, 9999, 'processingMaterial', '{"kind":"affixLock"}', 0.0000, 1, 15),
+    ('mat_ascension_core', '升阶核心', 'material', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '把装备推向更高加工上限的深渊结晶。', 1100, TRUE, 9999, 'processingMaterial', '{"kind":"ascensionCore"}', 0.0000, 1, 15),
+    ('mat_ascension_guard', '护阶符', 'material', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '升阶失败时保护装备不掉阶的稀有符印。', 1500, TRUE, 9999, 'processingMaterial', '{"kind":"ascensionGuard"}', 0.0000, 1, 15),
+    ('gem_ruby_1', '裂纹红宝石 I', 'gem', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后提升攻击。', 260, FALSE, 1, 'gem', '{"kind":"ruby","rank":1,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_2', '凝光红宝石 II', 'gem', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升攻击。', 620, FALSE, 1, 'gem', '{"kind":"ruby","rank":2,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_3', '深渊红宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后极大提升攻击。', 1400, FALSE, 1, 'gem', '{"kind":"ruby","rank":3,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_sapphire_1', '裂纹蓝宝石 I', 'gem', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后提升法力。', 240, FALSE, 1, 'gem', '{"kind":"sapphire","rank":1,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_2', '凝光蓝宝石 II', 'gem', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升法力。', 580, FALSE, 1, 'gem', '{"kind":"sapphire","rank":2,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_3', '深渊蓝宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后极大提升法力。', 1320, FALSE, 1, 'gem', '{"kind":"sapphire","rank":3,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_emerald_1', '裂纹绿宝石 I', 'gem', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后提升生命。', 260, FALSE, 1, 'gem', '{"kind":"emerald","rank":1,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_2', '凝光绿宝石 II', 'gem', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升生命。', 620, FALSE, 1, 'gem', '{"kind":"emerald","rank":2,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_3', '深渊绿宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后极大提升生命。', 1400, FALSE, 1, 'gem', '{"kind":"emerald","rank":3,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_topaz_1', '裂纹黄玉 I', 'gem', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后提升暴击。', 320, FALSE, 1, 'gem', '{"kind":"topaz","rank":1,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_2', '凝光黄玉 II', 'gem', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升暴击。', 740, FALSE, 1, 'gem', '{"kind":"topaz","rank":2,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_3', '深渊黄玉 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后极大提升暴击。', 1680, FALSE, 1, 'gem', '{"kind":"topaz","rank":3,"stat":"crit"}', 0.0000, 1, 15),
+    ('chest_abyss_weekly', '深渊周箱', 'chest', 'chest', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '根据本周最高深渊层数发放的奖励宝箱。', 1200, TRUE, 99, 'chest', '{"source":"riftWeekly"}', 0.0000, 1, 15)
+ON DUPLICATE KEY UPDATE name = VALUES(name), item_type = VALUES(item_type), item_category = VALUES(item_category), quality = VALUES(quality), required_level = VALUES(required_level), description = VALUES(description), sell_price = VALUES(sell_price), stackable = VALUES(stackable), max_stack = VALUES(max_stack), effect_type = VALUES(effect_type), effect_value_json = VALUES(effect_value_json);
+
+INSERT INTO gem_template
+(template_id, gem_kind, rank_level, stat_key, stat_value, slot_kind, next_template_id, sort_order) VALUES
+    ('gem_ruby_1', 'ruby', 1, 'attack', 18.0000, 'any', 'gem_ruby_2', 110),
+    ('gem_ruby_2', 'ruby', 2, 'attack', 42.0000, 'any', 'gem_ruby_3', 120),
+    ('gem_ruby_3', 'ruby', 3, 'attack', 90.0000, 'any', NULL, 130),
+    ('gem_sapphire_1', 'sapphire', 1, 'mp', 60.0000, 'any', 'gem_sapphire_2', 210),
+    ('gem_sapphire_2', 'sapphire', 2, 'mp', 135.0000, 'any', 'gem_sapphire_3', 220),
+    ('gem_sapphire_3', 'sapphire', 3, 'mp', 280.0000, 'any', NULL, 230),
+    ('gem_emerald_1', 'emerald', 1, 'hp', 90.0000, 'any', 'gem_emerald_2', 310),
+    ('gem_emerald_2', 'emerald', 2, 'hp', 210.0000, 'any', 'gem_emerald_3', 320),
+    ('gem_emerald_3', 'emerald', 3, 'hp', 460.0000, 'any', NULL, 330),
+    ('gem_topaz_1', 'topaz', 1, 'crit', 0.0120, 'any', 'gem_topaz_2', 410),
+    ('gem_topaz_2', 'topaz', 2, 'crit', 0.0260, 'any', 'gem_topaz_3', 420),
+    ('gem_topaz_3', 'topaz', 3, 'crit', 0.0550, 'any', NULL, 430)
+ON DUPLICATE KEY UPDATE gem_kind = VALUES(gem_kind), rank_level = VALUES(rank_level), stat_key = VALUES(stat_key), stat_value = VALUES(stat_value), next_template_id = VALUES(next_template_id), sort_order = VALUES(sort_order);
+
+INSERT INTO chest_loot (chest_template_id, reward_template_id, min_quantity, max_quantity, weight) VALUES
+    ('chest_abyss_weekly', 'mat_abyss_essence', 30, 90, 60),
+    ('chest_abyss_weekly', 'mat_tempering_shard', 8, 24, 30),
+    ('chest_abyss_weekly', 'mat_reforge_orb', 1, 3, 10),
+    ('chest_abyss_weekly', 'mat_socket_core', 2, 6, 18),
+    ('chest_abyss_weekly', 'mat_gem_dust', 8, 20, 24),
+    ('chest_abyss_weekly', 'mat_affix_lock', 1, 2, 8),
+    ('chest_abyss_weekly', 'mat_ascension_core', 1, 3, 10),
+    ('chest_abyss_weekly', 'mat_ascension_guard', 1, 1, 3),
+    ('chest_abyss_weekly', 'gem_ruby_1', 1, 2, 10),
+    ('chest_abyss_weekly', 'gem_emerald_1', 1, 2, 10),
+    ('chest_abyss_weekly', 'gem_sapphire_1', 1, 2, 10),
+    ('chest_abyss_weekly', 'gem_topaz_1', 1, 1, 6)
+ON DUPLICATE KEY UPDATE min_quantity = VALUES(min_quantity), max_quantity = VALUES(max_quantity), weight = VALUES(weight);
+
+INSERT INTO shop_offer
+(id, name, description, category, price_rmb, item_template_id, item_quantity, gold_amount, required_level, sort_order, enabled) VALUES
+    ('gold_10k', '一袋金币', '立即获得 10000 金，用于强化、技能训练和市场采购。', 'gold', 10, NULL, 0, 10000, 1, 10, TRUE),
+    ('gold_100k', '一箱金币', '立即获得 100000 金，适合连续强化或补足商会预算。', 'gold', 100, NULL, 0, 100000, 1, 20, TRUE),
+    ('gold_500k', '王室金库券', '立即获得 500000 金，高财富角色的大额成长储备。', 'gold', 500, NULL, 0, 500000, 20, 30, TRUE),
+    ('stamina_small_pack', '小瓶疲劳药水', '购买 3 瓶小瓶疲劳药水，适合低疲劳时继续刷本。', 'stamina', 5, 'potion_stamina_small', 3, 0, 1, 110, TRUE),
+    ('stamina_medium_pack', '中瓶疲劳药水', '购买 2 瓶中瓶疲劳药水，覆盖一段完整刷本节奏。', 'stamina', 8, 'potion_stamina_medium', 2, 0, 1, 120, TRUE),
+    ('stamina_large_pack', '大瓶疲劳药水', '购买 2 瓶大瓶疲劳药水，适合长线副本推进。', 'stamina', 18, 'potion_stamina_large', 2, 0, 10, 130, TRUE),
+    ('stamina_elite_pack', '远征疲劳药水', '购买 1 瓶远征疲劳药水，快速补满长线刷本状态。', 'stamina', 25, 'potion_stamina_elite', 1, 0, 20, 140, TRUE),
+    ('stone_crude_pack', '粗制强化石包', '购买 10 个粗制强化石，支撑前期 +1 至 +6 强化。', 'enhancement', 6, 'stone_crude', 10, 0, 1, 210, TRUE),
+    ('stone_refined_pack', '精炼强化石包', '购买 8 个精炼强化石，支撑中前期稳定强化。', 'enhancement', 12, 'stone_refined', 8, 0, 1, 220, TRUE),
+    ('stone_mithril_pack', '秘银强化石包', '购买 5 个秘银强化石，用于 +4 以上关键强化。', 'enhancement', 24, 'stone_mithril', 5, 0, 20, 230, TRUE),
+    ('stone_starfire_pack', '星火强化石包', '购买 3 个星火强化石，用于高阶装备冲刺。', 'enhancement', 45, 'stone_starfire', 3, 0, 40, 240, TRUE),
+    ('stone_dragonblood_pack', '龙血强化石包', '购买 2 个龙血强化石，用于顶级装备终段强化。', 'enhancement', 88, 'stone_dragonblood', 2, 0, 60, 250, TRUE),
+    ('processing_socket_pack', '开孔补给包', '购买 3 个打孔核心，作为深渊掉落之外的少量补充。', 'enhancement', 32, 'mat_socket_core', 3, 0, 60, 260, TRUE),
+    ('processing_gem_dust_pack', '宝石尘补给包', '购买 30 个宝石尘，用于开孔和宝石三合一升级。', 'enhancement', 20, 'mat_gem_dust', 30, 0, 60, 270, TRUE),
+    ('processing_ascension_pack', '升阶核心补给包', '购买 2 个升阶核心，核心来源仍以深渊为主。', 'enhancement', 68, 'mat_ascension_core', 2, 0, 60, 280, TRUE),
+    ('chest_growth_pack', '远征成长宝箱', '购买 1 个成长宝箱，随机获得属性药水、疲劳药水或强化石。', 'growth', 16, 'chest_growth_cache', 1, 0, 15, 310, TRUE),
+    ('chest_forge_pack', '锻炉秘藏宝箱', '购买 1 个锻炉秘藏宝箱，随机获得强化石或装备碎片。', 'chest', 28, 'chest_forge_cache', 1, 0, 1, 320, TRUE)
+ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), category = VALUES(category), price_rmb = VALUES(price_rmb), item_template_id = VALUES(item_template_id), item_quantity = VALUES(item_quantity), gold_amount = VALUES(gold_amount), required_level = VALUES(required_level), sort_order = VALUES(sort_order), enabled = VALUES(enabled);
+
+INSERT INTO arena_shop_offer
+(id, name, description, item_template_id, item_quantity, price_coins, required_rating, sort_order, enabled) VALUES
+    ('arena_stamina_small', '斗技疲劳补剂', '恢复疲劳的小型补给，让竞技场收益可以反哺刷本。', 'potion_stamina_small', 2, 80, 0, 10, TRUE),
+    ('arena_refine_shards', '淬炼碎片匣', '深渊淬炼常用材料，适合补齐后期加工缺口。', 'mat_tempering_shard', 12, 120, 1000, 20, TRUE),
+    ('arena_socket_core', '打孔核心', '宝石镶嵌前置材料，高品质装备的加工入口。', 'mat_socket_core', 1, 150, 1100, 30, TRUE),
+    ('arena_gem_dust', '宝石尘袋', '用于宝石升级和开孔补充。', 'mat_gem_dust', 20, 180, 1150, 40, TRUE),
+    ('arena_affix_lock', '锁词石', '重铸时保护关键词条。', 'mat_affix_lock', 1, 240, 1350, 50, TRUE),
+    ('arena_ascension_core', '升阶核心', '装备升阶核心材料，来自高段位竞技奖励。', 'mat_ascension_core', 1, 360, 1600, 60, TRUE),
+    ('arena_guard', '升阶保护石', '高阶升阶失败时避免掉级。', 'mat_ascension_guard', 1, 520, 1900, 70, TRUE)
+ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), item_template_id = VALUES(item_template_id), item_quantity = VALUES(item_quantity), price_coins = VALUES(price_coins), required_rating = VALUES(required_rating), sort_order = VALUES(sort_order), enabled = VALUES(enabled);
+
+UPDATE item_template
+SET market_category = CASE
+        WHEN item_type = 'gem' OR effect_type = 'gem' THEN 'gem'
+        WHEN item_category = 'chest' THEN 'chest'
+        WHEN item_category = 'consumable' THEN 'consumable'
+        WHEN item_category = 'material' THEN 'material'
+        ELSE 'equipment'
+    END,
+    market_min_unit_price = GREATEST(1, sell_price),
+    market_max_unit_price = GREATEST(0, sell_price * 40);
+
+UPDATE item_template
+SET tradeable = FALSE
+WHERE id IN ('chest_growth_cache', 'chest_forge_cache');
