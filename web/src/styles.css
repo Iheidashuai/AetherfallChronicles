@@ -4326,6 +4326,142 @@ body {
   height: 100%;
 }
 
+.arena-battle-screen .combat-main,
+.rift-battle-screen .combat-main {
+  grid-template-rows: minmax(260px, 0.9fr) minmax(220px, 1fr);
+}
+
+.arena-battle-fighter-stack,
+.arena-battle-side,
+.rift-battle-side {
+  min-height: 0;
+}
+
+.arena-battle-fighter-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.arena-battle-side .arena-fighter-card {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.arena-battle-return,
+.rift-battle-return {
+  flex: 0 0 auto;
+}
+
+.arena-duel-stage {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(26, 30, 33, 0.96), rgba(16, 18, 21, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.arena-duel-stage.victory {
+  border-color: rgba(119, 221, 151, 0.32);
+}
+
+.arena-duel-stage.defeat {
+  border-color: rgba(238, 112, 112, 0.32);
+}
+
+.arena-duel-fighters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(240px, 1.2fr) minmax(180px, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.arena-combatant,
+.arena-clash-column {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.arena-combatant {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: 14px;
+}
+
+.arena-combatant.enemy {
+  border-color: rgba(238, 112, 112, 0.22);
+}
+
+.arena-combatant strong {
+  color: #fff5dc;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.arena-combatant small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.arena-clash-column {
+  align-content: center;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  min-height: 150px;
+  padding: 16px;
+  text-align: center;
+  background:
+    linear-gradient(90deg, rgba(139, 213, 225, 0.08), transparent 34%, transparent 66%, rgba(238, 112, 112, 0.08)),
+    rgba(0, 0, 0, 0.18);
+}
+
+.arena-clash-column strong {
+  color: #fff5dc;
+  font-size: 20px;
+}
+
+.arena-clash-column p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.arena-battle-log {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(18, 20, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.arena-battle-log .arena-event-line.defender {
+  border-color: rgba(238, 112, 112, 0.18);
+}
+
+.arena-battle-log .arena-event-line.player {
+  border-color: rgba(131, 213, 225, 0.18);
+}
+
+.rift-battle-replay {
+  min-height: 0;
+  height: 100%;
+}
+
+.rift-battle-log {
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+
+.rift-battle-materials {
+  margin-top: 0;
+}
+
 .phaser-battle-shell {
   min-height: 0;
   overflow: hidden;
@@ -7177,6 +7313,10 @@ body {
     grid-template-rows: minmax(240px, 42vh) minmax(180px, 1fr);
   }
 
+  .arena-duel-fighters {
+    grid-template-columns: 1fr;
+  }
+
 .chat-screen {
     height: 100vh;
     min-height: 100vh;
@@ -7738,10 +7878,6 @@ body {
   display: grid;
   gap: 14px;
   grid-template-rows: auto minmax(0, 1fr);
-}
-
-.arena-main-panel:has(.arena-match-panel) {
-  grid-template-rows: auto minmax(150px, 0.7fr) minmax(0, 1.3fr);
 }
 
 .arena-profile-card,

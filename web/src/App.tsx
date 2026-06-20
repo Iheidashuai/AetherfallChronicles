@@ -166,6 +166,8 @@ import { SkillsScreen } from './screens/SkillsScreen';
 import { ItemCatalogScreen } from './screens/ItemCatalogScreen';
 import { DungeonScreen } from './screens/DungeonScreen';
 import { ResultScreen } from './screens/ResultScreen';
+import { ArenaResultScreen } from './screens/ArenaResultScreen';
+import { RiftResultScreen } from './screens/RiftResultScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
 import { BlacksmithScreen } from './screens/BlacksmithScreen';
 import { QuestScreen } from './screens/QuestScreen';
@@ -185,6 +187,8 @@ export function App() {
   const screen = useAppStore((state) => state.screen);
   const setScreen = useAppStore((state) => state.setScreen);
   const [lastResult, setLastResult] = useState<DungeonRunResult | null>(null);
+  const [lastArenaMatch, setLastArenaMatch] = useState<ArenaMatchDetail | null>(null);
+  const [lastRiftResult, setLastRiftResult] = useState<RiftRunResult | null>(null);
   const announcementsQuery = useQuery({
     queryKey: ['announcements', token],
     queryFn: () => gameApi.announcements(token!),
@@ -209,8 +213,26 @@ export function App() {
           {screen === 'market' && token && <MarketScreen token={token} />}
           {screen === 'shop' && token && <ShopScreen token={token} />}
           {screen === 'builds' && token && <BuildsScreen token={token} />}
-          {screen === 'endgame' && token && <EndgameRiftScreen token={token} />}
-          {screen === 'arena' && token && <ArenaScreen token={token} />}
+          {screen === 'endgame' && token && (
+            <EndgameRiftScreen
+              token={token}
+              onResult={(result) => {
+                setLastRiftResult(result);
+                setScreen('rift-result');
+              }}
+            />
+          )}
+          {screen === 'rift-result' && lastRiftResult && <RiftResultScreen result={lastRiftResult} />}
+          {screen === 'arena' && token && (
+            <ArenaScreen
+              token={token}
+              onBattle={(match) => {
+                setLastArenaMatch(match);
+                setScreen('arena-result');
+              }}
+            />
+          )}
+          {screen === 'arena-result' && lastArenaMatch && <ArenaResultScreen match={lastArenaMatch} />}
           {screen === 'guild' && token && <GuildScreen token={token} />}
           {screen === 'chat' && token && <ChatScreen token={token} />}
           {screen === 'leaderboard' && token && <LeaderboardScreen token={token} />}
@@ -231,4 +253,3 @@ export function App() {
     </main>
   );
 }
-

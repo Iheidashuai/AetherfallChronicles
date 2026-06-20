@@ -160,10 +160,9 @@ import {
   invalidateGameQueries,
 } from '../components/ui';
 
-export function ArenaScreen({ token }: { token: string }) {
+export function ArenaScreen({ token, onBattle }: { token: string; onBattle: (match: ArenaMatchDetail) => void }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
-  const [selectedMatch, setSelectedMatch] = useState<ArenaMatchDetail | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ['arena', token],
     queryFn: () => gameApi.arena(token),
@@ -172,7 +171,7 @@ export function ArenaScreen({ token }: { token: string }) {
   const challengeMutation = useMutation({
     mutationFn: (targetId: number) => gameApi.challengeArena(token, targetId),
     onSuccess: async (match) => {
-      setSelectedMatch(match);
+      onBattle(match);
       await invalidateGameQueries(queryClient, token);
     },
   });
@@ -184,7 +183,7 @@ export function ArenaScreen({ token }: { token: string }) {
   });
   const matchMutation = useMutation({
     mutationFn: (matchId: number) => gameApi.arenaMatch(token, matchId),
-    onSuccess: setSelectedMatch,
+    onSuccess: onBattle,
   });
 
   if (isLoading) {
@@ -246,7 +245,6 @@ export function ArenaScreen({ token }: { token: string }) {
               />
             ))}
           </div>
-          {selectedMatch && <ArenaMatchPanel match={selectedMatch} />}
         </section>
 
         <aside className="detail-rail arena-detail-rail">
@@ -276,7 +274,9 @@ export function ArenaScreen({ token }: { token: string }) {
       {buyMutation.error && (
         <FeedbackDialog variant="error" title="兑换失败" message={buyMutation.error.message} onClose={() => buyMutation.reset()} />
       )}
+      {matchMutation.error && (
+        <FeedbackDialog variant="error" title="战报读取失败" message={matchMutation.error.message} onClose={() => matchMutation.reset()} />
+      )}
     </section>
   );
 }
-
