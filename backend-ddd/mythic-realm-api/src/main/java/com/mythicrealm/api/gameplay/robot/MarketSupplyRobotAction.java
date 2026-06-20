@@ -38,15 +38,12 @@ public class MarketSupplyRobotAction implements RobotDecisionAction {
         if (context.marketOpportunities() < 3) {
             value += 10;
         }
-        if (context.stamina() != null && context.stamina().current() >= 180) {
+        if (context.stamina() != null
+            && context.stamina().current() >= Math.max(1, context.stamina().max()) * 0.9) {
             value += 8;
         }
-        if (context.personalityContains("商会") || context.personalityContains("掉落")) {
-            value += 8;
-        }
-        if (context.isCurrentKind("market_list")) {
-            value -= 10;
-        }
+        value += 8 * context.archetype().marketBias();
+        value -= context.repeatPenalty("market_list", 6.0);
         String reason = "个人寄售少于 4 单，刷本补货能给市场增加装备和成长材料流动";
         return new RobotActionScore(value, reason);
     }

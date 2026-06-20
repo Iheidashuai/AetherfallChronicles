@@ -29,7 +29,7 @@
 
 ## 玩家持久化字段（player 表节选）
 
-- 资源：`gold`（默认 100）、`real_money`（RMB 充值货币）、`stamina_current`（默认 200）
+- 资源：`gold`（默认 100）、`real_money`（RMB 充值货币）、`stamina_current`（默认 1000）
 - 财富氛围：`wealth_tier_level` / `wealth_tier`（虚荣财富等级，用于充值榜）
 - 身份：`controller_type`（`player` | `robot`，机器人复用同表）、`title`、`personality`
 - 冗余统计：`dungeon_clears`、`peak_enhancement`、`legendary_loot_count`、`current_activity_*`

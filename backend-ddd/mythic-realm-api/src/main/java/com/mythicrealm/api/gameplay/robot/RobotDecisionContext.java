@@ -4,6 +4,7 @@ import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.recharge.RechargeService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
+import java.util.Map;
 import java.util.Random;
 
 public record RobotDecisionContext(
@@ -41,6 +42,8 @@ public record RobotDecisionContext(
     String activeBuildName,
     String activeBuildPresetId,
     String recommendedBuildPresetId,
+    Map<String, Integer> recentKindCounts,
+    boolean inGuild,
     Random random
 ) {
     public RobotDecisionContext(
@@ -98,6 +101,8 @@ public record RobotDecisionContext(
             null,
             null,
             null,
+            Map.of(),
+            false,
             random
         );
     }
@@ -136,6 +141,27 @@ public record RobotDecisionContext(
 
     public boolean isCurrentKind(String kind) {
         return kind != null && kind.equals(actor.currentActivityKind());
+    }
+
+    public RobotArchetype archetype() {
+        return actor.archetype() == null ? RobotArchetype.CASUAL : actor.archetype();
+    }
+
+    /** How many of the robot's last few actions were {@code kind} (0 if unknown). */
+    public int recentKindCount(String kind) {
+        if (kind == null || recentKindCounts == null) {
+            return 0;
+        }
+        return recentKindCounts.getOrDefault(kind, 0);
+    }
+
+    /**
+     * Decaying anti-repeat penalty: the more of the recent history was already this
+     * kind, the stronger the nudge to do something else. Replaces the old one-step
+     * {@code isCurrentKind} check so robots stop ping-ponging between two actions.
+     */
+    public double repeatPenalty(String kind, double perOccurrence) {
+        return recentKindCount(kind) * perOccurrence;
     }
 
     public boolean personalityContains(String token) {

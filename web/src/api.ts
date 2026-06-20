@@ -60,6 +60,7 @@ export type Item = {
   sockets?: EquipmentSocket[];
   affixes?: EquipmentAffix[];
   displayName?: string;
+  description?: string;
 };
 
 export type EquipmentSocket = {
@@ -612,7 +613,18 @@ export type RiftLeaderboardEntry = {
   rating: string;
   score: number;
   turnsTaken: number;
+  playerFinalHp: number;
+  playerMaxHp: number;
   createdAt: string;
+  self: boolean;
+};
+
+export type RiftTierPreview = {
+  tier: number;
+  recommendedPower: number;
+  minimumPower: number;
+  modifiers: RiftModifier[];
+  rewardPreview: RiftReward;
 };
 
 export type RiftSnapshot = {
@@ -631,6 +643,7 @@ export type RiftSnapshot = {
   minimumPower: number;
   modifiers: RiftModifier[];
   rewardPreview: RiftReward;
+  tierPreviews: RiftTierPreview[];
   materials: RiftMaterials;
   stamina: StaminaSnapshot;
   leaderboard: RiftLeaderboardEntry[];
@@ -819,6 +832,7 @@ export type DropPreview = {
   mpBonus: number;
   sellPrice: number;
   dropRate: number;
+  description?: string;
 };
 
 export type DungeonRunResult = {

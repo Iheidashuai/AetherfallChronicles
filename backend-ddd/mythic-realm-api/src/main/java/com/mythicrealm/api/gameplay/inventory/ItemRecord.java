@@ -45,7 +45,8 @@ public record ItemRecord(
     int affixMpBonus,
     double affixCritBonus,
     List<EquipmentSocketView> sockets,
-    List<EquipmentAffixView> affixes
+    List<EquipmentAffixView> affixes,
+    String description
 ) {
     public ItemRecord(
         long id,
@@ -107,7 +108,8 @@ public record ItemRecord(
             0,
             0,
             List.of(),
-            List.of()
+            List.of(),
+            ""
         );
     }
 

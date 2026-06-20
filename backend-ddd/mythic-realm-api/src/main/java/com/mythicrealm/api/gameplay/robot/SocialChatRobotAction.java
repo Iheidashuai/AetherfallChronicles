@@ -22,13 +22,10 @@ public class SocialChatRobotAction implements RobotDecisionAction {
 
     @Override
     public RobotActionScore score(RobotDecisionContext context) {
-        double value = 15 + context.random().nextDouble() * 14;
-        if (context.isCurrentKind("chat")) {
-            value -= 10;
-        }
-        if (context.personalityContains("频道") || context.personalityContains("比较") || context.personalityContains("提醒")) {
-            value += 8;
-        }
+        // Raised baseline so the world channel isn't perpetually outscored by guild chat.
+        double value = 22 + context.random().nextDouble() * 10;
+        value += 8 * context.archetype().socialBias();
+        value -= context.repeatPenalty("chat", 8.0);
         return new RobotActionScore(value, "需要保持世界频道活跃，并同步自己的短期目标");
     }
 

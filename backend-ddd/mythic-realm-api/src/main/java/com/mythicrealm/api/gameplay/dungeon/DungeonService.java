@@ -225,13 +225,13 @@ public class DungeonService {
                         0,
                         monsterMaxHp
                     );
-                    if (monster.lootTable() == null) {
+                    if (specialDungeon || monster.lootTable() == null) {
+                        // 特殊副本的掉落（碎片/爆装/保底）按通关评分在结算阶段统一处理。
                         continue;
                     }
                     for (var lootEntry : monster.lootTable()) {
                         ItemTemplate template = gameConfigService.requireItem(lootEntry.itemId());
-                        double dropRate = adjustedDropRate(lootEntry.dropRate(), template.quality(), specialDungeon, powerRatio);
-                        if (random.nextDouble() <= dropRate) {
+                        if (random.nextDouble() <= lootEntry.dropRate()) {
                             ItemRecord item = inventoryService.addLootToInventory(player.id(), template, random);
                             loot.add(item);
                             if (isRareOrBetter(template.quality())) {
@@ -259,12 +259,14 @@ public class DungeonService {
                 appendFrame(logs, frames, "短暂整备，恢复 " + recover + " 生命，当前 " + playerHp + "/" + playerMaxHp, "heal", roomLabel, null, playerHp, playerMaxHp, 0, 0, "system", "heal", recover, false, false);
             }
         }
+        String rating = rating(success, powerRatio, playerHp, playerMaxHp);
         if (success && specialDungeon) {
-            rareOrBetterLoot += applySpecialPity(player.id(), dungeon, random, loot, logs, frames, playerHp, playerMaxHp);
+            rareOrBetterLoot += awardSpecialLoot(player.id(), dungeon, rating, random, loot, logs, frames, playerHp, playerMaxHp);
+        } else if (success) {
+            rareOrBetterLoot += awardNormalRatingBonus(player.id(), dungeon, rating, random, loot, logs, frames, playerHp, playerMaxHp);
         }
 
         PlayerRecord updatedPlayer = playerService.applyRewards(player.id(), expGained, goldGained);
-        String rating = rating(success, powerRatio, playerHp, playerMaxHp);
         DungeonRunResult result = new DungeonRunResult(
             dungeon.id(),
             dungeon.name(),
@@ -411,12 +413,170 @@ public class DungeonService {
         };
     }
 
-    private double adjustedDropRate(double baseDropRate, String quality, boolean specialDungeon, double powerRatio) {
-        if (!specialDungeon || (!"legendary".equals(quality) && !"immortal".equals(quality))) {
-            return baseDropRate;
+    private static final String[] EQUIPMENT_SLOTS =
+        {"weapon", "helmet", "armor", "legs", "boots", "gloves", "necklace", "ring"};
+
+    /** Map a special dungeon to its gear tier (60/70/80/90) from its minimum level. */
+    private int specialTier(DungeonConfig dungeon) {
+        int level = dungeon.minimumLevel();
+        if (level >= 90) {
+            return 90;
         }
-        double ratingBonus = powerRatio >= 1.25 ? 1.2 : 1.0;
-        return Math.min(1.0, baseDropRate * ratingBonus);
+        if (level >= 80) {
+            return 80;
+        }
+        if (level >= 70) {
+            return 70;
+        }
+        return 60;
+    }
+
+    /**
+     * Special-dungeon loot, driven by the clear rating: higher rating -> more fragments
+     * and a higher chance of a direct legendary/immortal piece. Fragments are the
+     * reliable currency (so a clear is never "empty"); direct gear is the jackpot.
+     * The legacy pity net is preserved for dry streaks.
+     */
+    private int awardSpecialLoot(
+        long playerId,
+        DungeonConfig dungeon,
+        String rating,
+        Random random,
+        List<ItemRecord> loot,
+        List<String> logs,
+        List<BattleFrame> frames,
+        int playerHp,
+        int playerMaxHp
+    ) {
+        int tier = specialTier(dungeon);
+        int mainFragments = switch (rating) {
+            case "S" -> 6;
+            case "A" -> 4;
+            default -> 2;
+        };
+        int sideFragments = switch (rating) {
+            case "S" -> 2;
+            case "A" -> 1;
+            default -> 0;
+        };
+        // Low tiers rain legendary fragments, high tiers rain immortal fragments;
+        // the 70/80 tiers also sprinkle a few of the other kind.
+        String mainFragment = tier >= 80 ? "mat_fragment_immortal" : "mat_fragment_legendary";
+        String sideFragment = tier >= 80 ? "mat_fragment_legendary" : "mat_fragment_immortal";
+        grantFragment(playerId, mainFragment, mainFragments, random, loot, logs, frames, playerHp, playerMaxHp);
+        if ((tier == 70 || tier == 80) && sideFragments > 0) {
+            grantFragment(playerId, sideFragment, sideFragments, random, loot, logs, frames, playerHp, playerMaxHp);
+        }
+
+        int rareOrBetter = 0;
+        double legendaryChance = switch (rating) {
+            case "S" -> 0.25;
+            case "A" -> 0.15;
+            default -> 0.08;
+        };
+        double immortalChance = switch (rating) {
+            case "S" -> 0.06;
+            case "A" -> 0.03;
+            default -> 0.01;
+        };
+        if (random.nextDouble() < immortalChance) {
+            rareOrBetter += grantTierGear(playerId, tier, "immortal", random, loot, logs, frames, playerHp, playerMaxHp);
+        }
+        if (random.nextDouble() < legendaryChance) {
+            rareOrBetter += grantTierGear(playerId, tier, "legendary", random, loot, logs, frames, playerHp, playerMaxHp);
+        }
+        rareOrBetter += applySpecialPity(playerId, dungeon, random, loot, logs, frames, playerHp, playerMaxHp);
+        return rareOrBetter;
+    }
+
+    private void grantFragment(
+        long playerId,
+        String fragmentId,
+        int count,
+        Random random,
+        List<ItemRecord> loot,
+        List<String> logs,
+        List<BattleFrame> frames,
+        int playerHp,
+        int playerMaxHp
+    ) {
+        if (count <= 0) {
+            return;
+        }
+        loot.addAll(inventoryService.grantItem(playerId, fragmentId, count, random));
+        String label = "mat_fragment_immortal".equals(fragmentId) ? "不朽装备碎片" : "传说装备碎片";
+        appendFrame(logs, frames, "血月结算：获得 " + count + " 个" + label, "loot", "血月结算", null, playerHp, playerMaxHp, 0, 0);
+    }
+
+    private int grantTierGear(
+        long playerId,
+        int tier,
+        String quality,
+        Random random,
+        List<ItemRecord> loot,
+        List<String> logs,
+        List<BattleFrame> frames,
+        int playerHp,
+        int playerMaxHp
+    ) {
+        String slot = EQUIPMENT_SLOTS[random.nextInt(EQUIPMENT_SLOTS.length)];
+        ItemTemplate template = gameConfigService.requireItem("eq_bloodmoon_l" + tier + "_" + slot + "_" + quality);
+        ItemRecord item = inventoryService.addLootToInventory(playerId, template, random);
+        loot.add(item);
+        appendFrame(logs, frames, "血月爆装：" + item.displayName(), lootTone(quality), "血月结算", null, playerHp, playerMaxHp, 0, 0);
+        return isRareOrBetter(quality) ? 1 : 0;
+    }
+
+    /**
+     * Normal dungeons: a high clear rating grants bonus loot rolls over the boss table
+     * (A -> +1 pass, S -> +2 passes). Quality is unchanged (normal caps at epic). Sweeps
+     * have no combat and therefore no rating, so manual high-rating clears out-earn sweeps.
+     */
+    private int awardNormalRatingBonus(
+        long playerId,
+        DungeonConfig dungeon,
+        String rating,
+        Random random,
+        List<ItemRecord> loot,
+        List<String> logs,
+        List<BattleFrame> frames,
+        int playerHp,
+        int playerMaxHp
+    ) {
+        int bonusRolls = switch (rating) {
+            case "S" -> 2;
+            case "A" -> 1;
+            default -> 0;
+        };
+        if (bonusRolls == 0) {
+            return 0;
+        }
+        int rareOrBetter = 0;
+        for (var room : dungeon.rooms()) {
+            if (!room.isBossRoom()) {
+                continue;
+            }
+            for (var roomMonster : room.monsters()) {
+                MonsterConfig monster = gameConfigService.requireMonster(roomMonster.monsterId());
+                if (monster.lootTable() == null) {
+                    continue;
+                }
+                for (int r = 0; r < bonusRolls; r++) {
+                    for (var lootEntry : monster.lootTable()) {
+                        if (random.nextDouble() <= lootEntry.dropRate()) {
+                            ItemTemplate template = gameConfigService.requireItem(lootEntry.itemId());
+                            ItemRecord item = inventoryService.addLootToInventory(playerId, template, random);
+                            loot.add(item);
+                            if (isRareOrBetter(template.quality())) {
+                                rareOrBetter++;
+                            }
+                            appendFrame(logs, frames, "高分奖励掉落：" + item.displayName(), lootTone(template.quality()), "结算", null, playerHp, playerMaxHp, 0, 0);
+                        }
+                    }
+                }
+            }
+        }
+        return rareOrBetter;
     }
 
     private int applySpecialPity(

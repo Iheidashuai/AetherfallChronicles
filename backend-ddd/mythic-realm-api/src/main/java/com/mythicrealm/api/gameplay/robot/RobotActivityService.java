@@ -5,6 +5,7 @@ import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Random;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,26 +14,25 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class RobotActivityService {
-    private static final int ROBOTS_PER_TICK = 24;
-    private static final int MIN_ACTIONS_PER_TICK = 14;
-    private static final int EXTRA_ACTION_RANGE = 7;
-
     private final JdbcTemplate jdbcTemplate;
     private final InventoryService inventoryService;
     private final RobotBrainService robotBrainService;
     private final RobotActionSupport robotActionSupport;
+    private final RobotSimulationProperties properties;
     private final Random random = new Random();
 
     public RobotActivityService(
         JdbcTemplate jdbcTemplate,
         InventoryService inventoryService,
         RobotBrainService robotBrainService,
-        RobotActionSupport robotActionSupport
+        RobotActionSupport robotActionSupport,
+        RobotSimulationProperties properties
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.inventoryService = inventoryService;
         this.robotBrainService = robotBrainService;
         this.robotActionSupport = robotActionSupport;
+        this.properties = properties;
     }
 
     @Scheduled(initialDelay = 6_000, fixedDelay = 15_000)
@@ -44,28 +44,49 @@ public class RobotActivityService {
             """
             SELECT id, account_id, name, title, profession, level, experience, gold, real_money,
                    wealth_tier_level, wealth_tier, strength, agility, constitution, intelligence,
-                   spirit, free_points, personality, dungeon_clears, peak_enhancement,
-                   legendary_loot_count, current_activity_kind, current_activity_text,
-                   current_activity_at, last_activity_at
+                   spirit, free_points, personality, personality_archetype, dungeon_clears,
+                   peak_enhancement, legendary_loot_count, current_activity_kind,
+                   current_activity_text, current_activity_at, last_activity_at
             FROM player
             WHERE controller_type = 'robot'
             ORDER BY RAND()
             LIMIT ?
             """,
             (rs, rowNum) -> mapRobot(rs),
-            ROBOTS_PER_TICK
+            properties.getRobotsPerTick()
         );
         if (robots.isEmpty()) {
             return;
         }
 
-        int actionCount = Math.min(robots.size(), MIN_ACTIONS_PER_TICK + random.nextInt(EXTRA_ACTION_RANGE));
+        int baseCount = properties.getMinActionsPerTick() + random.nextInt(Math.max(1, properties.getExtraActionRange()));
+        int scaledCount = (int) Math.round(baseCount * activityFactor(LocalTime.now()));
+        int actionCount = Math.min(robots.size(), Math.max(1, scaledCount));
         for (int index = 0; index < actionCount; index++) {
             RobotAgent actor = robots.get(index);
             RobotAgent target = robots.get((index + 1 + random.nextInt(robots.size())) % robots.size());
             robotBrainService.thinkAndAct(actor, target);
         }
         robotActionSupport.trimChat();
+    }
+
+    /**
+     * Time-of-day multiplier on how many robots act this tick, so the simulated
+     * population has believable peaks and lulls instead of flat 24/7 activity:
+     * quiet overnight, busy in the evening, normal during the day.
+     */
+    private double activityFactor(LocalTime now) {
+        int hour = now.getHour();
+        if (hour >= 1 && hour < 7) {
+            return 0.4; // overnight lull
+        }
+        if (hour >= 19 && hour < 24) {
+            return 1.2; // evening prime time
+        }
+        if (hour >= 12 && hour < 14) {
+            return 1.05; // lunch bump
+        }
+        return 0.85; // daytime baseline
     }
 
     private boolean hasHumanPlayer() {
@@ -99,6 +120,7 @@ public class RobotActivityService {
             player,
             rs.getString("title"),
             rs.getString("personality"),
+            RobotArchetype.resolve(rs.getString("personality_archetype"), rs.getString("personality")),
             inventoryService.combatPower(player),
             rs.getInt("dungeon_clears"),
             rs.getInt("peak_enhancement"),

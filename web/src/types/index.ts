@@ -3,7 +3,7 @@ import type { Dungeon, HomeSnapshot } from '../api';
 export type InventoryAction = 'equip' | 'sell' | 'enhance';
 export type FeedbackVariant = 'success' | 'error';
 export type DungeonMode = 'normal' | 'special';
-export type DungeonClearFilter = 'all' | 'uncleared' | 'cleared';
+export type DungeonClearFilter = 'all' | 'uncleared' | 'locked' | 'cleared';
 export type DungeonRiskFilter = 'all' | 'safe' | 'normal' | 'risky' | 'deadly';
 export type DungeonLevelFilter = 'all' | '1-30' | '31-60' | '61-90';
 export type QuestCategoryFilter = 'all' | 'main' | 'daily' | 'achievement';
@@ -96,4 +96,5 @@ export type EquipmentDetailData = {
   affixCritBonus?: number;
   origin?: string;
   power?: number;
+  description?: string;
 };

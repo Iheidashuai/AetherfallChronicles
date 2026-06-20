@@ -335,7 +335,8 @@ public class GameConfigService {
                     item.hpBonus(),
                     item.mpBonus(),
                     item.sellPrice(),
-                    Math.round((1 - entry.getValue()) * 10000) / 10000.0
+                    Math.round((1 - entry.getValue()) * 10000) / 10000.0,
+                    item.description()
                 );
             })
             .sorted(Comparator
@@ -398,7 +399,8 @@ public class GameConfigService {
         int hpBonus,
         int mpBonus,
         int sellPrice,
-        double dropRate
+        double dropRate,
+        String description
     ) {
     }
 }

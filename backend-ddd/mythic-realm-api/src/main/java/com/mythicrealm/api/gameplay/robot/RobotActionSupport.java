@@ -31,7 +31,28 @@ public class RobotActionSupport {
         "会长今天又上分了，咱们也别躺。",
         "公会频道安静了，冒个泡，大家加油。",
         "谁有多的强化石匀点，回头公会活动还你。",
-        "咱们公会排名又稳了一点，继续保持。"
+        "咱们公会排名又稳了一点，继续保持。",
+        "今晚有没有人冲公会 Boss？凑波伤害冲榜。",
+        "新人有问题尽管问，公会老人都挺热心的。",
+        "捐献别落下，公会升级了大家都有增益。",
+        "刚换了套构筑，感觉刷本顺手多了，推荐试试。",
+        "周常任务记得做，攒下来奖励不少。",
+        "谁的战力又涨了？带带我这条咸鱼。",
+        "下个副本门槛有点高，准备攒装备硬刚。",
+        "商会最近好货多，手快的盯一盯。"
+    );
+
+    private static final List<String> WORLD_BANTER = List.of(
+        "你现在主刷哪个副本？想找个稳定节奏。",
+        "我在比较装备词条，品质高但属性歪也不一定值。",
+        "刚看战力榜，前排又有人换装了。",
+        "先刷能稳定通关的本，掉落和经验都不会太亏。",
+        "今天手气一般，连开几个箱子都很素。",
+        "攒了点金币，纠结是强化还是去商会捡漏。",
+        "卡战力了，准备回头补一波强化再往上冲。",
+        "有没有人也在冲深渊裂隙？想交流下配装。",
+        "任务奖励刷新了，先把日常清一清。",
+        "这波掉落还行，挂商会出了换点活动经费。"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -48,6 +69,8 @@ public class RobotActionSupport {
     private final EquipmentProcessingService equipmentProcessingService;
     private final GuildBossService guildBossService;
     private final GuildService guildService;
+    private final RobotMemoryService memoryService;
+    private final RobotSimulationProperties properties;
 
     public RobotActionSupport(
         JdbcTemplate jdbcTemplate,
@@ -63,7 +86,9 @@ public class RobotActionSupport {
         BuildService buildService,
         EquipmentProcessingService equipmentProcessingService,
         GuildBossService guildBossService,
-        GuildService guildService
+        GuildService guildService,
+        RobotMemoryService memoryService,
+        RobotSimulationProperties properties
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.robotEquipmentService = robotEquipmentService;
@@ -79,6 +104,8 @@ public class RobotActionSupport {
         this.equipmentProcessingService = equipmentProcessingService;
         this.guildBossService = guildBossService;
         this.guildService = guildService;
+        this.memoryService = memoryService;
+        this.properties = properties;
     }
 
     public RobotActionResult runDungeon(RobotDecisionContext context, RobotActionScore score) {
@@ -150,7 +177,7 @@ public class RobotActionSupport {
             ? rechargeText + "刚把【" + change.itemName() + "】强化到 +" + change.enhancementLevel() + "，" + context.target().name() + " 你别再劝我收手了。"
             : rechargeText + "强化【" + change.itemName() + "】失败了，现在 +" + change.enhancementLevel() + "，先缓一口气。";
         if (change.usedStoneCount() > 0) {
-            text += " Used " + change.usedStoneCount() + " enhancement stones.";
+            text += "（消耗 " + change.usedStoneCount() + " 颗强化石）";
         }
         chat(context.actor(), text);
         record(context.actor(), "enhance", text, score.reason());
@@ -407,7 +434,9 @@ public class RobotActionSupport {
     }
 
     public RobotActionResult useInventoryItemOrCraft(RobotDecisionContext context, RobotActionScore score) {
-        if (context.stamina() != null && context.stamina().current() <= 30 && context.staminaPotionCount() > 0) {
+        if (context.stamina() != null
+            && context.stamina().current() <= Math.max(1, context.stamina().max()) * 0.15
+            && context.staminaPotionCount() > 0) {
             RobotActionResult result = useFirstItem(
                 context,
                 item -> "staminaPotion".equals(item.effectType()),
@@ -459,7 +488,9 @@ public class RobotActionSupport {
             }
         }
 
-        if (context.stamina() != null && context.stamina().current() < 160 && context.staminaPotionCount() > 0) {
+        if (context.stamina() != null
+            && context.stamina().current() < Math.max(1, context.stamina().max()) * 0.8
+            && context.staminaPotionCount() > 0) {
             return useFirstItem(
                 context,
                 item -> "staminaPotion".equals(item.effectType()),
@@ -513,12 +544,7 @@ public class RobotActionSupport {
         } else if (context.personalityContains("商会")) {
             text = "今天商会流动挺快，低价稀有装基本挂不住。";
         } else {
-            text = switch (context.random().nextInt(4)) {
-                case 0 -> context.target().name() + "，你现在主刷哪个副本？";
-                case 1 -> "我在比较装备词条，品质高但属性歪也不一定值。";
-                case 2 -> "刚看战力榜，前排又有人换装了。";
-                default -> "先刷能稳定通关的本，掉落和经验都不会太亏。";
-            };
+            text = pickFreshLine(context.actor().id(), WORLD_BANTER, context.random());
         }
         chat(context.actor(), text);
         record(context.actor(), "chat", text, score.reason());
@@ -559,7 +585,7 @@ public class RobotActionSupport {
         if (guildId == null) {
             return rest(context.actor(), "还没加入公会，先各刷各的。", score.reason());
         }
-        String text = GUILD_BANTER.get(context.random().nextInt(GUILD_BANTER.size()));
+        String text = pickFreshLine(context.actor().id(), GUILD_BANTER, context.random());
         jdbcTemplate.update(
             "INSERT INTO chat_message (player_id, sender_name, kind, text, channel) VALUES (?, ?, 'robot', ?, ?)",
             context.actor().id(),
@@ -567,13 +593,17 @@ public class RobotActionSupport {
             text,
             "guild:" + guildId
         );
+        if (memoryService != null) {
+            memoryService.recordChat(context.actor().id(), text);
+        }
         record(context.actor(), "guild_chat", text, score.reason());
         return RobotActionResult.success("guild_chat", text);
     }
 
     public void trimChat() {
         jdbcTemplate.update(
-            "DELETE FROM chat_message WHERE channel = 'world' AND id NOT IN (SELECT id FROM (SELECT id FROM chat_message WHERE channel = 'world' ORDER BY created_at DESC, id DESC LIMIT 260) recent)"
+            "DELETE FROM chat_message WHERE channel = 'world' AND id NOT IN (SELECT id FROM (SELECT id FROM chat_message WHERE channel = 'world' ORDER BY created_at DESC, id DESC LIMIT ?) recent)",
+            properties.getWorldChatRetention()
         );
     }
 
@@ -624,7 +654,10 @@ public class RobotActionSupport {
                 recordUseItemQuestEvents(context.player().id(), result);
                 String extra = result.rewards().isEmpty()
                     ? ""
-                    : "，获得 " + result.rewards().stream().map(ItemRecord::displayName).limit(2).toList();
+                    : "，获得 " + result.rewards().stream()
+                        .map(ItemRecord::displayName)
+                        .limit(2)
+                        .collect(java.util.stream.Collectors.joining("、"));
                 String text = "使用《" + result.itemName() + "》" + extra + "。";
                 chat(context.actor(), text);
                 record(context.actor(), kind, text, score.reason());
@@ -640,8 +673,12 @@ public class RobotActionSupport {
         try {
             InventoryService.CraftResult result = inventoryService.craftRecipe(context.player(), recipeId);
             questService.recordEvent(context.player().id(), new QuestEvent("fragmentCrafted", recipeId, 1));
-            String text = "合成《" + result.recipeName() + "》，背包获得 "
-                + result.rewards().stream().map(ItemRecord::displayName).limit(2).toList() + "。";
+            String rewardNames = result.rewards().stream()
+                .map(ItemRecord::displayName)
+                .limit(2)
+                .collect(java.util.stream.Collectors.joining("、"));
+            String text = "合成《" + result.recipeName() + "》"
+                + (rewardNames.isBlank() ? "" : "，背包获得 " + rewardNames) + "。";
             chat(context.actor(), text);
             record(context.actor(), "item_craft", text, score.reason());
             return RobotActionResult.success("item_craft", text);
@@ -679,6 +716,22 @@ public class RobotActionSupport {
             actor.name(),
             text
         );
+        if (memoryService != null) {
+            memoryService.recordChat(actor.id(), text);
+        }
+    }
+
+    /**
+     * Pick a line from a template pool that the robot hasn't said recently, so the
+     * world/guild channels don't visibly loop the same handful of sentences.
+     */
+    private String pickFreshLine(long robotId, List<String> pool, Random random) {
+        String candidate = pool.get(random.nextInt(pool.size()));
+        for (int attempt = 0; attempt < 4 && memoryService != null
+            && memoryService.recentlySaid(robotId, candidate); attempt++) {
+            candidate = pool.get(random.nextInt(pool.size()));
+        }
+        return candidate;
     }
 
     private void record(RobotAgent actor, String kind, String text, String reason) {

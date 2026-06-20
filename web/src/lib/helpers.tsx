@@ -26,7 +26,7 @@ import type {
   RobotFilters, PlayableProfession, AttributeKey, MarketFilters, EquipmentDetailData,
 } from '../types';
 import {
-  STAMINA_RECOVERY_SECONDS, ANNOUNCEMENT_SEEN_STORAGE_KEY, ATTRIBUTE_LABELS, CREATE_PROFESSIONS,
+  ANNOUNCEMENT_SEEN_STORAGE_KEY, ATTRIBUTE_LABELS, CREATE_PROFESSIONS,
 } from './constants';
 
 export function announcementSeenKey(announcement: GlobalAnnouncement) {
@@ -392,26 +392,14 @@ export function liveStaminaSnapshot(stamina: StaminaView, elapsedSeconds: number
     return { ...stamina, secondsUntilNext: 0, secondsUntilFull: 0 };
   }
   const elapsed = Math.max(0, elapsedSeconds);
-  if (elapsed < stamina.secondsUntilNext) {
-    return {
-      ...stamina,
-      secondsUntilNext: Math.max(0, stamina.secondsUntilNext - elapsed),
-      secondsUntilFull: Math.max(0, stamina.secondsUntilFull - elapsed),
-    };
+  const secondsUntilFull = Math.max(0, stamina.secondsUntilFull - elapsed);
+  if (secondsUntilFull <= 0) {
+    return { ...stamina, current: stamina.max, secondsUntilNext: 0, secondsUntilFull: 0 };
   }
-  const secondsAfterFirstRecovery = Math.max(0, elapsed - stamina.secondsUntilNext);
-  const recovered = 1 + Math.floor(secondsAfterFirstRecovery / STAMINA_RECOVERY_SECONDS);
-  const current = Math.min(stamina.max, stamina.current + recovered);
-  if (current >= stamina.max) {
-    return { ...stamina, current, secondsUntilNext: 0, secondsUntilFull: 0 };
-  }
-  const secondsIntoCurrentStep = secondsAfterFirstRecovery % STAMINA_RECOVERY_SECONDS;
-  const secondsUntilNext = STAMINA_RECOVERY_SECONDS - secondsIntoCurrentStep;
   return {
     ...stamina,
-    current,
-    secondsUntilNext,
-    secondsUntilFull: secondsUntilNext + Math.max(0, stamina.max - current - 1) * STAMINA_RECOVERY_SECONDS,
+    secondsUntilNext: secondsUntilFull,
+    secondsUntilFull,
   };
 }
 
@@ -935,7 +923,7 @@ export function catalogUsageHint(item: ItemCatalogItem) {
     return `强化 +${item.minEnhanceLevel} 至 +${item.maxEnhanceLevel} 时可用，成功率 +${formatPercent(item.enhanceBonusRate)}`;
   }
   if (item.effectType === 'staminaPotion') {
-    return '疲劳不足时使用，恢复值不会超过 200。';
+    return '疲劳不足时使用，恢复值不会超过 1000。';
   }
   if (item.effectType === 'attributePotion') {
     return '使用后永久增加角色属性，适合优先补主属性。';
@@ -1623,6 +1611,27 @@ export function toEquipmentDetail(item: Item): EquipmentDetailData {
     affixCritBonus: item.affixCritBonus,
     origin: originForItem(item.templateId),
     power: itemPower(item),
+    description: item.description,
+  };
+}
+
+export function dropToEquipmentDetail(drop: DropPreview): EquipmentDetailData {
+  return {
+    templateId: drop.templateId,
+    name: drop.name,
+    itemType: drop.itemType,
+    itemCategory: drop.itemCategory,
+    quality: drop.quality,
+    requiredLevel: drop.requiredLevel,
+    attackBonus: drop.attackBonus,
+    defenseBonus: drop.defenseBonus,
+    resistanceBonus: drop.resistanceBonus,
+    hpBonus: drop.hpBonus,
+    mpBonus: drop.mpBonus,
+    sellPrice: drop.sellPrice,
+    enhancementLevel: 0,
+    origin: originForItem(drop.templateId),
+    description: drop.description,
   };
 }
 

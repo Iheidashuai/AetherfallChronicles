@@ -160,6 +160,31 @@ import {
   invalidateGameQueries,
 } from '../components/ui';
 
+function dungeonMeetsGate(dungeon: Dungeon) {
+  return dungeon.gate?.eligible ?? true;
+}
+
+function dungeonMatchesClearFilter(dungeon: Dungeon, filter: DungeonClearFilter) {
+  const eligible = dungeonMeetsGate(dungeon);
+  if (filter === 'cleared') {
+    return dungeon.cleared;
+  }
+  if (filter === 'uncleared') {
+    return !dungeon.cleared && eligible;
+  }
+  if (filter === 'locked') {
+    return !dungeon.cleared && !eligible;
+  }
+  return true;
+}
+
+function sortDungeonsByLevelDesc(left: Dungeon, right: Dungeon) {
+  return right.minimumLevel - left.minimumLevel
+    || right.recommendedLevel - left.recommendedLevel
+    || right.minimumPower - left.minimumPower
+    || left.name.localeCompare(right.name, 'zh-Hans');
+}
+
 export function DungeonScreen({ token, onResult }: { token: string; onResult: (result: DungeonRunResult) => void }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
@@ -219,13 +244,29 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
   const normalDungeons = data.filter((dungeon) => !isSpecialDungeon(dungeon));
   const specialDungeons = data.filter(isSpecialDungeon);
   const selectedSpecialDungeon = specialDungeons.find((dungeon) => dungeon.id === selectedSpecialId) ?? specialDungeons[0] ?? null;
+  const clearedCount = normalDungeons.filter((dungeon) => dungeon.cleared).length;
+  const runnableUnclearedCount = normalDungeons.filter((dungeon) => !dungeon.cleared && dungeonMeetsGate(dungeon)).length;
+  const lockedUnclearedCount = normalDungeons.filter((dungeon) => !dungeon.cleared && !dungeonMeetsGate(dungeon)).length;
   const visibleDungeons = normalDungeons.filter((dungeon) => {
     const risk = dungeonRisk(combatPower, dungeon.minimumPower, playerLevel, dungeon.minimumLevel, dungeon.gate).level as DungeonRiskFilter;
-    const matchesClear = clearFilter === 'all' || (clearFilter === 'cleared' ? dungeon.cleared : !dungeon.cleared);
+    const matchesClear = dungeonMatchesClearFilter(dungeon, clearFilter);
     const matchesRisk = riskFilter === 'all' || risk === riskFilter;
     const matchesLevel = dungeonMatchesLevelFilter(dungeon, levelFilter);
     return matchesClear && matchesRisk && matchesLevel;
-  });
+  }).sort(sortDungeonsByLevelDesc);
+  const clearFilterHint = clearFilter === 'cleared'
+    ? '已通过副本 · 按门槛等级倒序'
+    : clearFilter === 'uncleared'
+      ? '未通过且已达门槛 · 按门槛等级倒序'
+      : clearFilter === 'locked'
+        ? '未通过且未达门槛 · 按门槛等级倒序'
+        : '全部普通副本 · 按门槛等级倒序';
+  const clearFilterOptions: { value: DungeonClearFilter; label: string; count: number }[] = [
+    { value: 'all', label: '全部', count: normalDungeons.length },
+    { value: 'cleared', label: '已通过', count: clearedCount },
+    { value: 'uncleared', label: '未通过', count: runnableUnclearedCount },
+    { value: 'locked', label: '未达标', count: lockedUnclearedCount },
+  ];
 
   return (
     <section className="screen dungeon-screen">
@@ -234,9 +275,9 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
         {homeQuery.data && (
           <div className="battle-brief">
             <Gauge size={20} />
-            <div>
-              <span className="eyebrow">当前战力</span>
-              <strong>{homeQuery.data.combatPower}</strong>
+            <div className="battle-brief-copy">
+              <span className="eyebrow">当前等级 / 战力</span>
+              <strong>Lv.{homeQuery.data.player.level} · {formatNumber(homeQuery.data.combatPower)}</strong>
             </div>
           </div>
         )}
@@ -264,17 +305,14 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
             <>
               <div className="filter-rail-group">
                 <strong>通关状态</strong>
-                <div className="segmented three">
-                  {[
-                    ['all', '全部'],
-                    ['uncleared', '未通过'],
-                    ['cleared', '已通过'],
-                  ].map(([value, label]) => (
+                <div className="segmented four">
+                  {clearFilterOptions.map(({ value, label, count }) => (
                     <button key={value} className={clearFilter === value ? 'active' : ''} onClick={() => {
-                      setClearFilter(value as DungeonClearFilter);
+                      setClearFilter(value);
                       refreshDungeonLobby();
                     }}>
                       {label}
+                      <small>{count}</small>
                     </button>
                   ))}
                 </div>
@@ -319,7 +357,7 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
               <div className="filter-result-card">
                 <span>当前匹配</span>
                 <strong>{visibleDungeons.length}/{normalDungeons.length}</strong>
-                <small>副本列表按门槛等级展示</small>
+                <small>{clearFilterHint}</small>
               </div>
             </>
           ) : (
@@ -387,4 +425,3 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
     </section>
   );
 }
-

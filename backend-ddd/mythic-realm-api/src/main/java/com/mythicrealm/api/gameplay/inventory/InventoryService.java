@@ -241,7 +241,7 @@ public class InventoryService {
         return jdbcTemplate.query(
             """
             SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
-                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
+                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level, it.description
             FROM inventory_slot s
             JOIN item_instance ii ON ii.id = s.item_id
             JOIN item_template it ON it.id = ii.template_id
@@ -313,7 +313,7 @@ public class InventoryService {
         return jdbcTemplate.query(
             """
             SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
-                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
+                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level, it.description
             FROM inventory_slot s
             JOIN item_instance ii ON ii.id = s.item_id
             JOIN item_template it ON it.id = ii.template_id
@@ -329,7 +329,7 @@ public class InventoryService {
         return jdbcTemplate.query(
                 """
                 SELECT es.slot_name, ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
-                       it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
+                       it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level, it.description
                 FROM equipment_slot es
                 JOIN item_instance ii ON ii.id = es.item_id
                 JOIN item_template it ON it.id = ii.template_id
@@ -583,8 +583,14 @@ public class InventoryService {
         }
 
         if ("chest".equals(item.effectType())) {
-            ChestLoot loot = rollChestLoot(item.templateId(), new Random(System.nanoTime() + item.id()));
             consumeOne(player.id(), item.id());
+            String tieredGear = synthesisChestGear(item.templateId(), player.level());
+            if (tieredGear != null) {
+                // 传说/不朽合成宝箱：按玩家等级档（60/70/80/90）+ 随机部位发一件装备。
+                List<ItemRecord> rewards = grantItem(player.id(), tieredGear, 1, new Random(System.nanoTime() + item.id()));
+                return new UseItemResult(item.name(), "chest", rewards, staminaService.snapshot(player.id()), snapshot(playerById(player.id())));
+            }
+            ChestLoot loot = rollChestLoot(item.templateId(), new Random(System.nanoTime() + item.id()));
             List<ItemRecord> rewards = grantItem(player.id(), loot.rewardTemplateId(), loot.quantity(), new Random(System.nanoTime() + loot.rewardTemplateId().hashCode()));
             return new UseItemResult(item.name(), "chest", rewards, staminaService.snapshot(player.id()), snapshot(playerById(player.id())));
         }
@@ -764,7 +770,7 @@ public class InventoryService {
         return jdbcTemplate.query(
                 """
                 SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
-                       it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
+                       it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level, it.description
                 FROM item_instance ii
                 JOIN item_template it ON it.id = ii.template_id
                 WHERE ii.id = ?
@@ -929,7 +935,7 @@ public class InventoryService {
         List<ItemRecord> stacks = jdbcTemplate.query(
             """
             SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
-                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level
+                   it.enhance_bonus_rate, it.min_enhance_level, it.max_enhance_level, it.description
             FROM inventory_slot s
             JOIN item_instance ii ON ii.id = s.item_id
             JOIN item_template it ON it.id = ii.template_id
@@ -1002,6 +1008,28 @@ public class InventoryService {
             case "strength", "agility", "constitution", "intelligence", "spirit" -> attribute;
             default -> throw ApiException.badRequest("Unsupported attribute: " + attribute);
         };
+    }
+
+    private static final String[] SYNTHESIS_CHEST_SLOTS =
+        {"weapon", "helmet", "armor", "legs", "boots", "gloves", "necklace", "ring"};
+
+    /**
+     * The legendary/immortal synthesis chests grant one equipment piece scaled to the
+     * player's level tier (clamped to 60/70/80/90) with a random slot, instead of a
+     * fixed template. Returns the target template id, or null for ordinary chests.
+     */
+    private String synthesisChestGear(String chestTemplateId, int playerLevel) {
+        String quality;
+        if ("chest_legendary_cache".equals(chestTemplateId)) {
+            quality = "legendary";
+        } else if ("chest_immortal_cache".equals(chestTemplateId)) {
+            quality = "immortal";
+        } else {
+            return null;
+        }
+        int tier = Math.max(60, Math.min(90, (playerLevel / 10) * 10));
+        String slot = SYNTHESIS_CHEST_SLOTS[new Random(System.nanoTime() + playerLevel).nextInt(SYNTHESIS_CHEST_SLOTS.length)];
+        return "eq_bloodmoon_l" + tier + "_" + slot + "_" + quality;
     }
 
     private ChestLoot rollChestLoot(String chestTemplateId, Random random) {
@@ -1232,8 +1260,18 @@ public class InventoryService {
             processingStats.affixMp(),
             processingStats.affixCrit(),
             processingStats.sockets(),
-            processingStats.affixes()
+            processingStats.affixes(),
+            descriptionOf(rs)
         );
+    }
+
+    private String descriptionOf(java.sql.ResultSet rs) {
+        try {
+            String value = rs.getString("description");
+            return value == null ? "" : value;
+        } catch (java.sql.SQLException ignored) {
+            return "";
+        }
     }
 
     private ProcessingStats processingStats(long itemId) {

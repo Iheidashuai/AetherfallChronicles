@@ -3,6 +3,9 @@ package com.mythicrealm.api.gameplay.market;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 /** Money-path: market 8% sale tax and 3x price cap. */
@@ -36,5 +39,18 @@ class MarketPricingTest {
     void priceCapIsThreeTimesRecommended() {
         assertEquals(3000, MarketService.maxListingPrice(1000));
         assertEquals(0, MarketService.maxListingPrice(0));
+    }
+
+    @Test
+    void historicalListingsDetachFromMovedItems() {
+        assertTrue(MarketService.MARK_LISTING_SOLD_SQL.contains("item_id = NULL"));
+        assertTrue(MarketService.MARK_LISTING_CANCELED_SQL.contains("item_id = NULL"));
+    }
+
+    @Test
+    void marketItemForeignKeyAllowsConsumedSoldItems() throws IOException {
+        String schema = Files.readString(Path.of("../mythic-realm-starter/src/main/resources/db/latest_schema.sql"));
+
+        assertTrue(schema.contains("CONSTRAINT fk_market_item FOREIGN KEY (item_id) REFERENCES item_instance (id) ON DELETE SET NULL"));
     }
 }

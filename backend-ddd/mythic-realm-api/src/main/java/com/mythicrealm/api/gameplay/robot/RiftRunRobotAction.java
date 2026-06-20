@@ -37,12 +37,8 @@ public class RiftRunRobotAction implements RobotDecisionAction {
         double value = 48;
         value += Math.min(22, context.riftNextTier() * 1.6);
         value += Math.max(0, 12 - context.riftEssence() / 8.0);
-        if (context.personalityContains("副本") || context.personalityContains("战斗")) {
-            value += 8;
-        }
-        if (context.isCurrentKind("rift")) {
-            value -= 10;
-        }
+        value += 8 * context.archetype().pveBias();
+        value -= context.repeatPenalty("rift", 6.0);
         return new RobotActionScore(value, "挑战深渊 T" + context.riftNextTier() + "，冲榜并获取淬炼材料");
     }
 

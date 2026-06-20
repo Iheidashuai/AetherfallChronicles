@@ -5,6 +5,7 @@ import {
   enhanceCost,
   formatNumber,
   formatStaminaTime,
+  liveStaminaSnapshot,
   pad2,
   professionName,
   qualityName,
@@ -67,6 +68,27 @@ describe('formatters', () => {
     expect(formatStaminaTime(0)).toBe('已满');
     expect(formatStaminaTime(90)).toBe('1:30');
     expect(formatStaminaTime(3700)).toBe('1h 1m');
+  });
+
+  it('liveStaminaSnapshot refills stamina to max when the recovery window ends', () => {
+    const stamina = {
+      current: 420,
+      max: 1000,
+      secondsUntilNext: 180,
+      secondsUntilFull: 180,
+      updatedAt: '2026-06-20T00:00:00Z',
+    };
+
+    expect(liveStaminaSnapshot(stamina, 179)).toMatchObject({
+      current: 420,
+      secondsUntilNext: 1,
+      secondsUntilFull: 1,
+    });
+    expect(liveStaminaSnapshot(stamina, 180)).toMatchObject({
+      current: 1000,
+      secondsUntilNext: 0,
+      secondsUntilFull: 0,
+    });
   });
 });
 

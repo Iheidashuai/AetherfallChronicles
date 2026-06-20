@@ -26,14 +26,16 @@ public class GuildChatRobotAction implements RobotDecisionAction {
     }
 
     @Override
+    public boolean canRun(RobotDecisionContext context) {
+        return context.inGuild();
+    }
+
+    @Override
     public RobotActionScore score(RobotDecisionContext context) {
-        double value = 34 + context.random().nextDouble() * 14;
-        if (context.isCurrentKind("guild_chat")) {
-            value -= 12;
-        }
-        if (context.personalityContains("频道") || context.personalityContains("公会") || context.personalityContains("聊天")) {
-            value += 8;
-        }
+        // Kept on par with world chat (not above it) so both channels stay lively.
+        double value = 20 + context.random().nextDouble() * 8;
+        value += 8 * context.archetype().socialBias();
+        value -= context.repeatPenalty("guild_chat", 8.0);
         return new RobotActionScore(value, "维持公会频道的活跃氛围");
     }
 

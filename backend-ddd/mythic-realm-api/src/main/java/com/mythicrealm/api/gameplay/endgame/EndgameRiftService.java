@@ -87,6 +87,8 @@ public class EndgameRiftService {
         RiftProgress progress = progress(player.id());
         int bestTier = progress.bestTier();
         int nextTier = unlocked ? Math.max(1, bestTier + 1) : 0;
+        List<Integer> challengeTiers = unlocked ? challengeTiers(bestTier) : List.of();
+        int previewTier = Math.max(1, nextTier);
         return new RiftSnapshot(
             unlocked,
             unlocked ? "深渊裂隙已开启" : "需要 Lv." + UNLOCK_LEVEL + " 且通关星陨深渊·王座",
@@ -96,16 +98,17 @@ public class EndgameRiftService {
             progress.bestScore(),
             progress.bestRating(),
             bestWeekly(player.id()).tier(),
-            unlocked ? challengeTiers(bestTier) : List.of(),
+            challengeTiers,
             nextTier,
             STAMINA_COST,
-            recommendedPower(Math.max(1, nextTier)),
-            minimumPower(Math.max(1, nextTier)),
-            modifiersForTier(Math.max(1, nextTier)),
-            rewardPreview(Math.max(1, nextTier), modifiersForTier(Math.max(1, nextTier)), "A"),
+            recommendedPower(previewTier),
+            minimumPower(previewTier),
+            modifiersForTier(previewTier),
+            rewardPreview(previewTier, modifiersForTier(previewTier), "A"),
+            tierPreviews(challengeTiers),
             materials(player.id()),
             staminaService.snapshot(player.id()),
-            leaderboard(12),
+            leaderboard(player.id(), 12),
             weeklyRewardAvailable(player.id())
         );
     }
@@ -363,6 +366,21 @@ public class EndgameRiftService {
         return tiers;
     }
 
+    private List<RiftTierPreview> tierPreviews(List<Integer> tiers) {
+        return tiers.stream()
+            .map(tier -> {
+                List<RiftModifier> modifiers = modifiersForTier(tier);
+                return new RiftTierPreview(
+                    tier,
+                    recommendedPower(tier),
+                    minimumPower(tier),
+                    modifiers,
+                    rewardPreview(tier, modifiers, "A")
+                );
+            })
+            .toList();
+    }
+
     public List<RiftModifier> modifiersForTier(int tier) {
         List<RiftModifier> enabled = modifierConfigs().stream().filter(RiftModifier::enabled).toList();
         if (enabled.isEmpty()) {
@@ -603,35 +621,65 @@ public class EndgameRiftService {
         );
     }
 
-    private List<RiftLeaderboardEntry> leaderboard(int limit) {
+    private List<RiftLeaderboardEntry> leaderboard(long viewerPlayerId, int limit) {
+        Instant weekStart = weekStart();
         return jdbcTemplate.query(
             """
-            SELECT player_id, player_name, controller_type, tier, rating, score, turns_taken, created_at
-            FROM rift_run
-            WHERE success = TRUE
-            ORDER BY tier DESC, score DESC, turns_taken ASC, created_at ASC
+            SELECT
+              r.player_id,
+              COALESCE(p.name, r.player_name) AS display_name,
+              COALESCE(p.controller_type, r.controller_type) AS display_controller_type,
+              r.tier,
+              r.rating,
+              r.score,
+              r.turns_taken,
+              r.player_final_hp,
+              r.player_max_hp,
+              r.created_at
+            FROM rift_run r
+            LEFT JOIN player p ON p.id = r.player_id
+            WHERE r.success = TRUE
+              AND r.created_at >= ?
+              AND NOT EXISTS (
+                SELECT 1
+                FROM rift_run better
+                WHERE better.player_id = r.player_id
+                  AND better.success = TRUE
+                  AND better.created_at >= ?
+                  AND (
+                    better.tier > r.tier
+                    OR (better.tier = r.tier AND better.score > r.score)
+                    OR (better.tier = r.tier AND better.score = r.score AND better.player_final_hp > r.player_final_hp)
+                    OR (better.tier = r.tier AND better.score = r.score AND better.player_final_hp = r.player_final_hp AND better.turns_taken < r.turns_taken)
+                    OR (better.tier = r.tier AND better.score = r.score AND better.player_final_hp = r.player_final_hp AND better.turns_taken = r.turns_taken AND better.created_at < r.created_at)
+                    OR (better.tier = r.tier AND better.score = r.score AND better.player_final_hp = r.player_final_hp AND better.turns_taken = r.turns_taken AND better.created_at = r.created_at AND better.id < r.id)
+                  )
+              )
+            ORDER BY r.tier DESC, r.score DESC, r.player_final_hp DESC, r.turns_taken ASC, r.created_at ASC, r.id ASC
             LIMIT ?
             """,
             (rs, rowNum) -> new RiftLeaderboardEntry(
                 rowNum + 1,
                 rs.getLong("player_id"),
-                rs.getString("player_name"),
-                rs.getString("controller_type"),
+                rs.getString("display_name"),
+                rs.getString("display_controller_type"),
                 rs.getInt("tier"),
                 rs.getString("rating"),
                 rs.getInt("score"),
                 rs.getInt("turns_taken"),
-                rs.getTimestamp("created_at").toInstant().toString()
+                rs.getInt("player_final_hp"),
+                rs.getInt("player_max_hp"),
+                rs.getTimestamp("created_at").toInstant().toString(),
+                rs.getLong("player_id") == viewerPlayerId
             ),
+            Timestamp.from(weekStart),
+            Timestamp.from(weekStart),
             limit
         );
     }
 
     private WeeklyBest bestWeekly(long playerId) {
-        Instant weekStart = LocalDate.now(ZoneId.systemDefault())
-            .with(DayOfWeek.MONDAY)
-            .atStartOfDay(ZoneId.systemDefault())
-            .toInstant();
+        Instant weekStart = weekStart();
         return jdbcTemplate.query(
             """
             SELECT id, tier, score
@@ -644,6 +692,13 @@ public class EndgameRiftService {
             playerId,
             Timestamp.from(weekStart)
         ).stream().findFirst().orElse(new WeeklyBest(0, 0, 0));
+    }
+
+    private Instant weekStart() {
+        return LocalDate.now(ZoneId.systemDefault())
+            .with(DayOfWeek.MONDAY)
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant();
     }
 
     private boolean weeklyRewardAvailable(long playerId) {
@@ -686,6 +741,7 @@ public class EndgameRiftService {
         int minimumPower,
         List<RiftModifier> modifiers,
         RiftReward rewardPreview,
+        List<RiftTierPreview> tierPreviews,
         RiftMaterials materials,
         StaminaSnapshot stamina,
         List<RiftLeaderboardEntry> leaderboard,
@@ -738,13 +794,16 @@ public class EndgameRiftService {
     public record RiftReward(int essence, int shards, int orbs, double multiplier) {
     }
 
+    public record RiftTierPreview(int tier, int recommendedPower, int minimumPower, List<RiftModifier> modifiers, RiftReward rewardPreview) {
+    }
+
     public record RiftMaterials(int essence, int shards, int orbs) {
     }
 
     public record RiftProgress(int bestTier, int bestScore, String bestRating) {
     }
 
-    public record RiftLeaderboardEntry(int rank, long playerId, String playerName, String controllerType, int tier, String rating, int score, int turnsTaken, String createdAt) {
+    public record RiftLeaderboardEntry(int rank, long playerId, String playerName, String controllerType, int tier, String rating, int score, int turnsTaken, int playerFinalHp, int playerMaxHp, String createdAt, boolean self) {
     }
 
     private record WeeklyBest(long runId, int tier, int score) {

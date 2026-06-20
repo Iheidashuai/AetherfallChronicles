@@ -40,23 +40,18 @@ public class DungeonRunRobotAction implements RobotDecisionAction {
             value += 10;
         }
         if (context.stamina() != null) {
-            if (context.stamina().current() >= 180) {
-                value += 18;
-            } else if (context.stamina().current() >= 120) {
-                value += 10;
-            } else if (context.stamina().current() <= 20) {
+            double ratio = context.stamina().current() / (double) Math.max(1, context.stamina().max());
+            // Logistic urgency to spend stamina while it's plentiful; sharp drop-off when nearly empty.
+            value += 18 * RobotResponseCurves.logistic(ratio, 0.5, 8.0);
+            if (ratio <= 0.1) {
                 value -= 18;
             }
         }
         if (context.progressionDungeon() != null && context.runnableDungeon().id().equals(context.progressionDungeon().id())) {
             value += 12;
         }
-        if (context.personalityContains("副本") || context.personalityContains("挑战") || context.personalityContains("刷")) {
-            value += 8;
-        }
-        if (context.isCurrentKind("dungeon")) {
-            value -= 12;
-        }
+        value += 8 * context.archetype().pveBias();
+        value -= context.repeatPenalty("dungeon", 7.0);
         String reason = "当前可刷【" + context.runnableDungeon().name() + "】，经验和掉落收益稳定";
         return new RobotActionScore(value, reason);
     }

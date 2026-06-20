@@ -26,17 +26,18 @@ public class GuildDonateRobotAction implements RobotDecisionAction {
     }
 
     @Override
+    public boolean canRun(RobotDecisionContext context) {
+        return context.inGuild();
+    }
+
+    @Override
     public RobotActionScore score(RobotDecisionContext context) {
         // Wealthier bots are more inclined to donate; kept below boss so contribution
         // mostly comes from fighting, with donations as a steady secondary stream.
         double value = 26 + context.random().nextDouble() * 14;
         value += Math.min(16, context.actor().wealthTierLevel() * 1.2);
-        if (context.isCurrentKind("guild_donate")) {
-            value -= 12;
-        }
-        if (context.personalityContains("公会") || context.personalityContains("商会")) {
-            value += 6;
-        }
+        value += 6 * context.archetype().socialBias();
+        value -= context.repeatPenalty("guild_donate", 8.0);
         return new RobotActionScore(value, "向公会捐献金币，推动公会等级与全员增益");
     }
 

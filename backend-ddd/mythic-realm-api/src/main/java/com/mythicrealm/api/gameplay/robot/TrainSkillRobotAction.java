@@ -44,12 +44,8 @@ public class TrainSkillRobotAction implements RobotDecisionAction {
         if (option.learn()) {
             value += 8;
         }
-        if (context.personalityContains("副本") || context.personalityContains("挑战")) {
-            value += 5;
-        }
-        if (context.isCurrentKind("skill")) {
-            value -= 14;
-        }
+        value += 5 * context.archetype().growthBias();
+        value -= context.repeatPenalty("skill", 7.0);
         return new RobotActionScore(value, option.reason() + "，成本 " + option.cost() + " 金");
     }
 

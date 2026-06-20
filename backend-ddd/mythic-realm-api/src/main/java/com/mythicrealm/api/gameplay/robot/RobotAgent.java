@@ -7,6 +7,7 @@ public record RobotAgent(
     PlayerRecord player,
     String title,
     String personality,
+    RobotArchetype archetype,
     int power,
     int dungeonClears,
     int peakEnhancement,

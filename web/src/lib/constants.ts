@@ -1,6 +1,6 @@
 import type { AttributeKey, PlayableProfession } from '../types';
 
-export const STAMINA_RECOVERY_SECONDS = 600;
+export const STAMINA_RECOVERY_SECONDS = 180;
 export const ANNOUNCEMENT_SEEN_STORAGE_KEY = 'mythic.announcements.seen';
 
 export const ATTRIBUTE_LABELS: { key: AttributeKey; label: string; meaning: string }[] = [

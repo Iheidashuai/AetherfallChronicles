@@ -30,3 +30,17 @@ mythic:
     rebuild-on-start: false
   config:
     version: v2.0-combat-db-source
+
+# Robot simulation cadence. The seed population size (~400) lives in the schema;
+# these knobs tune how lively that population feels. Sized so each robot acts
+# roughly every few minutes while the world stays busy.
+mythicrealm:
+  robot:
+    robots-per-tick: 48
+    min-actions-per-tick: 28
+    extra-action-range: 13
+    world-chat-retention: 400
+    activity-log-retention: 4000
+    # 被动成长：按真实时间持续给机器人加经验/战力（离线也长），让榜单梯队不断往上爬。
+    passive-growth-interval-ms: 180000
+    passive-levels-per-hour: 0.5

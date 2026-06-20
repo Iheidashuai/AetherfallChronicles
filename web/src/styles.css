@@ -156,6 +156,10 @@ input:focus {
   margin-bottom: 14px;
 }
 
+.segmented.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .primary-action,
 .compact-action,
 .nav-button,
@@ -1595,6 +1599,18 @@ input:focus {
   color: #fff5dc;
 }
 
+.battle-brief-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.battle-brief-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-channel-strip {
   grid-template-columns: auto 1fr auto;
 }
@@ -1658,6 +1674,15 @@ input:focus {
 .clear-state.cleared {
   color: #bff5c6;
   background: rgba(121, 223, 135, 0.13);
+}
+
+.gate-state {
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #ffd1d1;
+  background: rgba(255, 123, 123, 0.1);
+  border: 1px solid rgba(255, 123, 123, 0.2);
+  font-weight: 900;
 }
 
 .drop-preview-section {
@@ -1750,6 +1775,81 @@ input:focus {
   place-items: center;
   color: #d5c17a;
   font-weight: 900;
+  font-family: inherit;
+  font-size: inherit;
+  width: 100%;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.drop-preview-card.selectable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.drop-preview-card.selectable:hover {
+  border-color: rgba(213, 193, 122, 0.5);
+  transform: translateY(-1px);
+}
+
+.detail-description {
+  color: #c9c2b5;
+  font-style: italic;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.drop-more:hover {
+  background: rgba(213, 193, 122, 0.16);
+  border-color: rgba(213, 193, 122, 0.4);
+}
+
+.drop-quick-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.drop-quick-row > span {
+  min-width: 0;
+  color: #d5c17a;
+  font-size: 12px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drop-view-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  color: #c8f7ff;
+}
+
+.dungeon-drops-modal {
+  width: min(92vw, 860px);
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: rgba(18, 20, 24, 0.98);
+  border: 1px solid rgba(213, 193, 122, 0.25);
+  border-radius: 12px;
+}
+
+.dungeon-drops-modal-grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }
 
 .speed-bar {
@@ -6518,6 +6618,36 @@ body {
   grid-template-columns: 1fr;
 }
 
+.dungeon-filter-rail .segmented.four {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dungeon-filter-rail .segmented.four button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.dungeon-filter-rail .segmented.four button small {
+  min-width: 20px;
+  border-radius: 999px;
+  padding: 1px 6px;
+  color: #11131a;
+  background: rgba(213, 193, 122, 0.85);
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.dungeon-filter-rail .segmented.four button.active small {
+  background: rgba(17, 19, 26, 0.18);
+}
+
 .dungeon-filter-rail .dungeon-mode-tabs button {
   min-height: 48px;
 }
@@ -6545,12 +6675,19 @@ body {
 .dungeon-main-panel .dungeon-list {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 .dungeon-main-panel .dungeon-card {
   align-content: start;
   gap: 10px;
+}
+
+.dungeon-main-panel .dungeon-card:not(.special) {
+  gap: 8px;
+  padding: 12px;
 }
 
 .dungeon-main-panel .dungeon-card-head {
@@ -6568,6 +6705,11 @@ body {
   overflow: hidden;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+.dungeon-main-panel .dungeon-card:not(.special) .dungeon-card-head p {
+  min-height: 0;
+  -webkit-line-clamp: 1;
 }
 
 .dungeon-main-panel .dungeon-meta {
@@ -6631,13 +6773,15 @@ body {
 
 .special-dungeon-panel {
   flex: 1;
+  min-height: 0;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   grid-template-areas:
     "hero hero"
     "tiers card"
     "stats card";
   align-items: start;
-  overflow: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .special-dungeon-panel .bloodmoon-hero {
@@ -7042,26 +7186,52 @@ body {
 
 .rift-screen {
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
 }
 
 .rift-status-strip {
-  grid-template-columns: 1.35fr repeat(4, minmax(150px, 1fr));
+  grid-template-columns: minmax(190px, 1.25fr) repeat(5, minmax(118px, 1fr));
 }
 
 .rift-workbench {
-  grid-template-columns: 300px minmax(620px, 1fr) 360px;
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(320px, 360px);
   align-items: stretch;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .rift-tier-rail,
 .rift-main-panel,
 .rift-detail-rail {
-  min-height: 620px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.rift-tier-rail,
+.rift-detail-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rift-main-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .rift-tier-list {
   display: grid;
+  flex: 1 1 0;
   gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .rift-tier-list button,
@@ -7082,6 +7252,15 @@ body {
   color: #16140e;
 }
 
+.rift-tier-list button.next:not(.active) {
+  border-color: rgba(139, 213, 225, 0.38);
+  background: rgba(139, 213, 225, 0.08);
+}
+
+.rift-tier-list button.cleared:not(.active) small {
+  color: rgba(119, 221, 151, 0.9);
+}
+
 .rift-tier-list span,
 .rift-tier-list small {
   display: block;
@@ -7091,6 +7270,9 @@ body {
 .rift-locked-panel,
 .rift-result-panel,
 .rift-weekly-card,
+.rift-progress-card,
+.rift-combat-replay,
+.rift-combatant,
 .rift-modifier-card {
   background: linear-gradient(135deg, rgba(26, 30, 33, 0.96), rgba(16, 18, 21, 0.96));
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -7112,9 +7294,55 @@ body {
 
 .rift-hero-panel p,
 .rift-locked-panel p,
-.rift-modifier-card p {
+.rift-modifier-card p,
+.rift-progress-card p,
+.rift-clash-column p {
   color: var(--muted);
   margin: 0;
+}
+
+.rift-objective-grid,
+.rift-combat-metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+.rift-progress-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.rift-progress-card > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.rift-progress-card > strong {
+  color: var(--gold);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.rift-progress-card p {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.rift-progress-bar {
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.rift-progress-bar span {
+  background: linear-gradient(90deg, #8bd5e1, #d5c17a);
+  display: block;
+  height: 100%;
 }
 
 .rift-modifier-grid {
@@ -7152,6 +7380,120 @@ body {
   grid-template-columns: repeat(4, 1fr);
 }
 
+.rift-combat-replay {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.rift-combat-replay.success {
+  border-color: rgba(119, 221, 151, 0.32);
+}
+
+.rift-combat-replay.failed {
+  border-color: rgba(238, 112, 112, 0.32);
+}
+
+.rift-replay-controls {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.rift-replay-controls button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--text);
+  display: inline-flex;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 9px;
+}
+
+.rift-replay-controls button.active {
+  background: rgba(139, 213, 225, 0.15);
+  border-color: rgba(139, 213, 225, 0.4);
+  color: #d8fbff;
+}
+
+.rift-combat-stage {
+  align-items: stretch;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(160px, 1fr) minmax(220px, 1.15fr) minmax(160px, 1fr);
+}
+
+.rift-combatant {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+}
+
+.rift-combatant > div {
+  display: grid;
+  gap: 4px;
+}
+
+.rift-combatant strong {
+  color: #fff5dc;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.rift-combatant small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.rift-combatant.enemy {
+  border-color: rgba(238, 112, 112, 0.22);
+}
+
+.rift-clash-column {
+  align-content: center;
+  background:
+    linear-gradient(90deg, rgba(139, 213, 225, 0.08), transparent 34%, transparent 66%, rgba(238, 112, 112, 0.08)),
+    rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  min-height: 146px;
+  padding: 16px;
+  text-align: center;
+}
+
+.rift-clash-column strong {
+  color: #fff5dc;
+  font-size: 20px;
+}
+
+.rift-clash-column p {
+  line-height: 1.45;
+}
+
+.rift-outcome-badge {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 5px 10px;
+}
+
+.rift-outcome-badge.success {
+  border-color: rgba(119, 221, 151, 0.42);
+  color: #bff5ca;
+}
+
+.rift-outcome-badge.failed {
+  border-color: rgba(238, 112, 112, 0.42);
+  color: #ffb8b8;
+}
+
 .rift-result-panel {
   margin-top: 14px;
   padding: 14px;
@@ -7171,6 +7513,12 @@ body {
   margin-top: 12px;
   max-height: 320px;
   overflow: auto;
+}
+
+.rift-event-log.replay {
+  margin-top: 0;
+  max-height: 260px;
+  min-height: 120px;
 }
 
 .rift-event-line {
@@ -7227,11 +7575,17 @@ body {
   font-size: 22px;
 }
 
+.rift-weekly-card small {
+  color: var(--muted);
+}
+
 .rift-leaderboard-list {
   display: grid;
   gap: 8px;
-  max-height: 490px;
+  flex: 1 1 0;
+  min-height: 0;
   overflow: auto;
+  padding-right: 4px;
 }
 
 .rift-rank-row {
@@ -7241,8 +7595,13 @@ body {
   border-radius: 8px;
   display: grid;
   gap: 12px;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   padding: 10px;
+}
+
+.rift-rank-row.self {
+  background: rgba(139, 213, 225, 0.1);
+  border-color: rgba(139, 213, 225, 0.34);
 }
 
 .rift-rank-row > strong {
@@ -7250,9 +7609,20 @@ body {
   font-size: 20px;
 }
 
+.rift-rank-row b {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-size: 11px;
+  padding: 5px 8px;
+}
+
 .rift-rank-row span,
 .rift-rank-row small {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rift-rank-row small {
@@ -7279,6 +7649,44 @@ body {
 
 .forge-refine-focus {
   margin: 0 0 12px;
+}
+
+@media (max-width: 1100px) {
+  .rift-screen {
+    overflow: auto;
+  }
+
+  .rift-status-strip,
+  .rift-workbench,
+  .rift-hero-panel,
+  .rift-combat-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .rift-tier-rail,
+  .rift-main-panel,
+  .rift-detail-rail {
+    overflow: visible;
+  }
+
+  .rift-tier-list,
+  .rift-leaderboard-list,
+  .rift-event-log,
+  .rift-main-panel {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .rift-objective-grid,
+  .rift-reward-preview,
+  .rift-combat-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rift-replay-controls {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
 }
 
 .builds-screen {

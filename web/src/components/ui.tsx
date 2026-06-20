@@ -1,4 +1,5 @@
 import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CSSProperties, ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -150,7 +151,7 @@ import {
   screenForQuestTarget, selectedStoneBonus, selectedStoneCount, shopCategoryName, 
   shopOfferRewardText, shopPurchaseNotice, skillCategoryName, skillTriggerName, 
   skillValueLabel, slotName, socketBlockReason, socketSlotsFor, sortItems, statName, 
-  statusName, strategyName, targetEquipSlot, toEquipmentDetail, toggleTalent, triggerName, 
+  statusName, strategyName, targetEquipSlot, toEquipmentDetail, dropToEquipmentDetail, toggleTalent, triggerName,
   typeName, uniqueDropTypes, updateDraftSkill, withinRange, writeSeenAnnouncementKeys
 } from '../lib/helpers';
 
@@ -1095,6 +1096,9 @@ export function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sw
   const canSweepWithStamina = !stamina || stamina.current >= 10;
   const previewDrops = drops.slice(0, specialDungeon ? 5 : 3);
   const hiddenDropCount = Math.max(0, drops.length - previewDrops.length);
+  const normalDropLabel = drops.length > 0 ? `${drops.length} 件可掉落` : '暂无掉落';
+  const [showDrops, setShowDrops] = useState(false);
+  const [detailDrop, setDetailDrop] = useState<DropPreview | null>(null);
   return (
     <article className={`dungeon-card ${risk.level} ${specialDungeon ? 'special' : ''} ${eligible ? '' : 'locked'}`}>
       <div className="dungeon-card-head">
@@ -1108,27 +1112,42 @@ export function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sw
       <div className="dungeon-meta">
         <span>门槛 {formatNumber(dungeon.minimumPower)}</span>
         <span>推荐 {formatNumber(dungeon.recommendedPower)}</span>
-        <span>Boss {bossArchetypeName(dungeon.bossArchetype)}</span>
-        <span>预计 {dungeon.expectedRounds} 回合</span>
+        {specialDungeon && <span>Boss {bossArchetypeName(dungeon.bossArchetype)}</span>}
+        {specialDungeon && <span>预计 {dungeon.expectedRounds} 回合</span>}
         <span className={dungeon.cleared ? 'clear-state cleared' : 'clear-state'}>{dungeon.cleared ? '已通过' : '未通过'}</span>
-        <strong>{specialDungeon ? `${qualityName(highestQuality)}上限 · ${formatDropRate(highDropChance)}` : `${drops.length} 件可掉落`}</strong>
+        {!eligible && !specialDungeon && <span className="gate-state">{dungeon.gate.label}</span>}
+        {specialDungeon && <strong>{qualityName(highestQuality)}上限 · {formatDropRate(highDropChance)}</strong>}
       </div>
-      {!eligible && <p className="gate-warning">{dungeon.gate.label}</p>}
+      {specialDungeon && !eligible && <p className="gate-warning">{dungeon.gate.label}</p>}
       {stamina && stamina.current <= 0 && <p className="gate-warning">疲劳不足，可在背包使用疲劳药水。</p>}
-      <div className="drop-preview-section">
-        <span>当前副本可掉落</span>
-        {dropTypes.length > 0 && (
-          <div className="drop-slot-row">
-            {dropTypes.map((type) => <small key={type}>{typeName(type)}</small>)}
+      {specialDungeon ? (
+        <div className="drop-preview-section">
+          <span>当前副本可掉落</span>
+          {dropTypes.length > 0 && (
+            <div className="drop-slot-row">
+              {dropTypes.map((type) => <small key={type}>{typeName(type)}</small>)}
+            </div>
+          )}
+          <div className="drop-preview-grid">
+            {previewDrops.map((drop) => (
+              <DropPreviewCard key={drop.templateId} drop={drop} onSelect={() => setDetailDrop(drop)} />
+            ))}
+            {hiddenDropCount > 0 && (
+              <button type="button" className="drop-more" onClick={() => setShowDrops(true)} title="查看全部掉落">
+                +{hiddenDropCount}
+              </button>
+            )}
           </div>
-        )}
-        <div className="drop-preview-grid">
-          {previewDrops.map((drop) => (
-            <DropPreviewCard key={drop.templateId} drop={drop} />
-          ))}
-          {hiddenDropCount > 0 && <div className="drop-more">+{hiddenDropCount}</div>}
         </div>
-      </div>
+      ) : (
+        <div className="drop-quick-row">
+          <span>{normalDropLabel}</span>
+          <button type="button" className="text-button drop-view-button" disabled={drops.length === 0} onClick={() => setShowDrops(true)}>
+            <Package size={16} />
+            查看掉落
+          </button>
+        </div>
+      )}
       <div className="dungeon-action-row">
         <button className="compact-action" disabled={loading || !eligible || !canRunWithStamina} onClick={onRun}>
           {loading ? '战斗中' : !canRunWithStamina ? '疲劳不足' : eligible ? specialDungeon ? '挑战裂隙' : '进入' : '未达标'}
@@ -1141,14 +1160,65 @@ export function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sw
           </button>
         )}
       </div>
+      {showDrops && createPortal(
+        <DungeonDropsModal dungeon={dungeon} special={specialDungeon} onClose={() => setShowDrops(false)} />,
+        document.body
+      )}
+      {detailDrop && createPortal(
+        <ItemDetail item={dropToEquipmentDetail(detailDrop)} onClose={() => setDetailDrop(null)} />,
+        document.body
+      )}
     </article>
   );
 }
 
-export function DropPreviewCard({ drop }: { drop: DropPreview }) {
+export function DungeonDropsModal({ dungeon, special = false, onClose }: {
+  dungeon: Dungeon;
+  special?: boolean;
+  onClose: () => void;
+}) {
+  const drops = [...(dungeon.drops ?? [])].sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality) || b.dropRate - a.dropRate);
+  const dropTypes = uniqueDropTypes(drops);
+  const specialDungeon = special || isSpecialDungeon(dungeon);
+  const [detailDrop, setDetailDrop] = useState<DropPreview | null>(null);
+  return (
+    <div className="detail-backdrop result-modal-backdrop" onClick={onClose}>
+      <section className="dungeon-drops-modal" onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
+        <div className="result-modal-head">
+          <div>
+            <span className="eyebrow">{specialDungeon ? '特殊副本' : dungeon.difficulty} · 门槛 Lv.{dungeon.minimumLevel}</span>
+            <h2>{dungeon.name} · 掉落详情</h2>
+            <p>共 {drops.length} 件可掉落 · 推荐战力 {formatNumber(dungeon.recommendedPower)}{specialDungeon ? ' · 评分越高碎片与爆装越多' : ''}</p>
+          </div>
+          <button className="text-button close-button" onClick={onClose}>关闭</button>
+        </div>
+        {dropTypes.length > 0 && (
+          <div className="drop-slot-row">
+            {dropTypes.map((type) => <small key={type}>{typeName(type)}</small>)}
+          </div>
+        )}
+        <div className="drop-preview-grid dungeon-drops-modal-grid">
+          {drops.map((drop) => (
+            <DropPreviewCard key={drop.templateId} drop={drop} onSelect={() => setDetailDrop(drop)} />
+          ))}
+        </div>
+      </section>
+      {detailDrop && createPortal(
+        <ItemDetail item={dropToEquipmentDetail(detailDrop)} onClose={() => setDetailDrop(null)} />,
+        document.body
+      )}
+    </div>
+  );
+}
+
+export function DropPreviewCard({ drop, onSelect }: { drop: DropPreview; onSelect?: () => void }) {
   const chance = formatDropRate(drop.dropRate);
   return (
-    <div className={`drop-preview-card ${drop.quality}`}>
+    <div
+      className={`drop-preview-card ${drop.quality}${onSelect ? ' selectable' : ''}`}
+      onClick={onSelect}
+      role={onSelect ? 'button' : undefined}
+    >
       <div>
         <Gem size={16} />
         <span>{qualityName(drop.quality)} · {typeName(drop.itemType)} · Lv.{drop.requiredLevel}</span>
@@ -1548,6 +1618,7 @@ export function ItemDetail({ item, onClose }: { item: EquipmentDetailData; onClo
           <EnhancementBadge level={item.enhancementLevel} />
         </div>
         <h2 className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</h2>
+        {item.description && <p className="detail-description">{item.description}</p>}
         <p>{itemEffectText(item)}</p>
         <div className="detail-stat-grid">
           <Metric label="攻击" value={formatNumber(item.attackBonus)} />
@@ -2170,7 +2241,7 @@ export function StaminaPanel({ stamina, compact = false }: { stamina?: HomeSnaps
       <div className="progress-bar stamina-bar" aria-label="疲劳值">
         <span style={{ width: `${percent}%` }} />
       </div>
-      <small>{liveStamina.current >= liveStamina.max ? '已满' : `下次恢复 ${formatStaminaTime(liveStamina.secondsUntilNext)} · 回满 ${formatStaminaTime(liveStamina.secondsUntilFull)}`}</small>
+      <small>{liveStamina.current >= liveStamina.max ? '已满' : `回满 ${formatStaminaTime(liveStamina.secondsUntilFull)}`}</small>
     </div>
   );
 }
@@ -2310,5 +2381,3 @@ export async function invalidateGameQueries(queryClient: ReturnType<typeof useQu
     queryClient.invalidateQueries({ queryKey: ['recharge-dashboard', token] }),
   ]);
 }
-
-

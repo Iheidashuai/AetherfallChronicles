@@ -16,15 +16,18 @@ public class RobotActivityLogService {
     private final JdbcTemplate jdbcTemplate;
     private final RobotEquipmentService robotEquipmentService;
     private final InventoryService inventoryService;
+    private final RobotSimulationProperties properties;
 
     public RobotActivityLogService(
         JdbcTemplate jdbcTemplate,
         RobotEquipmentService robotEquipmentService,
-        InventoryService inventoryService
+        InventoryService inventoryService,
+        RobotSimulationProperties properties
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.robotEquipmentService = robotEquipmentService;
         this.inventoryService = inventoryService;
+        this.properties = properties;
     }
 
     @Transactional
@@ -60,7 +63,8 @@ public class RobotActivityLogService {
             normalizedText
         );
         jdbcTemplate.update(
-            "DELETE FROM robot_activity_log WHERE id NOT IN (SELECT id FROM (SELECT id FROM robot_activity_log ORDER BY created_at DESC, id DESC LIMIT 2400) recent)"
+            "DELETE FROM robot_activity_log WHERE id NOT IN (SELECT id FROM (SELECT id FROM robot_activity_log ORDER BY created_at DESC, id DESC LIMIT ?) recent)",
+            properties.getActivityLogRetention()
         );
     }
 

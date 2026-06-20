@@ -6,6 +6,7 @@ import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
 import com.mythicrealm.api.gameplay.quest.QuestService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService;
+import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -24,6 +25,7 @@ public class RobotBrainService {
     private final StaminaService staminaService;
     private final QuestService questService;
     private final EndgameRiftService endgameRiftService;
+    private final RobotMemoryService memoryService;
 
     @Autowired
     public RobotBrainService(
@@ -33,9 +35,10 @@ public class RobotBrainService {
         RobotEquipmentService robotEquipmentService,
         RobotActionSupport actionSupport,
         StaminaService staminaService,
-        QuestService questService
+        QuestService questService,
+        RobotMemoryService memoryService
     ) {
-        this(actions, jdbcTemplate, gameConfigService, robotEquipmentService, actionSupport, staminaService, questService, null);
+        this(actions, jdbcTemplate, gameConfigService, robotEquipmentService, actionSupport, staminaService, questService, null, memoryService);
     }
 
     public RobotBrainService(
@@ -46,7 +49,8 @@ public class RobotBrainService {
         RobotActionSupport actionSupport,
         StaminaService staminaService,
         QuestService questService,
-        EndgameRiftService endgameRiftService
+        EndgameRiftService endgameRiftService,
+        RobotMemoryService memoryService
     ) {
         this.actions = actions.stream()
             .sorted(Comparator.comparingInt(RobotDecisionAction::priority).reversed())
@@ -58,6 +62,7 @@ public class RobotBrainService {
         this.staminaService = staminaService;
         this.questService = questService;
         this.endgameRiftService = endgameRiftService;
+        this.memoryService = memoryService == null ? new RobotMemoryService() : memoryService;
     }
 
     public RobotActionResult thinkAndAct(RobotAgent actor, RobotAgent target) {
@@ -65,22 +70,67 @@ public class RobotBrainService {
         RobotDecisionContext context = createContext(actor, target, random);
         List<ScoredAction> candidates = actions.stream()
             .filter(action -> action.canRun(context))
-            .map(action -> {
-                RobotActionScore score = action.score(context);
-                return new ScoredAction(action, score, score.value() + random.nextDouble() * 6.0);
-            })
+            .map(action -> new ScoredAction(action, action.score(context)))
             .filter(candidate -> candidate.score().value() > 0)
-            .sorted(Comparator
-                .comparingDouble(ScoredAction::finalScore)
-                .thenComparing(candidate -> candidate.action().priority())
-                .reversed())
             .toList();
 
         if (candidates.isEmpty()) {
-            return actionSupport.rest(actor, "在公会大厅整理背包和下一步路线。", "没有可执行候选动作");
+            RobotActionResult fallback = actionSupport.rest(actor, "在公会大厅整理背包和下一步路线。", "没有可执行候选动作");
+            memoryService.recordKind(actor.id(), fallback.kind());
+            return fallback;
         }
-        ScoredAction selected = candidates.getFirst();
-        return selected.action().execute(context, selected.score());
+        ScoredAction selected = sampleSoftmax(candidates, temperature(actor), random);
+        RobotActionResult result = selected.action().execute(context, selected.score());
+        memoryService.recordKind(actor.id(), result.kind());
+        return result;
+    }
+
+    /**
+     * Weighted-random (softmax) action selection instead of argmax. The highest
+     * utility action is still most likely, but lower-utility actions keep a non-zero
+     * chance — robots "satisfice" like people rather than always grabbing the single
+     * optimal action (which made them predictable and starved low-value actions).
+     * Temperature is the human-vs-expert dial: higher = more varied.
+     */
+    private ScoredAction sampleSoftmax(List<ScoredAction> candidates, double temperature, Random random) {
+        double t = Math.max(1.0, temperature);
+        double max = candidates.stream().mapToDouble(c -> c.score().value()).max().orElse(0.0);
+        double[] weights = new double[candidates.size()];
+        double total = 0.0;
+        for (int i = 0; i < candidates.size(); i++) {
+            double w = Math.exp((candidates.get(i).score().value() - max) / t);
+            weights[i] = w;
+            total += w;
+        }
+        double roll = random.nextDouble() * total;
+        double cumulative = 0.0;
+        for (int i = 0; i < candidates.size(); i++) {
+            cumulative += weights[i];
+            if (roll <= cumulative) {
+                return candidates.get(i);
+            }
+        }
+        return candidates.getLast();
+    }
+
+    /**
+     * Selection temperature for this robot: base comes from its personality
+     * archetype, then we nudge it up at night so off-peak behaviour feels looser /
+     * more idle, the way a real population does.
+     */
+    private double temperature(RobotAgent actor) {
+        RobotArchetype archetype = actor.archetype() == null ? RobotArchetype.CASUAL : actor.archetype();
+        double base = archetype.temperature();
+        int hour = LocalTime.now().getHour();
+        double timeFactor;
+        if (hour >= 1 && hour < 7) {
+            timeFactor = 1.25; // deep night: sparse, meandering
+        } else if (hour >= 19 && hour < 24) {
+            timeFactor = 0.95; // prime time: a touch more purposeful
+        } else {
+            timeFactor = 1.0;
+        }
+        return Math.min(16.0, base * timeFactor);
     }
 
     private RobotDecisionContext createContext(RobotAgent actor, RobotAgent target, Random random) {
@@ -132,8 +182,19 @@ public class RobotBrainService {
             activeBuildName(playerId),
             activeBuildPresetId(playerId),
             recommendedBuildPresetId(actor, riftNextTier),
+            memoryService.recentKindCounts(playerId),
+            inGuild(playerId),
             random
         );
+    }
+
+    private boolean inGuild(long playerId) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM guild_member WHERE player_id = ?",
+            Integer.class,
+            playerId
+        );
+        return count != null && count > 0;
     }
 
     private DungeonConfig chooseRunnableDungeon(RobotAgent actor, Random random) {
@@ -325,6 +386,6 @@ public class RobotBrainService {
         ).stream().findFirst().orElse(null);
     }
 
-    private record ScoredAction(RobotDecisionAction action, RobotActionScore score, double finalScore) {
+    private record ScoredAction(RobotDecisionAction action, RobotActionScore score) {
     }
 }

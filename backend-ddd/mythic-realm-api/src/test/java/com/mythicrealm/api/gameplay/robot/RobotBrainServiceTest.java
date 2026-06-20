@@ -60,7 +60,7 @@ class RobotBrainServiceTest {
             10,
             0,
             0,
-            new StaminaSnapshot(0, 200, 600, 120000, Instant.EPOCH),
+            new StaminaSnapshot(0, 1000, 180, 180, Instant.EPOCH),
             0,
             null,
             0,
@@ -73,6 +73,45 @@ class RobotBrainServiceTest {
         );
 
         assertThat(action.canRun(context)).isFalse();
+    }
+
+    @Test
+    void softmaxKeepsLowerUtilityActionsAliveButFavoursTheBest() {
+        RobotBrainService brain = brainWith(
+            List.of(),
+            new SimpleAction("high", 60),
+            new SimpleAction("low", 40)
+        );
+
+        int high = 0;
+        int low = 0;
+        for (int i = 0; i < 600; i++) {
+            String kind = brain.thinkAndAct(agent(1, 6, 1500, 10_000), agent(2, 6, 1500, 10_000)).kind();
+            if ("high".equals(kind)) {
+                high++;
+            } else if ("low".equals(kind)) {
+                low++;
+            }
+        }
+
+        // The best action dominates (unlike pure random) but the lower one is never
+        // starved to zero (unlike pure argmax) — that's the "satisficing" sweet spot.
+        assertThat(high).isGreaterThan(low);
+        assertThat(low).isGreaterThan(0);
+    }
+
+    @Test
+    void memoryServiceTracksRecentKindsAndChatLines() {
+        RobotMemoryService memory = new RobotMemoryService();
+        memory.recordKind(7, "dungeon");
+        memory.recordKind(7, "dungeon");
+        memory.recordKind(7, "market_buy");
+
+        assertThat(memory.recentKindCounts(7)).containsEntry("dungeon", 2).containsEntry("market_buy", 1);
+
+        memory.recordChat(7, "刷本组队吗？");
+        assertThat(memory.recentlySaid(7, "刷本组队吗？")).isTrue();
+        assertThat(memory.recentlySaid(7, "没说过的话")).isFalse();
     }
 
     private RobotBrainService brainWith(List<DungeonConfig> dungeons, RobotDecisionAction... actions) {
@@ -91,19 +130,24 @@ class RobotBrainServiceTest {
         RobotActionSupport support = mock(RobotActionSupport.class);
         when(support.rest(any(), any(), any())).thenReturn(RobotActionResult.success("rest", "rest"));
         StaminaService staminaService = mock(StaminaService.class);
-        when(staminaService.snapshot(anyLong())).thenReturn(new StaminaSnapshot(200, 200, 0, 0, Instant.EPOCH));
+        when(staminaService.snapshot(anyLong())).thenReturn(new StaminaSnapshot(1000, 1000, 0, 0, Instant.EPOCH));
         QuestService questService = mock(QuestService.class);
         when(questService.claimableCount(anyLong())).thenReturn(0);
         when(questService.firstClaimableQuestId(anyLong())).thenReturn(null);
 
-        return new RobotBrainService(List.of(actions), jdbcTemplate, gameConfigService, equipmentService, support, staminaService, questService);
+        return new RobotBrainService(List.of(actions), jdbcTemplate, gameConfigService, equipmentService, support, staminaService, questService, new RobotMemoryService());
     }
 
     private RobotAgent agent(long id, int level, int power, long gold) {
+        return agent(id, level, power, gold, RobotArchetype.CASUAL);
+    }
+
+    private RobotAgent agent(long id, int level, int power, long gold, RobotArchetype archetype) {
         return new RobotAgent(
             new PlayerRecord(id, id, "bot-" + id, "warrior", level, 0, gold, 0, 0, "common", 10, 8, 10, 4, 6, 0),
             "title",
             "dungeon progression",
+            archetype,
             power,
             0,
             0,
@@ -143,6 +187,36 @@ class RobotBrainServiceTest {
         @Override
         public RobotActionResult execute(RobotDecisionContext context, RobotActionScore score) {
             return RobotActionResult.success("dungeon", context.runnableDungeon().id());
+        }
+    }
+
+    private static class SimpleAction implements RobotDecisionAction {
+        private final String kind;
+        private final double value;
+
+        SimpleAction(String kind, double value) {
+            this.kind = kind;
+            this.value = value;
+        }
+
+        @Override
+        public String key() {
+            return kind;
+        }
+
+        @Override
+        public int priority() {
+            return 50;
+        }
+
+        @Override
+        public RobotActionScore score(RobotDecisionContext context) {
+            return new RobotActionScore(value, kind);
+        }
+
+        @Override
+        public RobotActionResult execute(RobotDecisionContext context, RobotActionScore score) {
+            return RobotActionResult.success(kind, kind);
         }
     }
 

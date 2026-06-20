@@ -27,17 +27,19 @@ public class GuildBossRobotAction implements RobotDecisionAction {
     }
 
     @Override
+    public boolean canRun(RobotDecisionContext context) {
+        // Only guild members can chip the boss; without this the action used to "win",
+        // execute, then fall back to rest — a wasted tick.
+        return context.inGuild();
+    }
+
+    @Override
     public RobotActionScore score(RobotDecisionContext context) {
-        // Tentpole: scored in the top tier (near quest-claim ~82) so bots regularly chip
-        // the shared boss — that visible bar movement from guildmates is the "alive world"
-        // payoff. Tunable; a later balance pass can dial this down with the rubber-band.
-        double value = 60 + context.random().nextDouble() * 22;
-        if (context.isCurrentKind("guild_boss")) {
-            value -= 15;
-        }
-        if (context.personalityContains("副本") || context.personalityContains("公会") || context.personalityContains("推进")) {
-            value += 8;
-        }
+        // Sits in the same band as dungeon/rift so guildmates regularly move the shared
+        // boss bar (the "alive world" payoff) without crowding out everything else.
+        double value = 46 + context.random().nextDouble() * 10;
+        value += 8 * context.archetype().pveBias();
+        value -= context.repeatPenalty("guild_boss", 8.0);
         return new RobotActionScore(value, "为公会 Boss 贡献伤害，冲公会榜");
     }
 

@@ -23,7 +23,7 @@ public class UseInventoryItemRobotAction implements RobotDecisionAction {
     @Override
     public boolean canRun(RobotDecisionContext context) {
         boolean lowStaminaPotion = context.stamina() != null
-            && context.stamina().current() < 160
+            && context.stamina().current() < Math.max(1, context.stamina().max()) * 0.8
             && context.staminaPotionCount() > 0;
         return lowStaminaPotion
             || context.attributePotionCount() > 0
@@ -42,7 +42,7 @@ public class UseInventoryItemRobotAction implements RobotDecisionAction {
             int missing = Math.max(0, context.stamina().max() - context.stamina().current());
             if (context.stamina().current() == 0) {
                 value += 46;
-            } else if (context.stamina().current() <= 30) {
+            } else if (context.stamina().current() <= Math.max(1, context.stamina().max()) * 0.15) {
                 value += 32;
             } else {
                 value += Math.min(18, missing / 10.0);

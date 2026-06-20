@@ -37,12 +37,8 @@ public class ArenaChallengeRobotAction implements RobotDecisionAction {
             return RobotActionScore.zero("等级或战力还不足以进入竞技场");
         }
         double value = 24 + Math.min(18, context.actor().power() / 6000.0);
-        if (context.personalityContains("战斗") || context.personalityContains("排行") || context.personalityContains("竞技")) {
-            value += 10;
-        }
-        if (context.isCurrentKind("arena")) {
-            value -= 18;
-        }
+        value += 10 * context.archetype().pveBias();
+        value -= context.repeatPenalty("arena", 9.0);
         return new RobotActionScore(value, "进入竞技场异步挑战，争取竞技币和排名");
     }
 

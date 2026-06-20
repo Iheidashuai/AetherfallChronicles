@@ -10,8 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StaminaService {
-    public static final int MAX_STAMINA = 200;
-    public static final int RECOVERY_SECONDS = 600;
+    public static final int MAX_STAMINA = 1000;
+    public static final int RECOVERY_SECONDS = 180;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -78,13 +78,9 @@ public class StaminaService {
         RawStamina raw = rows.getFirst();
         Instant now = Instant.now();
         long elapsedSeconds = Math.max(0, Duration.between(raw.updatedAt(), now).getSeconds());
-        long recoverySteps = elapsedSeconds / RECOVERY_SECONDS;
-        if (raw.current() < MAX_STAMINA && recoverySteps > 0) {
-            int recovered = (int) Math.min(recoverySteps, MAX_STAMINA - raw.current());
-            int next = raw.current() + recovered;
-            Instant nextUpdatedAt = next >= MAX_STAMINA
-                ? now
-                : raw.updatedAt().plusSeconds(recoverySteps * RECOVERY_SECONDS);
+        if (raw.current() < MAX_STAMINA && elapsedSeconds >= RECOVERY_SECONDS) {
+            int next = MAX_STAMINA;
+            Instant nextUpdatedAt = now;
             jdbcTemplate.update(
                 "UPDATE player SET stamina_current = ?, stamina_updated_at = ? WHERE id = ?",
                 next,
@@ -105,10 +101,8 @@ public class StaminaService {
         }
         Instant now = Instant.now();
         long elapsedSeconds = Math.max(0, Duration.between(updatedAt, now).getSeconds());
-        int secondsUntilNext = (int) Math.max(0, RECOVERY_SECONDS - (elapsedSeconds % RECOVERY_SECONDS));
-        int missing = Math.max(0, MAX_STAMINA - current);
-        long secondsUntilFull = secondsUntilNext + (long) Math.max(0, missing - 1) * RECOVERY_SECONDS;
-        return new StaminaSnapshot(current, MAX_STAMINA, secondsUntilNext, secondsUntilFull, updatedAt);
+        int secondsUntilFull = (int) Math.max(0, RECOVERY_SECONDS - elapsedSeconds);
+        return new StaminaSnapshot(current, MAX_STAMINA, secondsUntilFull, secondsUntilFull, updatedAt);
     }
 
     private record RawStamina(int current, Instant updatedAt) {

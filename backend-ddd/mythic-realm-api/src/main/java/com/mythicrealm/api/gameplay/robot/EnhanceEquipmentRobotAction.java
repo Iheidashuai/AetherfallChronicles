@@ -36,17 +36,14 @@ public class EnhanceEquipmentRobotAction implements RobotDecisionAction {
         }
 
         double value = 34;
-        value += Math.min(24, context.powerGapToProgression() / 180.0);
+        // Quadratic: closing a big power gap is what really drives an enhancement push.
+        value += 24 * RobotResponseCurves.quadratic(context.powerGapToProgression(), 0, 4500);
         value += Math.max(0, 10 - opportunity.currentLevel()) * 2.0;
         value += Math.min(14, context.actor().wealthTierLevel() * 0.8);
         value += opportunity.affordableNow() ? 8 : 4;
         value += Math.min(12, context.usableEnhancementStoneCount() * 4.0);
-        if (context.personalityContains("强化")) {
-            value += 10;
-        }
-        if (context.isCurrentKind("enhance")) {
-            value -= 14;
-        }
+        value += 10 * context.archetype().growthBias();
+        value -= context.repeatPenalty("enhance", 7.0);
         String reason = "强化" + opportunity.slotName() + "【" + opportunity.itemName() + "】到 +" + opportunity.nextLevel()
             + "，成本 " + opportunity.cost() + " 金，可补足下一阶段战力";
         return new RobotActionScore(value, reason);

@@ -14,13 +14,23 @@
 RobotActivityService.simulateTick   @Scheduled(initialDelay=6s, fixedDelay=15s)
   └─ 仅在有真人玩家时运行
   └─ 每 tick 采样 24 个机器人（ROBOTS_PER_TICK）
-  └─ 其中 14~20 个执行动作（MIN_ACTIONS_PER_TICK=14 + nextInt(7)）
+  └─ 行动人数 = (14 + nextInt(7)) × activityFactor(当前时段)  ← 晚高峰多/深夜少
        └─ RobotBrainService.thinkAndAct(robot)
-            ├─ 构建 RobotDecisionContext（感知玩家 / 自身 / 市场 / 副本状态）
-            ├─ 每个 canRun 的 RobotDecisionAction 调 score()（+ 随机抖动 ×6）
-            ├─ 过滤 score>0，按最终分排序、再按 priority
-            └─ 执行最高分动作；无候选则 RestRobotAction 兜底
+            ├─ 构建 RobotDecisionContext（感知玩家 / 自身 / 市场 / 副本 / 近期行为 / 公会）
+            ├─ 每个 canRun 的 RobotDecisionAction 调 score()
+            ├─ 过滤 score>0
+            ├─ softmax 加权随机抽样（温度由 archetype + 时段决定）← 不再是 argmax
+            └─ 执行抽中的动作；无候选则 RestRobotAction 兜底
 ```
+
+> **决策"像人"的关键机制（2026-06 重构）**：
+> - **softmax 选择**取代 argmax：最高分动作仍最可能，但低分动作有非零概率，机器人"满意即可"而非永远最优，低价值动作不再被饿死。
+> - **温度**（`temperature`）是人味旋钮，基于 `RobotArchetype`，深夜更高（更随性）。
+> - **结构化性格** `RobotArchetype`（`personality_archetype` 列）给每个机器人 pve/market/social/growth 倾向权重，乘到各动作性格加分上，取代旧的"关键词子串 + 固定分"。
+> - **多步记忆** `RobotMemoryService`：近期动作环形缓冲 + `repeatPenalty` 递减惩罚，取代只看上一步的 `isCurrentKind`，消除 A→B→A→B 机械循环；聊天据此去重。
+> - **响应曲线** `RobotResponseCurves`：体力用 logistic、战力差用 quadratic，取代线性 clamp。
+> - **作息**：`activityFactor` 按时段调节行动人数，营造在场人数起伏。
+> - `priority()` 仅排序、不参与打分——调它不改变行为。
 
 - **机器人数量**：种子数据 **200** 个（旧 spec 说 200-300）。
 - **节奏是现实时间 15 秒一 tick**，无"游戏日"概念，无离线追算。
@@ -47,7 +57,12 @@ RobotActivityService.simulateTick   @Scheduled(initialDelay=6s, fixedDelay=15s)
 
 ## 性格
 
-机器人带 `personality` 字段（影响聊天风格）与 `title`。性格类型沿用旧设计的语义（friendly / showoff / casual / hardcore / newbie / merchant 等），用于聊天模板选择（见 [通告系统](07-announcement-system.md) 的机器人反应）。
+机器人有两层性格：
+
+- `personality`（中文描述句）+ `title`：用于聊天/展示风格。
+- `personality_archetype`（结构化枚举 `RobotArchetype`：HARDCORE / SHOWOFF / MERCHANT / SOCIAL / CASUAL / NEWBIE）：每种带 pve/market/social/growth 倾向权重与选择温度，**直接参与打分**，决定该机器人偏好哪类动作、行为多随性。种子按真实占比分布（多数 casual/newbie，少量 merchant/social/showoff，高等级偏 hardcore），并与等级/财富梯度一起初始化，让 200 个机器人开局即有差异、榜单可信。
+
+> 旧文档提到的 friendly/showoff/... 语义现已落地为上面的 `RobotArchetype`；`personality` 自由文本仍保留用于聊天。
 
 ## 与旧 iOS spec 的差异（已修正）
 

@@ -33,6 +33,10 @@ public class MarketService {
     private static final int LISTING_PAGE_LIMIT = 1200;
     private static final int PRICE_CAP_MULTIPLIER = 3;
     private static final int MARKET_TAX_RATE = 8;
+    static final String MARK_LISTING_SOLD_SQL =
+        "UPDATE market_listing SET status = 'sold', item_id = NULL, buyer_player_id = ?, sold_at = CURRENT_TIMESTAMP WHERE id = ?";
+    static final String MARK_LISTING_CANCELED_SQL =
+        "UPDATE market_listing SET status = 'canceled', item_id = NULL WHERE id = ?";
 
     /** Gold the seller receives after the market tax, floored at 1. Pure for unit testing. */
     static int netSellerProceeds(int price) {
@@ -202,7 +206,7 @@ public class MarketService {
             createItemFromSnapshot(buyer.id(), row.item());
         }
         jdbcTemplate.update(
-            "UPDATE market_listing SET status = 'sold', buyer_player_id = ?, sold_at = CURRENT_TIMESTAMP WHERE id = ?",
+            MARK_LISTING_SOLD_SQL,
             buyer.id(),
             listingId
         );
@@ -226,7 +230,7 @@ public class MarketService {
         } else {
             createItemFromSnapshot(player.id(), row.item());
         }
-        jdbcTemplate.update("UPDATE market_listing SET status = 'canceled' WHERE id = ?", listingId);
+        jdbcTemplate.update(MARK_LISTING_CANCELED_SQL, listingId);
     }
 
     private List<MarketListingView> activeListings() {
@@ -638,7 +642,7 @@ public class MarketService {
             }
         }
         jdbcTemplate.update(
-            "UPDATE market_listing SET status = 'sold', buyer_player_id = ?, sold_at = CURRENT_TIMESTAMP WHERE id = ?",
+            MARK_LISTING_SOLD_SQL,
             buyer.id(),
             listing.id()
         );
