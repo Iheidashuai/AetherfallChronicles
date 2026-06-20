@@ -1,14 +1,19 @@
 package com.mythicrealm.api.gameplay.leaderboard;
 
 import com.mythicrealm.api.gameplay.combat.CombatStats;
+import com.mythicrealm.api.gameplay.combat.CombatPowerService;
 import com.mythicrealm.api.gameplay.combat.CombatStatsService;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.inventory.ItemRecord;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.robot.RobotEquipmentService;
+import com.mythicrealm.api.gameplay.skill.SkillService;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,60 +25,41 @@ public class LeaderboardService {
     private final InventoryService inventoryService;
     private final RobotEquipmentService robotEquipmentService;
     private final CombatStatsService combatStatsService;
+    private final CombatPowerService combatPowerService;
+    private final SkillService skillService;
 
     public LeaderboardService(
         JdbcTemplate jdbcTemplate,
         InventoryService inventoryService,
         RobotEquipmentService robotEquipmentService,
-        CombatStatsService combatStatsService
+        CombatStatsService combatStatsService,
+        CombatPowerService combatPowerService,
+        SkillService skillService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.inventoryService = inventoryService;
         this.robotEquipmentService = robotEquipmentService;
         this.combatStatsService = combatStatsService;
+        this.combatPowerService = combatPowerService;
+        this.skillService = skillService;
     }
 
     public List<LeaderboardEntry> entries(PlayerRecord player) {
-        List<LeaderboardEntry> entries = new ArrayList<>();
-        entries.addAll(jdbcTemplate.query(
+        List<LeaderboardPlayer> players = jdbcTemplate.query(
             """
-            SELECT id, account_id, name, profession, level, experience, gold, strength, agility,
-                   constitution, intelligence, spirit, free_points, controller_type, title
+            SELECT id, account_id, name, profession, level, experience, gold, real_money,
+                   wealth_tier_level, wealth_tier, strength, agility, constitution, intelligence,
+                   spirit, free_points, title
             FROM player
             WHERE controller_type IN ('player', 'robot')
             """,
-            (rs, rowNum) -> {
-                PlayerRecord entryPlayer = mapPlayer(rs);
-                boolean self = entryPlayer.id() == player.id();
-                boolean robot = "robot".equals(rs.getString("controller_type"));
-                List<EquipmentSummary> equipment = robot
-                    ? robotEquipmentService.equipmentForRobot(entryPlayer.id(), entryPlayer.name(), entryPlayer.profession(), entryPlayer.level(), inventoryService.combatPower(entryPlayer))
-                    : equipmentForPlayer(entryPlayer);
-                DerivedStats derivedStats = derivedStatsForPlayer(entryPlayer);
-                int power = inventoryService.combatPower(entryPlayer);
-                int equipmentPower = equipment.stream().mapToInt(EquipmentSummary::power).sum();
-                return new LeaderboardEntry(
-                    0,
-                    entryPlayer.name(),
-                    self ? "你" : rs.getString("title"),
-                    entryPlayer.profession(),
-                    entryPlayer.level(),
-                    power,
-                    self,
-                    entryPlayer.experience(),
-                    entryPlayer.gold(),
-                    entryPlayer.strength(),
-                    entryPlayer.agility(),
-                    entryPlayer.constitution(),
-                    entryPlayer.intelligence(),
-                    entryPlayer.spirit(),
-                    entryPlayer.freePoints(),
-                    derivedStats,
-                    equipmentPower,
-                    equipment
-                );
-            }
-        ));
+            (rs, rowNum) -> new LeaderboardPlayer(mapPlayer(rs), rs.getString("title"))
+        );
+        Map<Long, Map<String, ItemRecord>> equippedByPlayer = equippedItemsByPlayer(players.stream().map(row -> row.player().id()).toList());
+        Map<Long, Integer> skillPowerByPlayer = skillService.skillPowerForPlayers(players.stream().map(LeaderboardPlayer::player).toList());
+        List<LeaderboardEntry> entries = new ArrayList<>(players.stream()
+            .map(row -> leaderboardEntry(row, player.id(), equippedByPlayer.getOrDefault(row.player().id(), Map.of()), skillPowerByPlayer.getOrDefault(row.player().id(), 0)))
+            .toList());
         entries.sort(Comparator.comparingInt(LeaderboardEntry::power).reversed());
         List<LeaderboardEntry> ranked = new ArrayList<>();
         for (int i = 0; i < entries.size(); i++) {
@@ -102,6 +88,35 @@ public class LeaderboardService {
         return ranked;
     }
 
+    private LeaderboardEntry leaderboardEntry(LeaderboardPlayer row, long viewerPlayerId, Map<String, ItemRecord> equipped, int skillPower) {
+        PlayerRecord entryPlayer = row.player();
+        List<ItemRecord> equippedItems = equipped.values().stream().toList();
+        CombatStats derived = combatStatsService.playerStats(entryPlayer, equippedItems);
+        CombatStats base = combatStatsService.playerStats(entryPlayer, List.of());
+        int equipmentPower = equippedItems.stream().mapToInt(inventoryService::equipmentPower).sum();
+        int power = combatPowerService.combatPower(derived, base, equipmentPower) + skillPower;
+        return new LeaderboardEntry(
+            0,
+            entryPlayer.name(),
+            entryPlayer.id() == viewerPlayerId ? "你" : row.title(),
+            entryPlayer.profession(),
+            entryPlayer.level(),
+            power,
+            entryPlayer.id() == viewerPlayerId,
+            entryPlayer.experience(),
+            entryPlayer.gold(),
+            entryPlayer.strength(),
+            entryPlayer.agility(),
+            entryPlayer.constitution(),
+            entryPlayer.intelligence(),
+            entryPlayer.spirit(),
+            entryPlayer.freePoints(),
+            DerivedStats.from(derived),
+            equipmentPower,
+            equipmentSummaries(equipped)
+        );
+    }
+
     public List<EquipmentSummary> equipmentForPlayer(PlayerRecord player) {
         var equipped = inventoryService.equippedItems(player.id());
         return SLOT_ORDER.stream()
@@ -117,6 +132,78 @@ public class LeaderboardService {
 
     public int equipmentPowerForPlayer(PlayerRecord player) {
         return equipmentForPlayer(player).stream().mapToInt(EquipmentSummary::power).sum();
+    }
+
+    private List<EquipmentSummary> equipmentSummaries(Map<String, ItemRecord> equipped) {
+        return SLOT_ORDER.stream()
+            .filter(equipped::containsKey)
+            .map(slot -> equipmentSummary(slot, equipped.get(slot)))
+            .toList();
+    }
+
+    private Map<Long, Map<String, ItemRecord>> equippedItemsByPlayer(List<Long> playerIds) {
+        if (playerIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = String.join(",", Collections.nCopies(playerIds.size(), "?"));
+        Map<Long, Map<String, ItemRecord>> equipped = new LinkedHashMap<>();
+        jdbcTemplate.query(
+            """
+            SELECT es.player_id AS owner_player_id, es.slot_name, ii.*, it.item_category, it.stackable,
+                   it.effect_type, it.effect_value_json, it.enhance_bonus_rate, it.min_enhance_level,
+                   it.max_enhance_level, it.description,
+                   COALESCE(sock.socket_attack, 0) AS socket_attack_bonus,
+                   COALESCE(sock.socket_defense, 0) AS socket_defense_bonus,
+                   COALESCE(sock.socket_resistance, 0) AS socket_resistance_bonus,
+                   COALESCE(sock.socket_hp, 0) AS socket_hp_bonus,
+                   COALESCE(sock.socket_mp, 0) AS socket_mp_bonus,
+                   COALESCE(sock.socket_crit, 0) AS socket_crit_bonus,
+                   COALESCE(aff.affix_attack, 0) AS affix_attack_bonus,
+                   COALESCE(aff.affix_defense, 0) AS affix_defense_bonus,
+                   COALESCE(aff.affix_resistance, 0) AS affix_resistance_bonus,
+                   COALESCE(aff.affix_hp, 0) AS affix_hp_bonus,
+                   COALESCE(aff.affix_mp, 0) AS affix_mp_bonus,
+                   COALESCE(aff.affix_crit, 0) AS affix_crit_bonus
+            FROM equipment_slot es
+            JOIN item_instance ii ON ii.id = es.item_id
+            JOIN item_template it ON it.id = ii.template_id
+            LEFT JOIN (
+                SELECT s.item_id,
+                       SUM(CASE WHEN gt.stat_key = 'attack' THEN ROUND(gt.stat_value) ELSE 0 END) AS socket_attack,
+                       SUM(CASE WHEN gt.stat_key = 'defense' THEN ROUND(gt.stat_value) ELSE 0 END) AS socket_defense,
+                       SUM(CASE WHEN gt.stat_key = 'resistance' THEN ROUND(gt.stat_value) ELSE 0 END) AS socket_resistance,
+                       SUM(CASE WHEN gt.stat_key = 'hp' THEN ROUND(gt.stat_value) ELSE 0 END) AS socket_hp,
+                       SUM(CASE WHEN gt.stat_key = 'mp' THEN ROUND(gt.stat_value) ELSE 0 END) AS socket_mp,
+                       SUM(CASE WHEN gt.stat_key = 'crit' THEN gt.stat_value ELSE 0 END) AS socket_crit
+                FROM equipment_socket s
+                JOIN equipment_slot equipped_socket ON equipped_socket.item_id = s.item_id
+                LEFT JOIN item_instance gem ON gem.id = s.gem_item_id
+                LEFT JOIN gem_template gt ON gt.template_id = gem.template_id
+                GROUP BY s.item_id
+            ) sock ON sock.item_id = ii.id
+            LEFT JOIN (
+                SELECT ea.item_id,
+                       SUM(CASE WHEN stat_key = 'attack' THEN ROUND(stat_value) ELSE 0 END) AS affix_attack,
+                       SUM(CASE WHEN stat_key = 'defense' THEN ROUND(stat_value) ELSE 0 END) AS affix_defense,
+                       SUM(CASE WHEN stat_key = 'resistance' THEN ROUND(stat_value) ELSE 0 END) AS affix_resistance,
+                       SUM(CASE WHEN stat_key = 'hp' THEN ROUND(stat_value) ELSE 0 END) AS affix_hp,
+                       SUM(CASE WHEN stat_key = 'mp' THEN ROUND(stat_value) ELSE 0 END) AS affix_mp,
+                       SUM(CASE WHEN stat_key = 'crit' THEN stat_value ELSE 0 END) AS affix_crit
+                FROM equipment_affix ea
+                JOIN equipment_slot equipped_affix ON equipped_affix.item_id = ea.item_id
+                GROUP BY ea.item_id
+            ) aff ON aff.item_id = ii.id
+            WHERE es.player_id IN (
+            """ + placeholders + """
+            )
+            ORDER BY es.player_id, es.slot_name
+            """,
+            (org.springframework.jdbc.core.RowCallbackHandler) rs -> equipped
+                .computeIfAbsent(rs.getLong("owner_player_id"), ignored -> new LinkedHashMap<>())
+                .put(rs.getString("slot_name"), mapItem(rs)),
+            playerIds.toArray()
+        );
+        return equipped;
     }
 
     private EquipmentSummary equipmentSummary(String slot, ItemRecord item) {
@@ -209,6 +296,9 @@ public class LeaderboardService {
             rs.getInt("level"),
             rs.getInt("experience"),
             rs.getLong("gold"),
+            rs.getLong("real_money"),
+            rs.getInt("wealth_tier_level"),
+            rs.getString("wealth_tier"),
             rs.getInt("strength"),
             rs.getInt("agility"),
             rs.getInt("constitution"),
@@ -216,6 +306,57 @@ public class LeaderboardService {
             rs.getInt("spirit"),
             rs.getInt("free_points")
         );
+    }
+
+    private ItemRecord mapItem(java.sql.ResultSet rs) throws java.sql.SQLException {
+        return new ItemRecord(
+            rs.getLong("id"),
+            rs.getLong("player_id"),
+            rs.getString("template_id"),
+            rs.getString("name"),
+            rs.getString("item_type"),
+            rs.getString("item_category"),
+            rs.getString("quality"),
+            rs.getInt("required_level"),
+            rs.getInt("attack_bonus"),
+            rs.getInt("defense_bonus"),
+            rs.getInt("resistance_bonus"),
+            rs.getInt("hp_bonus"),
+            rs.getInt("mp_bonus"),
+            rs.getBigDecimal("crit_bonus"),
+            rs.getInt("sell_price"),
+            rs.getInt("quantity"),
+            rs.getBoolean("stackable"),
+            rs.getString("effect_type"),
+            rs.getString("effect_value_json"),
+            rs.getDouble("enhance_bonus_rate"),
+            rs.getInt("min_enhance_level"),
+            rs.getInt("max_enhance_level"),
+            rs.getInt("enhancement_level"),
+            rs.getInt("enhancement_luck"),
+            rs.getInt("refine_level"),
+            rs.getString("refine_focus"),
+            rs.getInt("ascension_level"),
+            rs.getInt("ascension_luck"),
+            rs.getInt("socket_attack_bonus"),
+            rs.getInt("socket_defense_bonus"),
+            rs.getInt("socket_resistance_bonus"),
+            rs.getInt("socket_hp_bonus"),
+            rs.getInt("socket_mp_bonus"),
+            rs.getDouble("socket_crit_bonus"),
+            rs.getInt("affix_attack_bonus"),
+            rs.getInt("affix_defense_bonus"),
+            rs.getInt("affix_resistance_bonus"),
+            rs.getInt("affix_hp_bonus"),
+            rs.getInt("affix_mp_bonus"),
+            rs.getDouble("affix_crit_bonus"),
+            List.of(),
+            List.of(),
+            rs.getString("description") == null ? "" : rs.getString("description")
+        );
+    }
+
+    private record LeaderboardPlayer(PlayerRecord player, String title) {
     }
 
     public record LeaderboardEntry(

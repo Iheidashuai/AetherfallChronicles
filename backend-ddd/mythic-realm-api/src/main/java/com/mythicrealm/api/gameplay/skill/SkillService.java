@@ -8,6 +8,7 @@ import com.mythicrealm.api.gameplay.player.PlayerService;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -159,9 +160,29 @@ public class SkillService {
     public int skillPower(PlayerRecord player) {
         ensureStarterSkills(player);
         Map<String, Integer> ranks = learnedRanks(player.id());
-        int raw = playerTemplates(player).stream()
+        return skillPower(player, playerTemplates(player), ranks);
+    }
+
+    public Map<Long, Integer> skillPowerForPlayers(List<PlayerRecord> players) {
+        if (players.isEmpty()) {
+            return Map.of();
+        }
+        List<SkillTemplate> templates = templates("player");
+        Map<Long, Map<String, Integer>> ranksByPlayer = learnedRanks(players.stream().map(PlayerRecord::id).toList());
+        Map<Long, Integer> result = new HashMap<>();
+        for (PlayerRecord player : players) {
+            List<SkillTemplate> playerTemplates = templates.stream()
+                .filter(template -> "any".equals(template.profession()) || normalize(player.profession()).equals(template.profession()))
+                .toList();
+            result.put(player.id(), skillPower(player, playerTemplates, ranksByPlayer.getOrDefault(player.id(), Map.of())));
+        }
+        return result;
+    }
+
+    private int skillPower(PlayerRecord player, List<SkillTemplate> playerTemplates, Map<String, Integer> ranks) {
+        int raw = playerTemplates.stream()
             .mapToInt(template -> {
-                int rank = ranks.getOrDefault(template.id(), 0);
+                int rank = ranks.getOrDefault(template.id(), template.unlockLevel() <= 1 ? 1 : 0);
                 if (rank <= 0) {
                     return 0;
                 }
@@ -265,6 +286,24 @@ public class SkillService {
         for (Map.Entry<String, Integer> row : rows) {
             ranks.put(row.getKey(), row.getValue());
         }
+        return ranks;
+    }
+
+    private Map<Long, Map<String, Integer>> learnedRanks(List<Long> playerIds) {
+        if (playerIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = String.join(",", Collections.nCopies(playerIds.size(), "?"));
+        Map<Long, Map<String, Integer>> ranks = new HashMap<>();
+        jdbcTemplate.query(
+            "SELECT player_id, skill_id, skill_rank FROM player_skill WHERE player_id IN (" + placeholders + ")",
+            (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
+                long playerId = rs.getLong("player_id");
+                ranks.computeIfAbsent(playerId, ignored -> new HashMap<>())
+                    .put(rs.getString("skill_id"), rs.getInt("skill_rank"));
+            },
+            playerIds.toArray()
+        );
         return ranks;
     }
 
