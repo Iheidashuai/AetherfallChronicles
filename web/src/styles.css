@@ -5632,6 +5632,16 @@ body {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
 }
 
+.enhance-modal-backdrop {
+  overflow: hidden;
+}
+
+.enhance-modal {
+  width: min(calc(100vw - 72px), 760px);
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
 .compare-grid,
 .power-delta {
   display: grid;

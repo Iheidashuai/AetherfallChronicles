@@ -1757,8 +1757,8 @@ export function EnhanceModal({ item, gold, loading, stones = [], selectedStoneId
     setStonePickerOpen(false);
   };
   return (
-    <div className="detail-backdrop result-modal-backdrop" onClick={onClose}>
-      <section className={`decision-modal ${item.quality} ${enhancementEffectClass(item)}`} onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
+    <div className="detail-backdrop result-modal-backdrop enhance-modal-backdrop" onClick={onClose}>
+      <section className={`decision-modal enhance-modal ${item.quality} ${enhancementEffectClass(item)}`} onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
         <div className="result-modal-head">
           <div>
             <div className="item-meta-line">
