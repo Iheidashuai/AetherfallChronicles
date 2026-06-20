@@ -287,6 +287,9 @@ export function typeName(type: string) {
   if (type === 'attributePotion') {
     return '属性药水';
   }
+  if (type === 'levelBoost') {
+    return '成长药水';
+  }
   if (type === 'fragment') {
     return '碎片';
   }
@@ -319,6 +322,10 @@ export function itemEffectText(item: Item | EquipmentDetailData) {
   if (item.effectType === 'attributePotion') {
     const effect = parseEffectValue(item);
     return `${attributeName(String(effect.attribute ?? ''))} +${Number(effect.amount ?? 0)}`;
+  }
+  if (item.effectType === 'levelBoost') {
+    const effect = parseEffectValue(item);
+    return `直升 Lv.${Number(effect.targetLevel ?? 60)} · 获得 9 件史诗装备`;
   }
   if (item.effectType === 'enhancementStone') {
     return `成功率 +${formatPercent(item.enhanceBonusRate ?? 0)} · +${item.minEnhanceLevel ?? 1}-${item.maxEnhanceLevel ?? 15}`;
@@ -705,6 +712,7 @@ export function shopCategoryName(category: string) {
     gold: '金币',
     stamina: '疲劳',
     enhancement: '强化',
+    gem: '宝石',
     growth: '成长',
     chest: '宝箱',
   };
@@ -903,6 +911,9 @@ export function catalogEffectDetail(item: ItemCatalogItem) {
 }
 
 export function catalogSourceHint(item: ItemCatalogItem) {
+  if (item.effectType === 'levelBoost') {
+    return '冒险者商店限购一次';
+  }
   if (item.itemCategory === 'chest') {
     return item.quality === 'legendary' || item.quality === 'immortal' ? '碎片合成与高难任务' : '任务奖励与副本掉落';
   }
@@ -927,6 +938,9 @@ export function catalogUsageHint(item: ItemCatalogItem) {
   }
   if (item.effectType === 'attributePotion') {
     return '使用后永久增加角色属性，适合优先补主属性。';
+  }
+  if (item.effectType === 'levelBoost') {
+    return '使用后直升指定等级，并获得对应职业的整套等级装备。';
   }
   if (item.effectType === 'fragment') {
     return '积攒到配方数量后可合成传说或不朽装备宝箱。';
@@ -1067,11 +1081,13 @@ export function gemUpgradeBlockReason(gems: Item[], selectedIds: number[], mater
   if (selected.length !== 3 || selected.some((gem) => gem.templateId !== selected[0].templateId)) {
     return '只能选择 3 颗完全相同的宝石。';
   }
-  if ((materials.mat_gem_dust ?? 0) < 8) {
-    return '无法升级：宝石尘不足。';
-  }
-  if (selected[0].templateId.endsWith('_3')) {
+  const rank = gemRank(selected[0]);
+  if (rank >= 9 || selected[0].templateId.endsWith('_9')) {
     return '该宝石已达到最高阶。';
+  }
+  const gemDustCost = 8 * rank;
+  if ((materials.mat_gem_dust ?? 0) < gemDustCost) {
+    return `无法升级：宝石尘不足，需要 ${gemDustCost}。`;
   }
   return null;
 }
@@ -1083,6 +1099,20 @@ export function gemEffectText(gem: Item) {
   } catch {
     return '可镶嵌宝石';
   }
+}
+
+function gemRank(gem: Item) {
+  try {
+    const parsed = JSON.parse(gem.effectValueJson || '{}');
+    const rank = Number(parsed.rank);
+    if (Number.isFinite(rank) && rank > 0) {
+      return rank;
+    }
+  } catch {
+    // Fall through to the template suffix.
+  }
+  const match = gem.templateId.match(/_(\d+)$/);
+  return match ? Number(match[1]) : 1;
 }
 
 export function processingActionName(actionType: string) {
@@ -1203,6 +1233,9 @@ export function formatMarketActivityTime(activity: { createdAt?: string; minutes
 }
 
 export function isMarketableInventoryItem(item: Item) {
+  if (item.effectType === 'levelBoost') {
+    return false;
+  }
   return item.itemCategory === 'equipment'
     || item.itemCategory === 'material'
     || item.itemCategory === 'consumable'
@@ -1267,7 +1300,7 @@ export function robotActivityKindName(kind: string) {
     processing_reforge: '词条重铸',
     processing_ascend: '装备升阶',
   };
-  return names[kind] ?? '后台活动';
+  return names[kind] ?? '冒险活动';
 }
 
 export function rechargeReasonName(sourceAction: string) {

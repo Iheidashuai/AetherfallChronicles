@@ -162,12 +162,15 @@ import {
 
 export function MarketScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
+  const pendingWorldEventAction = useAppStore((state) => state.pendingWorldEventAction);
+  const clearPendingWorldEventAction = useAppStore((state) => state.clearPendingWorldEventAction);
   const queryClient = useQueryClient();
   const [priceByItem, setPriceByItem] = useState<Record<number, string>>({});
   const [quantityByItem, setQuantityByItem] = useState<Record<number, string>>({});
   const [selectedMarketItem, setSelectedMarketItem] = useState<EquipmentDetailData | null>(null);
   const [marketFilters, setMarketFilters] = useState<MarketFilters>(emptyMarketFilters());
   const [marketLedgerTab, setMarketLedgerTab] = useState<MarketLedgerTab>('listed');
+  const [highlightListingId, setHighlightListingId] = useState<number | null>(null);
   const homeQuery = useQuery({
     queryKey: ['home', token],
     queryFn: () => gameApi.home(token),
@@ -185,6 +188,22 @@ export function MarketScreen({ token }: { token: string }) {
     () => filterMarketListings(listingsQuery.data?.listings ?? [], marketFilters),
     [listingsQuery.data?.listings, marketFilters],
   );
+
+  useEffect(() => {
+    if (pendingWorldEventAction?.targetScreen !== 'market') {
+      return;
+    }
+    const listingId = Number(pendingWorldEventAction.params?.listingId ?? pendingWorldEventAction.targetId ?? 0);
+    if (listingId > 0) {
+      setHighlightListingId(listingId);
+    }
+    setMarketFilters((current) => ({
+      ...current,
+      category: 'equipment',
+      sort: 'quality',
+    }));
+    clearPendingWorldEventAction();
+  }, [pendingWorldEventAction, clearPendingWorldEventAction]);
 
   const listMutation = useMutation({
     mutationFn: ({ item, quantity, unitPrice }: { item: Item; quantity: number; unitPrice: number }) => gameApi.listItem(token, item.id, quantity, unitPrice),
@@ -222,6 +241,17 @@ export function MarketScreen({ token }: { token: string }) {
     .filter((listing) => listing.playerListing && listing.sellerName === playerName)
     .sort((left, right) => Date.parse(right.listedAt) - Date.parse(left.listedAt) || right.id - left.id);
   const inventoryItems = inventoryQuery.data.inventory.filter(isMarketableInventoryItem).slice(0, 24);
+  const ledgerCount = marketLedgerTab === 'listed'
+    ? playerActiveListings.length
+    : marketLedgerTab === 'unlisted'
+      ? inventoryItems.length
+      : playerSales.length;
+  const ledgerCountUnit = marketLedgerTab === 'unlisted' ? '件' : '单';
+  const ledgerTitle = marketLedgerTab === 'listed'
+    ? '已上架'
+    : marketLedgerTab === 'unlisted'
+      ? '未上架'
+      : '已成交';
   const marketActionError = listMutation.error?.message ?? buyMutation.error?.message ?? cancelMutation.error?.message;
   const hasMarketFilters = marketFilters.minLevel.trim().length > 0
     || marketFilters.maxLevel.trim().length > 0
@@ -235,27 +265,28 @@ export function MarketScreen({ token }: { token: string }) {
       <div className="stat-grid market-stats status-strip">
         <Metric label="金币" value={homeQuery.data.player.gold.toString()} />
         <Metric label="在线商贩" value={market.onlineTraders.toString()} />
-        <Metric label="机器人挂单" value={market.robotListings.toString()} />
+        <Metric label="冒险者挂单" value={market.robotListings.toString()} />
         <Metric label="近时成交" value={market.soldRecently.toString()} />
-        <Metric label="我的寄售" value={market.playerListings.toString()} />
+        <Metric label="我的上架" value={playerActiveListings.length.toString()} />
         <Metric label="均价" value={`${market.averagePrice} 金`} />
         <Metric label="背包" value={inventoryQuery.data.inventory.length.toString()} />
       </div>
       <div className="market-workbench desktop-workbench">
         <aside className="market-sell-panel filter-rail">
-          <SectionTitle icon={<Package size={18} />} title="我的可寄售物品" />
+          <SectionTitle icon={<Package size={18} />} title="我的寄售" />
           <div className="market-rule-card">
             <strong>商会规则</strong>
             <p>{market.rules.antiExploit}</p>
           </div>
           <div className="market-sales-panel">
             <div className="market-sales-head">
-              <SectionTitle icon={<Coins size={18} />} title="我的寄售" />
-              <strong>{marketLedgerTab === 'listed' ? playerActiveListings.length : playerSales.length} 单</strong>
+              <SectionTitle icon={<Coins size={18} />} title={ledgerTitle} />
+              <strong>{ledgerCount} {ledgerCountUnit}</strong>
             </div>
             <div className="market-ledger-tabs">
               {[
                 ['listed', '已上架'],
+                ['unlisted', '未上架'],
                 ['sold', '已成交'],
               ].map(([value, label]) => (
                 <button key={value} className={marketLedgerTab === value ? 'active' : ''} onClick={() => setMarketLedgerTab(value as MarketLedgerTab)}>
@@ -263,7 +294,7 @@ export function MarketScreen({ token }: { token: string }) {
                 </button>
               ))}
             </div>
-            <div className="market-sale-list">
+            <div className={`market-sale-list ${marketLedgerTab === 'unlisted' ? 'market-inventory-list' : ''}`}>
               {marketLedgerTab === 'listed' && playerActiveListings.length === 0 && <EmptyState text="当前没有已上架的寄售。" />}
               {marketLedgerTab === 'listed' && playerActiveListings.map((listing) => (
                 <MarketListedCard
@@ -274,6 +305,43 @@ export function MarketScreen({ token }: { token: string }) {
                   onInspect={() => setSelectedMarketItem(marketItemToDetail(listing))}
                 />
               ))}
+              {marketLedgerTab === 'unlisted' && inventoryItems.length === 0 && <EmptyState text="背包没有可寄售物品。" />}
+              {marketLedgerTab === 'unlisted' && inventoryItems.map((item) => {
+                const defaultPrice = marketPriceEstimate(item);
+                const unitPrice = Number(priceByItem[item.id] || defaultPrice);
+                const quantity = item.stackable ? Math.min(item.quantity ?? 1, Math.max(1, Number(quantityByItem[item.id] || 1))) : 1;
+                const totalPrice = Math.max(1, unitPrice) * Math.max(1, quantity);
+                return (
+                  <ItemCard key={item.id} item={item} onSelect={() => setSelectedMarketItem(toEquipmentDetail(item))}>
+                    {item.stackable && (
+                      <input
+                        className="price-input quantity-input"
+                        inputMode="numeric"
+                        value={quantityByItem[item.id] ?? '1'}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => setQuantityByItem((current) => ({ ...current, [item.id]: event.target.value }))}
+                      />
+                    )}
+                    <input
+                      className="price-input"
+                      inputMode="numeric"
+                      value={priceByItem[item.id] ?? String(defaultPrice)}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={(event) => setPriceByItem((current) => ({ ...current, [item.id]: event.target.value }))}
+                    />
+                    <button
+                      className="mini-action"
+                      disabled={listMutation.isPending}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        listMutation.mutate({ item, quantity, unitPrice });
+                      }}
+                    >
+                      上架 {item.stackable ? `${totalPrice}金` : ''}
+                    </button>
+                  </ItemCard>
+                );
+              })}
               {marketLedgerTab === 'sold' && playerSales.length === 0 && <EmptyState text="暂时还没有寄售成交。" />}
               {marketLedgerTab === 'sold' && playerSales.map((sale) => (
                 <MarketSaleCard
@@ -283,45 +351,6 @@ export function MarketScreen({ token }: { token: string }) {
                 />
               ))}
             </div>
-          </div>
-          <div className="market-inventory-list">
-            {inventoryItems.length === 0 && <EmptyState text="背包没有可寄售物品。" />}
-            {inventoryItems.map((item) => {
-              const defaultPrice = marketPriceEstimate(item);
-              const unitPrice = Number(priceByItem[item.id] || defaultPrice);
-              const quantity = item.stackable ? Math.min(item.quantity ?? 1, Math.max(1, Number(quantityByItem[item.id] || 1))) : 1;
-              const totalPrice = Math.max(1, unitPrice) * Math.max(1, quantity);
-              return (
-                <ItemCard key={item.id} item={item} onSelect={() => setSelectedMarketItem(toEquipmentDetail(item))}>
-                  {item.stackable && (
-                    <input
-                      className="price-input quantity-input"
-                      inputMode="numeric"
-                      value={quantityByItem[item.id] ?? '1'}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={(event) => setQuantityByItem((current) => ({ ...current, [item.id]: event.target.value }))}
-                    />
-                  )}
-                  <input
-                    className="price-input"
-                    inputMode="numeric"
-                    value={priceByItem[item.id] ?? String(defaultPrice)}
-                    onClick={(event) => event.stopPropagation()}
-                    onChange={(event) => setPriceByItem((current) => ({ ...current, [item.id]: event.target.value }))}
-                  />
-                  <button
-                    className="mini-action"
-                    disabled={listMutation.isPending}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      listMutation.mutate({ item, quantity, unitPrice });
-                    }}
-                  >
-                    上架 {item.stackable ? `${totalPrice}金` : ''}
-                  </button>
-                </ItemCard>
-              );
-            })}
           </div>
         </aside>
 
@@ -395,15 +424,16 @@ export function MarketScreen({ token }: { token: string }) {
           <div className="market-listing-grid">
             {visibleMarketListings.length === 0 && <EmptyState text="当前筛选下没有商会商品。" />}
             {visibleMarketListings.map((listing) => (
-              <ListingCard
-                key={listing.id}
-                listing={listing}
-                own={listing.playerListing && listing.sellerName === playerName}
-                loading={buyMutation.isPending || cancelMutation.isPending}
-                onBuy={() => buyMutation.mutate(listing.id)}
-                onCancel={() => cancelMutation.mutate(listing.id)}
-                onInspect={() => setSelectedMarketItem(marketItemToDetail(listing))}
-              />
+              <div key={listing.id} className={listing.id === highlightListingId ? 'world-event-highlight' : undefined}>
+                <ListingCard
+                  listing={listing}
+                  own={listing.playerListing && listing.sellerName === playerName}
+                  loading={buyMutation.isPending || cancelMutation.isPending}
+                  onBuy={() => buyMutation.mutate(listing.id)}
+                  onCancel={() => cancelMutation.mutate(listing.id)}
+                  onInspect={() => setSelectedMarketItem(marketItemToDetail(listing))}
+                />
+              </div>
             ))}
           </div>
         </section>
@@ -438,4 +468,3 @@ export function MarketScreen({ token }: { token: string }) {
     </section>
   );
 }
-

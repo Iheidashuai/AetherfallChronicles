@@ -234,6 +234,14 @@ public class RobotActionSupport {
     public RobotActionResult processSockets(RobotDecisionContext context, RobotActionScore score) {
         try {
             EquipmentProcessingService.ProcessingSnapshot snapshot = equipmentProcessingService.snapshot(context.player());
+            List<Long> upgradeGemIds = firstUpgradeableGemSet(snapshot.gems(), snapshot.materials().getOrDefault("mat_gem_dust", 0));
+            if (!upgradeGemIds.isEmpty()) {
+                EquipmentProcessingService.ProcessingResult result = equipmentProcessingService.upgradeGems(context.player(), upgradeGemIds);
+                String text = "把三颗宝石合成为【" + result.item().displayName() + "】，继续给核心装备攒孔位收益。";
+                chat(context.actor(), text);
+                record(context.actor(), "processing_socket", text, score.reason());
+                return RobotActionResult.success("processing_socket", text);
+            }
             List<EquipmentProcessingService.ProcessingItemView> equippedTargets = snapshot.equipment().stream()
                 .filter(entry -> inventoryService.equippedItems(context.player().id()).values().stream().anyMatch(item -> item.id() == entry.item().id()))
                 .sorted(Comparator.comparingInt((EquipmentProcessingService.ProcessingItemView entry) -> inventoryService.equipmentPower(entry.item())).reversed())
@@ -267,6 +275,36 @@ public class RobotActionSupport {
             return rest(context.actor(), "宝石和孔位暂时对不上，先继续刷深渊材料。", score.reason());
         } catch (ApiException error) {
             return rest(context.actor(), "宝石加工条件还差一点，先不硬上。", score.reason());
+        }
+    }
+
+    private List<Long> firstUpgradeableGemSet(List<ItemRecord> gems, int gemDust) {
+        for (ItemRecord gem : gems) {
+            int rank = gemRank(gem.templateId());
+            if (rank >= 9 || gemDust < rank * 8) {
+                continue;
+            }
+            List<Long> sameGems = gems.stream()
+                .filter(candidate -> candidate.templateId().equals(gem.templateId()))
+                .map(ItemRecord::id)
+                .limit(3)
+                .toList();
+            if (sameGems.size() == 3) {
+                return sameGems;
+            }
+        }
+        return List.of();
+    }
+
+    private int gemRank(String templateId) {
+        int separator = templateId == null ? -1 : templateId.lastIndexOf('_');
+        if (separator < 0 || separator >= templateId.length() - 1) {
+            return 1;
+        }
+        try {
+            return Integer.parseInt(templateId.substring(separator + 1));
+        } catch (NumberFormatException error) {
+            return 1;
         }
     }
 

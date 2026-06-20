@@ -189,6 +189,14 @@ export function BlacksmithScreen({ token }: { token: string }) {
     queryKey: ['equipmentProcessing', token],
     queryFn: () => gameApi.equipmentProcessing(token),
   });
+  const {
+    data: homeData,
+    isLoading: homeLoading,
+    error: homeError,
+  } = useQuery({
+    queryKey: ['home', token],
+    queryFn: () => gameApi.home(token),
+  });
 
   useEffect(() => {
     if (!enhanceToast) {
@@ -305,7 +313,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
     setFocusedItemId(result.item.id);
     setSelectedGemId(null);
     setSelectedUpgradeGemIds([]);
-    setNotice(`${result.message}，战力 ${formatNumber(result.powerBefore)} → ${formatNumber(result.powerAfter)}`);
+    setNotice(`${result.message}，角色战力 ${formatNumber(result.powerBefore)} → ${formatNumber(result.powerAfter)}`);
     await invalidateGameQueries(queryClient, token);
   }
 
@@ -341,11 +349,11 @@ export function BlacksmithScreen({ token }: { token: string }) {
     onSuccess: handleProcessingSuccess,
   });
 
-  if (isLoading || processingLoading) {
+  if (isLoading || processingLoading || homeLoading) {
     return <LoadingScreen title="点燃锻炉" />;
   }
-  if (error || processingError || !data || !processingData) {
-    return <ErrorScreen message={(error as Error)?.message ?? (processingError as Error)?.message ?? '铁匠铺加载失败'} />;
+  if (error || processingError || homeError || !data || !processingData || !homeData) {
+    return <ErrorScreen message={(error as Error)?.message ?? (processingError as Error)?.message ?? (homeError as Error)?.message ?? '铁匠铺加载失败'} />;
   }
 
   const processingBusy = unlockSocketMutation.isPending
@@ -411,6 +419,8 @@ export function BlacksmithScreen({ token }: { token: string }) {
     { id: 'ascend', title: '装备升阶', detail: '突破加工上限', icon: <Shield size={18} />, badge: `${ascendableCount}` },
   ];
   const activeForge = forgeViews.find((view) => view.id === activeView) ?? forgeViews[0];
+  const currentCombatPower = data.combatPower;
+  const currentLevel = homeData.player.level;
 
   return (
     <section className="screen blacksmith-screen forge-screen">
@@ -425,6 +435,8 @@ export function BlacksmithScreen({ token }: { token: string }) {
             <h1>装备工坊</h1>
           </div>
         </div>
+        <Metric label="战力" value={formatNumber(currentCombatPower)} />
+        <Metric label="等级" value={`Lv.${currentLevel}`} />
         <Metric label="金币" value={formatNumber(data.gold)} />
         <Metric label="装备" value={allEquipment.length.toString()} />
         <Metric label="可转移" value={sourceItems.length.toString()} />
@@ -461,6 +473,8 @@ export function BlacksmithScreen({ token }: { token: string }) {
               <h2>{activeForge.title}</h2>
             </div>
             <div className="forge-pill-row">
+              <span>战力 {formatNumber(currentCombatPower)}</span>
+              <span>Lv.{currentLevel}</span>
               <span>{formatNumber(data.gold)} 金</span>
               {activeView === 'transfer' && <span>{transferTargetCount} 个目标</span>}
             </div>

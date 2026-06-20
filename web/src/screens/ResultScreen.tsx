@@ -173,10 +173,12 @@ export function ResultScreen({ result, onResult }: { result: DungeonRunResult; o
   const [visibleFrames, setVisibleFrames] = useState(1);
   const [selectedLoot, setSelectedLoot] = useState<Item | null>(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [summaryResult, setSummaryResult] = useState(result);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const battleStageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    setSummaryResult(result);
     setVisibleFrames(1);
     setSelectedLoot(null);
     setShowSummary(false);
@@ -202,10 +204,13 @@ export function ResultScreen({ result, onResult }: { result: DungeonRunResult; o
   }, [visibleFrames]);
 
   useEffect(() => {
+    if (summaryResult !== result) {
+      return;
+    }
     if (visibleFrames >= frames.length) {
       setShowSummary(true);
     }
-  }, [frames.length, visibleFrames]);
+  }, [frames.length, result, summaryResult, visibleFrames]);
 
   const battlePlaying = visibleFrames < frames.length;
 
@@ -224,6 +229,13 @@ export function ResultScreen({ result, onResult }: { result: DungeonRunResult; o
     void returnToDungeons();
   }
 
+  function handleRetry() {
+    if (retryMutation.isPending) {
+      return;
+    }
+    retryMutation.mutate();
+  }
+
   const retryMutation = useMutation({
     mutationFn: () => {
       if (!token) {
@@ -232,6 +244,7 @@ export function ResultScreen({ result, onResult }: { result: DungeonRunResult; o
       return gameApi.runDungeon(token, result.dungeonId);
     },
     onSuccess: async (nextResult) => {
+      setShowSummary(false);
       onResult(nextResult);
       if (token) {
         await invalidateGameQueries(queryClient, token);
@@ -323,7 +336,7 @@ export function ResultScreen({ result, onResult }: { result: DungeonRunResult; o
           result={result}
           onClose={() => setShowSummary(false)}
           onReturn={returnToDungeons}
-          onRetry={!result.success ? () => retryMutation.mutate() : undefined}
+          onRetry={handleRetry}
           retrying={retryMutation.isPending}
           onSelectLoot={setSelectedLoot}
         />
@@ -346,7 +359,7 @@ export function ResultScreen({ result, onResult }: { result: DungeonRunResult; o
       {retryMutation.error && (
         <FeedbackDialog
           variant="error"
-          title="重试失败"
+          title="再来一次失败"
           message={retryMutation.error.message}
           onClose={() => retryMutation.reset()}
         />
@@ -354,4 +367,3 @@ export function ResultScreen({ result, onResult }: { result: DungeonRunResult; o
     </section>
   );
 }
-

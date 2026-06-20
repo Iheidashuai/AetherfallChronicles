@@ -198,15 +198,18 @@ export function ShopScreen({ token }: { token: string }) {
     ?? visibleOffers[0]
     ?? data.offers[0]
     ?? null;
-  const safeQuantity = Math.max(1, Math.min(99, quantity));
+  const selectedRemaining = selectedOffer?.remainingPurchases ?? 99;
+  const maxQuantity = Math.max(1, Math.min(99, selectedRemaining <= 0 ? 1 : selectedRemaining));
+  const safeQuantity = Math.max(1, Math.min(maxQuantity, quantity));
   const totalPrice = selectedOffer ? selectedOffer.priceRmb * safeQuantity : 0;
-  const canBuySelected = Boolean(selectedOffer?.unlocked && totalPrice <= data.wallet.realMoney && !purchaseMutation.isPending);
+  const canBuySelected = Boolean(selectedOffer?.unlocked && !selectedOffer.soldOut && totalPrice <= data.wallet.realMoney && !purchaseMutation.isPending);
   const shopError = purchaseMutation.error?.message ?? null;
   const categoryRows: Array<[ShopCategoryFilter, string]> = [
     ['all', '全部'],
     ['gold', '金币'],
     ['stamina', '疲劳'],
     ['enhancement', '强化'],
+    ['gem', '宝石'],
     ['growth', '成长'],
     ['chest', '宝箱'],
   ];
@@ -275,10 +278,11 @@ export function ShopScreen({ token }: { token: string }) {
                   <span>Lv.{offer.requiredLevel}</span>
                   <span>{offer.unlocked ? '可购买' : '等级不足'}</span>
                   <span>{offer.affordable ? '余额足够' : '余额不足'}</span>
+                  {offer.purchaseLimit ? <span>{offer.soldOut ? '已限购' : `剩余 ${offer.remainingPurchases ?? offer.purchaseLimit}`}</span> : null}
                 </div>
                 <button
                   className="mini-action"
-                  disabled={!offer.unlocked || !offer.affordable || purchaseMutation.isPending}
+                  disabled={!offer.unlocked || !offer.affordable || offer.soldOut || purchaseMutation.isPending}
                   onClick={(event) => {
                     event.stopPropagation();
                     buyOffer(offer, 1);
@@ -306,10 +310,15 @@ export function ShopScreen({ token }: { token: string }) {
                 <input
                   inputMode="numeric"
                   value={String(safeQuantity)}
-                  onChange={(event) => setQuantity(Math.max(1, Math.min(99, Number(event.target.value.replace(/[^\d]/g, '')) || 1)))}
+                  onChange={(event) => setQuantity(Math.max(1, Math.min(maxQuantity, Number(event.target.value.replace(/[^\d]/g, '')) || 1)))}
                 />
-                <button disabled={purchaseMutation.isPending || safeQuantity >= 99} onClick={() => setQuantity((current) => Math.min(99, current + 1))}>+</button>
+                <button disabled={purchaseMutation.isPending || safeQuantity >= maxQuantity} onClick={() => setQuantity((current) => Math.min(maxQuantity, current + 1))}>+</button>
               </div>
+              {selectedOffer.purchaseLimit ? (
+                <div className="shop-limit-note">
+                  限购 {selectedOffer.purchaseLimit} 份，已购 {selectedOffer.purchasedQuantity ?? 0} 份
+                </div>
+              ) : null}
               <div className="shop-total-card">
                 <span>合计</span>
                 <strong>{formatNumber(totalPrice)} 元</strong>
@@ -320,7 +329,7 @@ export function ShopScreen({ token }: { token: string }) {
                 disabled={!canBuySelected}
                 onClick={() => purchaseMutation.mutate({ offerId: selectedOffer.id, count: safeQuantity })}
               >
-                {purchaseMutation.isPending ? '购买中...' : '确认购买'}
+                {selectedOffer.soldOut ? '已限购' : purchaseMutation.isPending ? '购买中...' : '确认购买'}
               </button>
             </>
           ) : (
@@ -351,4 +360,3 @@ export function ShopScreen({ token }: { token: string }) {
     </section>
   );
 }
-

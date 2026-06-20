@@ -5,6 +5,7 @@ import {
   enhanceCost,
   formatNumber,
   formatStaminaTime,
+  gemUpgradeBlockReason,
   liveStaminaSnapshot,
   pad2,
   professionName,
@@ -15,6 +16,14 @@ import {
 // Minimal Item fixture — enhanceCost/enhanceChance only read a few fields.
 const item = (over: Partial<Item>): Item =>
   ({ requiredLevel: 1, enhancementLevel: 0, enhancementLuck: 0, ...over }) as unknown as Item;
+
+const gem = (id: number, templateId: string, rank: number): Item =>
+  item({
+    id,
+    templateId,
+    effectType: 'gem',
+    effectValueJson: JSON.stringify({ kind: 'ruby', rank, stat: 'attack' }),
+  });
 
 describe('enhanceCost (money path)', () => {
   it('follows requiredLevel^2 * nextLevel * 10', () => {
@@ -97,5 +106,20 @@ describe('name maps fall back gracefully', () => {
     expect(professionName('warrior')).not.toBe('');
     expect(qualityName('immortal')).not.toBe('');
     expect(qualityName('totally-unknown')).toBeTypeOf('string');
+  });
+});
+
+describe('gemUpgradeBlockReason', () => {
+  it('scales dust cost by current gem rank', () => {
+    const gems = [gem(1, 'gem_ruby_8', 8), gem(2, 'gem_ruby_8', 8), gem(3, 'gem_ruby_8', 8)];
+
+    expect(gemUpgradeBlockReason(gems, [1, 2, 3], { mat_gem_dust: 63 })).toContain('需要 64');
+    expect(gemUpgradeBlockReason(gems, [1, 2, 3], { mat_gem_dust: 64 })).toBeNull();
+  });
+
+  it('blocks rank 9 gems as max rank', () => {
+    const gems = [gem(1, 'gem_ruby_9', 9), gem(2, 'gem_ruby_9', 9), gem(3, 'gem_ruby_9', 9)];
+
+    expect(gemUpgradeBlockReason(gems, [1, 2, 3], { mat_gem_dust: 999 })).toBe('该宝石已达到最高阶。');
   });
 });

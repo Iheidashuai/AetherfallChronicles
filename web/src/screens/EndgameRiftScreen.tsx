@@ -322,7 +322,7 @@ export function EndgameRiftScreen({ token, onResult }: { token: string; onResult
                     <small>T{entry.tier} · {entry.rating} · {formatNumber(entry.score)} 分</small>
                     <small>剩余 {Math.max(0, entry.playerFinalHp)}/{Math.max(1, entry.playerMaxHp)} · {entry.turnsTaken} 行动</small>
                   </div>
-                  <b>{entry.self ? '你' : entry.controllerType === 'robot' ? '机器人' : '玩家'}</b>
+                  <b>{entry.self ? '你' : entry.controllerType === 'robot' ? '冒险者' : '玩家'}</b>
                 </article>
               ))}
             </div>

@@ -162,9 +162,12 @@ import {
 
 export function LeaderboardScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
+  const pendingWorldEventAction = useAppStore((state) => state.pendingWorldEventAction);
+  const clearPendingWorldEventAction = useAppStore((state) => state.clearPendingWorldEventAction);
   const [selectedSpeaker, setSelectedSpeaker] = useState<ChatSpeaker | null>(null);
   const [metric, setMetric] = useState<LeaderboardMetric>('power');
   const [profession, setProfession] = useState<ProfessionFilter>('all');
+  const [focusNearby, setFocusNearby] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ['leaderboard', token],
     queryFn: () => gameApi.leaderboard(token),
@@ -172,6 +175,16 @@ export function LeaderboardScreen({ token }: { token: string }) {
   });
   const rankedEntries = useMemo(() => rankLeaderboardEntries(data ?? [], metric, profession), [data, metric, profession]);
   const ownRank = rankedEntries.find((entry) => entry.player)?.rank;
+
+  useEffect(() => {
+    if (pendingWorldEventAction?.targetScreen !== 'leaderboard') {
+      return;
+    }
+    setMetric('power');
+    setProfession('all');
+    setFocusNearby(pendingWorldEventAction.params?.focus === 'nearby');
+    clearPendingWorldEventAction();
+  }, [pendingWorldEventAction, clearPendingWorldEventAction]);
 
   if (isLoading) {
     return <LoadingScreen title="读取银冠榜单" />;
@@ -215,17 +228,20 @@ export function LeaderboardScreen({ token }: { token: string }) {
       </div>
       <div className="leaderboard-list">
         {rankedEntries.length === 0 && <EmptyState text="当前职业筛选下没有榜单角色。" />}
-        {rankedEntries.map((entry) => (
-          <LeaderboardCard
-            key={`${metric}-${profession}-${entry.rank}-${entry.name}`}
-            entry={entry}
-            metric={metric}
-            onSelectSpeaker={() => setSelectedSpeaker(leaderboardEntryToSpeaker(entry))}
-          />
-        ))}
+        {rankedEntries.map((entry) => {
+          const nearby = focusNearby && ownRank != null && Math.abs(entry.rank - ownRank) <= 1;
+          return (
+            <div key={`${metric}-${profession}-${entry.rank}-${entry.name}`} className={nearby ? 'world-event-highlight' : undefined}>
+              <LeaderboardCard
+                entry={entry}
+                metric={metric}
+                onSelectSpeaker={() => setSelectedSpeaker(leaderboardEntryToSpeaker(entry))}
+              />
+            </div>
+          );
+        })}
       </div>
       {selectedSpeaker && <SpeakerDetailModal speaker={selectedSpeaker} onClose={() => setSelectedSpeaker(null)} />}
     </section>
   );
 }
-

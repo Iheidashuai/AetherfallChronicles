@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Coins, LogOut, MessageCircle, Send, Shield, Skull, Swords, Trophy, UserRound } from 'lucide-react';
@@ -11,9 +11,20 @@ const PROFESSION_NAMES: Record<string, string> = { warrior: '战士', ranger: '�
 
 export function GuildScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
+  const pendingWorldEventAction = useAppStore((state) => state.pendingWorldEventAction);
+  const clearPendingWorldEventAction = useAppStore((state) => state.clearPendingWorldEventAction);
   const queryClient = useQueryClient();
+  const [focusBoss, setFocusBoss] = useState(false);
   const homeQuery = useQuery({ queryKey: ['guild', 'home'], queryFn: () => gameApi.myGuild(token) });
   const guild = homeQuery.data?.guild ?? null;
+
+  useEffect(() => {
+    if (pendingWorldEventAction?.targetScreen !== 'guild') {
+      return;
+    }
+    setFocusBoss(pendingWorldEventAction.params?.focus === 'boss');
+    clearPendingWorldEventAction();
+  }, [pendingWorldEventAction, clearPendingWorldEventAction]);
 
   if (homeQuery.isLoading) {
     return <LoadingScreen title="公会" />;
@@ -26,7 +37,7 @@ export function GuildScreen({ token }: { token: string }) {
     <div className="screen guild-screen">
       <TopBar title="公会" onBack={() => setScreen('home')} />
       {guild ? (
-        <GuildHall token={token} view={guild} onChanged={() => queryClient.invalidateQueries({ queryKey: ['guild'] })} />
+        <GuildHall token={token} view={guild} focusBoss={focusBoss} onChanged={() => queryClient.invalidateQueries({ queryKey: ['guild'] })} />
       ) : (
         <GuildBrowser token={token} onJoined={() => queryClient.invalidateQueries({ queryKey: ['guild'] })} />
       )}
@@ -82,7 +93,7 @@ function GuildBrowser({ token, onJoined }: { token: string; onJoined: () => void
   );
 }
 
-function GuildHall({ token, view, onChanged }: { token: string; view: GuildView; onChanged: () => void }) {
+function GuildHall({ token, view, focusBoss, onChanged }: { token: string; view: GuildView; focusBoss: boolean; onChanged: () => void }) {
   const { guild, members } = view;
   const leaveMutation = useMutation({ mutationFn: () => gameApi.leaveGuild(token), onSuccess: onChanged });
   const donateMutation = useMutation({
@@ -127,7 +138,7 @@ function GuildHall({ token, view, onChanged }: { token: string; view: GuildView;
         </div>
       </div>
 
-      <GuildBoss token={token} />
+      <GuildBoss token={token} focus={focusBoss} />
 
       <GuildRanking token={token} />
 
@@ -159,7 +170,7 @@ function GuildHall({ token, view, onChanged }: { token: string; view: GuildView;
   );
 }
 
-function GuildBoss({ token }: { token: string }) {
+function GuildBoss({ token, focus }: { token: string; focus: boolean }) {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<string | null>(null);
   const bossQuery = useQuery({
@@ -191,7 +202,7 @@ function GuildBoss({ token }: { token: string }) {
   const pct = boss.hpMax > 0 ? Math.max(0, Math.min(100, (boss.hpCurrent / boss.hpMax) * 100)) : 0;
 
   return (
-    <div className="guild-boss">
+    <div className={`guild-boss ${focus ? 'world-event-focus' : ''}`}>
       <div className="guild-boss-head">
         <SectionTitle icon={<Skull size={16} />} title={`公会 Boss · ${boss.name}${boss.tier > 1 ? ` (T${boss.tier})` : ''}`} />
         <span className="guild-boss-week">{boss.weekKey}</span>

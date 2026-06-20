@@ -9815,6 +9815,7 @@ INSERT INTO item_template
     ('potion_stamina_medium', '中瓶疲劳药水', 'staminaPotion', 'consumable', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 50 点疲劳，疲劳值不会超过 1000。', 35, TRUE, 99, 'staminaPotion', '{"amount":50}', 0, 1, 15),
     ('potion_stamina_large', '大瓶疲劳药水', 'staminaPotion', 'consumable', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 100 点疲劳，疲劳值不会超过 1000。', 80, TRUE, 99, 'staminaPotion', '{"amount":100}', 0, 1, 15),
     ('potion_stamina_elite', '远征疲劳药水', 'staminaPotion', 'consumable', 'legendary', 20, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 150 点疲劳，适合长线刷本前补满状态。', 140, TRUE, 99, 'staminaPotion', '{"amount":150}', 0, 1, 15),
+    ('potion_level_60_boost', '一键60级药水', 'levelBoost', 'consumable', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '使用后直升 Lv.60，并获得当前职业九件 60 级史诗传承装备。商店限购一次。', 1, FALSE, 1, 'levelBoost', '{"targetLevel":60,"equipmentLevel":60,"equipmentQuality":"epic","equipmentTier":"eq_t48","shopPurchaseLimit":1,"dropPolicy":"shopOnly"}', 0, 1, 15),
     ('potion_strength_low', '初级力量药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点力量，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_agility_low', '初级敏捷药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点敏捷，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"agility","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_constitution_low', '初级体质药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点体质，适合低等级阶段补强生存属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":1,"maxLevel":30}', 0, 1, 15),
@@ -10042,7 +10043,7 @@ CREATE TABLE player_rift_weekly_reward (
     PRIMARY KEY (player_id, week_key),
     CONSTRAINT fk_rift_weekly_player FOREIGN KEY (player_id) REFERENCES player (id),
     CONSTRAINT fk_rift_weekly_run FOREIGN KEY (claimed_run_id) REFERENCES rift_run (id),
-    CONSTRAINT fk_rift_weekly_chest FOREIGN KEY (chest_item_id) REFERENCES item_instance (id)
+    CONSTRAINT fk_rift_weekly_chest FOREIGN KEY (chest_item_id) REFERENCES item_instance (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE build_preset (
@@ -10277,16 +10278,40 @@ INSERT INTO item_template
     ('mat_ascension_guard', '护阶符', 'material', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '升阶失败时保护装备不掉阶的稀有符印。', 1500, TRUE, 9999, 'processingMaterial', '{"kind":"ascensionGuard"}', 0.0000, 1, 15),
     ('gem_ruby_1', '裂纹红宝石 I', 'gem', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后提升攻击。', 260, FALSE, 1, 'gem', '{"kind":"ruby","rank":1,"stat":"attack"}', 0.0000, 1, 15),
     ('gem_ruby_2', '凝光红宝石 II', 'gem', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升攻击。', 620, FALSE, 1, 'gem', '{"kind":"ruby","rank":2,"stat":"attack"}', 0.0000, 1, 15),
-    ('gem_ruby_3', '深渊红宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后极大提升攻击。', 1400, FALSE, 1, 'gem', '{"kind":"ruby","rank":3,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_3', '深渊红宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升攻击。', 1400, FALSE, 1, 'gem', '{"kind":"ruby","rank":3,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_4', '熔心红宝石 IV', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升攻击。', 2600, FALSE, 1, 'gem', '{"kind":"ruby","rank":4,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_5', '星辉红宝石 V', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升攻击。', 4600, FALSE, 1, 'gem', '{"kind":"ruby","rank":5,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_6', '虚空红宝石 VI', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升攻击。', 7600, FALSE, 1, 'gem', '{"kind":"ruby","rank":6,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_7', '神铸红宝石 VII', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升攻击。', 12000, FALSE, 1, 'gem', '{"kind":"ruby","rank":7,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_8', '永恒红宝石 VIII', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升攻击。', 18400, FALSE, 1, 'gem', '{"kind":"ruby","rank":8,"stat":"attack"}', 0.0000, 1, 15),
+    ('gem_ruby_9', '九曜红宝石 IX', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升攻击。', 27600, FALSE, 1, 'gem', '{"kind":"ruby","rank":9,"stat":"attack"}', 0.0000, 1, 15),
     ('gem_sapphire_1', '裂纹蓝宝石 I', 'gem', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后提升法力。', 240, FALSE, 1, 'gem', '{"kind":"sapphire","rank":1,"stat":"mp"}', 0.0000, 1, 15),
     ('gem_sapphire_2', '凝光蓝宝石 II', 'gem', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升法力。', 580, FALSE, 1, 'gem', '{"kind":"sapphire","rank":2,"stat":"mp"}', 0.0000, 1, 15),
-    ('gem_sapphire_3', '深渊蓝宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后极大提升法力。', 1320, FALSE, 1, 'gem', '{"kind":"sapphire","rank":3,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_3', '深渊蓝宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升法力。', 1320, FALSE, 1, 'gem', '{"kind":"sapphire","rank":3,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_4', '熔心蓝宝石 IV', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升法力。', 2400, FALSE, 1, 'gem', '{"kind":"sapphire","rank":4,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_5', '星辉蓝宝石 V', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升法力。', 4200, FALSE, 1, 'gem', '{"kind":"sapphire","rank":5,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_6', '虚空蓝宝石 VI', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升法力。', 7000, FALSE, 1, 'gem', '{"kind":"sapphire","rank":6,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_7', '神铸蓝宝石 VII', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升法力。', 11000, FALSE, 1, 'gem', '{"kind":"sapphire","rank":7,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_8', '永恒蓝宝石 VIII', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升法力。', 16800, FALSE, 1, 'gem', '{"kind":"sapphire","rank":8,"stat":"mp"}', 0.0000, 1, 15),
+    ('gem_sapphire_9', '九曜蓝宝石 IX', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升法力。', 25200, FALSE, 1, 'gem', '{"kind":"sapphire","rank":9,"stat":"mp"}', 0.0000, 1, 15),
     ('gem_emerald_1', '裂纹绿宝石 I', 'gem', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后提升生命。', 260, FALSE, 1, 'gem', '{"kind":"emerald","rank":1,"stat":"hp"}', 0.0000, 1, 15),
     ('gem_emerald_2', '凝光绿宝石 II', 'gem', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升生命。', 620, FALSE, 1, 'gem', '{"kind":"emerald","rank":2,"stat":"hp"}', 0.0000, 1, 15),
-    ('gem_emerald_3', '深渊绿宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后极大提升生命。', 1400, FALSE, 1, 'gem', '{"kind":"emerald","rank":3,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_3', '深渊绿宝石 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升生命。', 1400, FALSE, 1, 'gem', '{"kind":"emerald","rank":3,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_4', '熔心绿宝石 IV', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升生命。', 2600, FALSE, 1, 'gem', '{"kind":"emerald","rank":4,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_5', '星辉绿宝石 V', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升生命。', 4600, FALSE, 1, 'gem', '{"kind":"emerald","rank":5,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_6', '虚空绿宝石 VI', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升生命。', 7600, FALSE, 1, 'gem', '{"kind":"emerald","rank":6,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_7', '神铸绿宝石 VII', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升生命。', 12000, FALSE, 1, 'gem', '{"kind":"emerald","rank":7,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_8', '永恒绿宝石 VIII', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升生命。', 18400, FALSE, 1, 'gem', '{"kind":"emerald","rank":8,"stat":"hp"}', 0.0000, 1, 15),
+    ('gem_emerald_9', '九曜绿宝石 IX', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升生命。', 27600, FALSE, 1, 'gem', '{"kind":"emerald","rank":9,"stat":"hp"}', 0.0000, 1, 15),
     ('gem_topaz_1', '裂纹黄玉 I', 'gem', 'material', 'rare', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后提升暴击。', 320, FALSE, 1, 'gem', '{"kind":"topaz","rank":1,"stat":"crit"}', 0.0000, 1, 15),
     ('gem_topaz_2', '凝光黄玉 II', 'gem', 'material', 'epic', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升暴击。', 740, FALSE, 1, 'gem', '{"kind":"topaz","rank":2,"stat":"crit"}', 0.0000, 1, 15),
-    ('gem_topaz_3', '深渊黄玉 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后极大提升暴击。', 1680, FALSE, 1, 'gem', '{"kind":"topaz","rank":3,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_3', '深渊黄玉 III', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后大幅提升暴击。', 1680, FALSE, 1, 'gem', '{"kind":"topaz","rank":3,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_4', '熔心黄玉 IV', 'gem', 'material', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升暴击。', 3100, FALSE, 1, 'gem', '{"kind":"topaz","rank":4,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_5', '星辉黄玉 V', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升暴击。', 5400, FALSE, 1, 'gem', '{"kind":"topaz","rank":5,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_6', '虚空黄玉 VI', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升暴击。', 8900, FALSE, 1, 'gem', '{"kind":"topaz","rank":6,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_7', '神铸黄玉 VII', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升暴击。', 14000, FALSE, 1, 'gem', '{"kind":"topaz","rank":7,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_8', '永恒黄玉 VIII', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升暴击。', 21400, FALSE, 1, 'gem', '{"kind":"topaz","rank":8,"stat":"crit"}', 0.0000, 1, 15),
+    ('gem_topaz_9', '九曜黄玉 IX', 'gem', 'material', 'immortal', 60, 0, 0, 0, 0, 0, 0.000000, 0, '镶嵌后显著提升暴击。', 32000, FALSE, 1, 'gem', '{"kind":"topaz","rank":9,"stat":"crit"}', 0.0000, 1, 15),
     ('chest_abyss_weekly', '深渊周箱', 'chest', 'chest', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '根据本周最高深渊层数发放的奖励宝箱。', 1200, TRUE, 99, 'chest', '{"source":"riftWeekly"}', 0.0000, 1, 15)
 ON DUPLICATE KEY UPDATE name = VALUES(name), item_type = VALUES(item_type), item_category = VALUES(item_category), quality = VALUES(quality), required_level = VALUES(required_level), description = VALUES(description), sell_price = VALUES(sell_price), stackable = VALUES(stackable), max_stack = VALUES(max_stack), effect_type = VALUES(effect_type), effect_value_json = VALUES(effect_value_json);
 
@@ -10294,16 +10319,40 @@ INSERT INTO gem_template
 (template_id, gem_kind, rank_level, stat_key, stat_value, slot_kind, next_template_id, sort_order) VALUES
     ('gem_ruby_1', 'ruby', 1, 'attack', 18.0000, 'any', 'gem_ruby_2', 110),
     ('gem_ruby_2', 'ruby', 2, 'attack', 42.0000, 'any', 'gem_ruby_3', 120),
-    ('gem_ruby_3', 'ruby', 3, 'attack', 90.0000, 'any', NULL, 130),
+    ('gem_ruby_3', 'ruby', 3, 'attack', 90.0000, 'any', 'gem_ruby_4', 130),
+    ('gem_ruby_4', 'ruby', 4, 'attack', 150.0000, 'any', 'gem_ruby_5', 140),
+    ('gem_ruby_5', 'ruby', 5, 'attack', 230.0000, 'any', 'gem_ruby_6', 150),
+    ('gem_ruby_6', 'ruby', 6, 'attack', 330.0000, 'any', 'gem_ruby_7', 160),
+    ('gem_ruby_7', 'ruby', 7, 'attack', 460.0000, 'any', 'gem_ruby_8', 170),
+    ('gem_ruby_8', 'ruby', 8, 'attack', 620.0000, 'any', 'gem_ruby_9', 180),
+    ('gem_ruby_9', 'ruby', 9, 'attack', 820.0000, 'any', NULL, 190),
     ('gem_sapphire_1', 'sapphire', 1, 'mp', 60.0000, 'any', 'gem_sapphire_2', 210),
     ('gem_sapphire_2', 'sapphire', 2, 'mp', 135.0000, 'any', 'gem_sapphire_3', 220),
-    ('gem_sapphire_3', 'sapphire', 3, 'mp', 280.0000, 'any', NULL, 230),
+    ('gem_sapphire_3', 'sapphire', 3, 'mp', 280.0000, 'any', 'gem_sapphire_4', 230),
+    ('gem_sapphire_4', 'sapphire', 4, 'mp', 470.0000, 'any', 'gem_sapphire_5', 240),
+    ('gem_sapphire_5', 'sapphire', 5, 'mp', 720.0000, 'any', 'gem_sapphire_6', 250),
+    ('gem_sapphire_6', 'sapphire', 6, 'mp', 1040.0000, 'any', 'gem_sapphire_7', 260),
+    ('gem_sapphire_7', 'sapphire', 7, 'mp', 1450.0000, 'any', 'gem_sapphire_8', 270),
+    ('gem_sapphire_8', 'sapphire', 8, 'mp', 1980.0000, 'any', 'gem_sapphire_9', 280),
+    ('gem_sapphire_9', 'sapphire', 9, 'mp', 2600.0000, 'any', NULL, 290),
     ('gem_emerald_1', 'emerald', 1, 'hp', 90.0000, 'any', 'gem_emerald_2', 310),
     ('gem_emerald_2', 'emerald', 2, 'hp', 210.0000, 'any', 'gem_emerald_3', 320),
-    ('gem_emerald_3', 'emerald', 3, 'hp', 460.0000, 'any', NULL, 330),
+    ('gem_emerald_3', 'emerald', 3, 'hp', 460.0000, 'any', 'gem_emerald_4', 330),
+    ('gem_emerald_4', 'emerald', 4, 'hp', 760.0000, 'any', 'gem_emerald_5', 340),
+    ('gem_emerald_5', 'emerald', 5, 'hp', 1160.0000, 'any', 'gem_emerald_6', 350),
+    ('gem_emerald_6', 'emerald', 6, 'hp', 1680.0000, 'any', 'gem_emerald_7', 360),
+    ('gem_emerald_7', 'emerald', 7, 'hp', 2350.0000, 'any', 'gem_emerald_8', 370),
+    ('gem_emerald_8', 'emerald', 8, 'hp', 3200.0000, 'any', 'gem_emerald_9', 380),
+    ('gem_emerald_9', 'emerald', 9, 'hp', 4300.0000, 'any', NULL, 390),
     ('gem_topaz_1', 'topaz', 1, 'crit', 0.0120, 'any', 'gem_topaz_2', 410),
     ('gem_topaz_2', 'topaz', 2, 'crit', 0.0260, 'any', 'gem_topaz_3', 420),
-    ('gem_topaz_3', 'topaz', 3, 'crit', 0.0550, 'any', NULL, 430)
+    ('gem_topaz_3', 'topaz', 3, 'crit', 0.0550, 'any', 'gem_topaz_4', 430),
+    ('gem_topaz_4', 'topaz', 4, 'crit', 0.0680, 'any', 'gem_topaz_5', 440),
+    ('gem_topaz_5', 'topaz', 5, 'crit', 0.0820, 'any', 'gem_topaz_6', 450),
+    ('gem_topaz_6', 'topaz', 6, 'crit', 0.0960, 'any', 'gem_topaz_7', 460),
+    ('gem_topaz_7', 'topaz', 7, 'crit', 0.1100, 'any', 'gem_topaz_8', 470),
+    ('gem_topaz_8', 'topaz', 8, 'crit', 0.1250, 'any', 'gem_topaz_9', 480),
+    ('gem_topaz_9', 'topaz', 9, 'crit', 0.1400, 'any', NULL, 490)
 ON DUPLICATE KEY UPDATE gem_kind = VALUES(gem_kind), rank_level = VALUES(rank_level), stat_key = VALUES(stat_key), stat_value = VALUES(stat_value), next_template_id = VALUES(next_template_id), sort_order = VALUES(sort_order);
 
 INSERT INTO chest_loot (chest_template_id, reward_template_id, min_quantity, max_quantity, weight) VALUES
@@ -10335,11 +10384,19 @@ INSERT INTO shop_offer
     ('stone_mithril_pack', '秘银强化石包', '购买 5 个秘银强化石，用于 +4 以上关键强化。', 'enhancement', 24, 'stone_mithril', 5, 0, 20, 230, TRUE),
     ('stone_starfire_pack', '星火强化石包', '购买 3 个星火强化石，用于高阶装备冲刺。', 'enhancement', 45, 'stone_starfire', 3, 0, 40, 240, TRUE),
     ('stone_dragonblood_pack', '龙血强化石包', '购买 2 个龙血强化石，用于顶级装备终段强化。', 'enhancement', 88, 'stone_dragonblood', 2, 0, 60, 250, TRUE),
+    ('processing_abyss_essence_pack', '深渊精华匣', '购买 120 个深渊精华，用于淬炼、开孔、重铸和升阶补缺。', 'enhancement', 56, 'mat_abyss_essence', 120, 0, 60, 252, TRUE),
+    ('processing_tempering_shard_pack', '淬炼碎片匣', '购买 36 个淬炼碎片，用于高阶淬炼和装备升阶。', 'enhancement', 72, 'mat_tempering_shard', 36, 0, 60, 254, TRUE),
     ('processing_socket_pack', '开孔补给包', '购买 3 个打孔核心，作为深渊掉落之外的少量补充。', 'enhancement', 32, 'mat_socket_core', 3, 0, 60, 260, TRUE),
     ('processing_gem_dust_pack', '宝石尘补给包', '购买 30 个宝石尘，用于开孔和宝石三合一升级。', 'enhancement', 20, 'mat_gem_dust', 30, 0, 60, 270, TRUE),
     ('processing_ascension_pack', '升阶核心补给包', '购买 2 个升阶核心，核心来源仍以深渊为主。', 'enhancement', 68, 'mat_ascension_core', 2, 0, 60, 280, TRUE),
+    ('processing_guard_pack', '护阶符', '购买 1 个护阶符，保护 +3 以上装备升阶失败不掉阶。', 'enhancement', 118, 'mat_ascension_guard', 1, 0, 60, 286, TRUE),
+    ('growth_level_60_boost', '一键60级药水', '购买后在背包使用，直升 Lv.60 并获得当前职业九件 60 级史诗传承装备。限购一次。', 'growth', 1, 'potion_level_60_boost', 1, 0, 1, 300, TRUE),
     ('chest_growth_pack', '远征成长宝箱', '购买 1 个成长宝箱，随机获得属性药水、疲劳药水或强化石。', 'growth', 16, 'chest_growth_cache', 1, 0, 15, 310, TRUE),
-    ('chest_forge_pack', '锻炉秘藏宝箱', '购买 1 个锻炉秘藏宝箱，随机获得强化石或装备碎片。', 'chest', 28, 'chest_forge_cache', 1, 0, 1, 320, TRUE)
+    ('chest_forge_pack', '锻炉秘藏宝箱', '购买 1 个锻炉秘藏宝箱，随机获得强化石或装备碎片。', 'chest', 28, 'chest_forge_cache', 1, 0, 1, 320, TRUE),
+    ('gem_ruby_starter', '裂纹红宝石', '购买 1 颗 1 级红宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 42, 'gem_ruby_1', 1, 0, 60, 410, TRUE),
+    ('gem_sapphire_starter', '裂纹蓝宝石', '购买 1 颗 1 级蓝宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 38, 'gem_sapphire_1', 1, 0, 60, 420, TRUE),
+    ('gem_emerald_starter', '裂纹绿宝石', '购买 1 颗 1 级绿宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 42, 'gem_emerald_1', 1, 0, 60, 430, TRUE),
+    ('gem_topaz_starter', '裂纹黄玉', '购买 1 颗 1 级黄玉，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 48, 'gem_topaz_1', 1, 0, 60, 440, TRUE)
 ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), category = VALUES(category), price_rmb = VALUES(price_rmb), item_template_id = VALUES(item_template_id), item_quantity = VALUES(item_quantity), gold_amount = VALUES(gold_amount), required_level = VALUES(required_level), sort_order = VALUES(sort_order), enabled = VALUES(enabled);
 
 INSERT INTO arena_shop_offer
@@ -10366,4 +10423,4 @@ SET market_category = CASE
 
 UPDATE item_template
 SET tradeable = FALSE
-WHERE id IN ('chest_growth_cache', 'chest_forge_cache');
+WHERE id IN ('chest_growth_cache', 'chest_forge_cache', 'potion_level_60_boost');

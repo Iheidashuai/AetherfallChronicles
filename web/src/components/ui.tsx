@@ -645,7 +645,7 @@ export function ArenaProfileCard({ profile, featured = false }: { profile: Arena
       <div>
         <span className="eyebrow">Lv.{profile.level} {professionName(profile.profession)}</span>
         <h2>{profile.name}</h2>
-        <p>{profile.controllerType === 'robot' ? '后台机器人' : '玩家角色'} · {profile.tier}</p>
+        <p>{profile.controllerType === 'robot' ? '冒险者' : '玩家角色'} · {profile.tier}</p>
       </div>
       <div className="arena-profile-stats">
         <Metric label="战力" value={formatNumber(profile.combatPower)} />
@@ -938,7 +938,7 @@ export function RobotActivityDetailModal({ token, robot: fallbackRobot, onClose 
             <SectionTitle icon={<Shield size={18} />} title={`装备档案 ${equipment.length}/9`} />
             <div className="robot-equipment-grid">
               {isLoading && equipment.length === 0 && <EmptyState text="正在读取装备档案。" />}
-              {error && <EmptyState text="机器人详情加载失败，稍后会自动重试。" />}
+              {error && <EmptyState text="冒险者详情加载失败，稍后会自动重试。" />}
               {!isLoading && !error && equipment.length === 0 && <EmptyState text="暂无装备记录。" />}
               {equipment.map((item) => (
                 <button
@@ -960,7 +960,7 @@ export function RobotActivityDetailModal({ token, robot: fallbackRobot, onClose 
           <aside className="robot-history-panel">
             <SectionTitle icon={<Clock3 size={18} />} title="实时历史动态" />
             <div className="robot-history-list" ref={historyRef}>
-              {events.length === 0 && <EmptyState text="这个机器人还没有留下历史动态。" />}
+              {events.length === 0 && <EmptyState text="这个冒险者还没有留下历史动态。" />}
               {events.map((event) => (
                 <RobotEventCard key={`${event.robotId}-${event.createdAt}-${event.text}`} event={event} />
               ))}
@@ -1977,8 +1977,8 @@ export function ResultSummaryModal({ result, onClose, onReturn, onRetry, retryin
         </div>
         <div className="result-modal-actions">
           <button className="mini-action subtle" onClick={onClose}>继续看战报</button>
-          {onRetry && <button className="mini-action" disabled={retrying} onClick={onRetry}>{retrying ? '进入中...' : '重试'}</button>}
-          <button className="primary-action" onClick={() => void onReturn()}>回到副本大厅</button>
+          {onRetry && <button className="primary-action" disabled={retrying} onClick={onRetry}>{retrying ? '进入中...' : '再来一次'}</button>}
+          <button className="mini-action subtle" onClick={() => void onReturn()}>回到副本大厅</button>
         </div>
       </section>
     </div>
@@ -2122,7 +2122,7 @@ export function LeaderboardCard({ entry, metric, onSelectSpeaker }: { entry: Lea
         <button className="leaderboard-name" onClick={onSelectSpeaker}>{entry.name}</button>
         <p>
           <span className={`profession-badge ${entry.profession}`}>{professionName(entry.profession)}</span>
-          <span>{entry.player ? '玩家角色' : '后台机器人'}</span>
+          <span>{entry.player ? '玩家角色' : '冒险者'}</span>
         </p>
       </div>
       <div className="leaderboard-insight">

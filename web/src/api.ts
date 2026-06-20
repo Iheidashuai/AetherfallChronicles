@@ -951,6 +951,26 @@ export type GlobalAnnouncement = {
   createdAt: string;
 };
 
+export type WorldEventAction = {
+  label: string;
+  targetScreen: 'guild' | 'market' | 'leaderboard' | 'robots';
+  targetId?: string;
+  params?: Record<string, string | number | boolean>;
+};
+
+export type WorldEvent = {
+  id: string;
+  type: 'guild_boss' | 'market_upgrade' | 'leaderboard_neighbor' | 'robot_highlight';
+  priority: number;
+  title: string;
+  summary: string;
+  relevance: string;
+  rewardHint: string;
+  freshness: string;
+  tone: 'urgent' | 'opportunity' | 'competitive' | 'social' | 'ambient';
+  action: WorldEventAction;
+};
+
 export type RobotActivitySnapshot = {
   robots: RobotActivityView[];
   events: RobotActivityEvent[];
@@ -1085,6 +1105,10 @@ export type ShopOffer = {
   unlocked: boolean;
   affordable: boolean;
   sortOrder: number;
+  purchaseLimit?: number | null;
+  purchasedQuantity?: number;
+  remainingPurchases?: number | null;
+  soldOut?: boolean;
 };
 
 export type ShopSnapshot = {
@@ -1303,6 +1327,7 @@ export const gameApi = {
   recharge: (token: string, rmbAmount: number) =>
     api<RechargeResult>('/api/recharge', { method: 'POST', body: JSON.stringify({ rmbAmount }) }, token),
   announcements: (token: string) => api<GlobalAnnouncement[]>('/api/announcements', {}, token),
+  worldEvents: (token: string) => api<WorldEvent[]>('/api/world-events', {}, token),
   guildBrowse: (token: string) => api<GuildSummary[]>('/api/guild/guilds', {}, token),
   myGuild: (token: string) => api<GuildHomeResponse>('/api/guild', {}, token),
   joinGuild: (token: string, guildId: number) =>

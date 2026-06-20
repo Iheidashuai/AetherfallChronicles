@@ -267,7 +267,9 @@ export function InventoryScreen({ token }: { token: string }) {
       queryClient.setQueryData(['inventory', token], result.inventory);
       setSelectedStoneIds([]);
       const rewardText = result.rewards.length > 0
-        ? `，获得 ${result.rewards.map((item) => equipmentDisplayName(item)).join('、')}`
+        ? result.effectType === 'levelBoost'
+          ? `，获得 ${result.rewards.length} 件 60 级史诗装备`
+          : `，获得 ${result.rewards.map((item) => equipmentDisplayName(item)).join('、')}`
         : '';
       const staminaText = result.stamina ? `，疲劳 ${result.stamina.current}/${result.stamina.max}` : '';
       setNotice(`已使用 ${result.itemName}${rewardText}${staminaText}`);
@@ -459,7 +461,7 @@ export function InventoryScreen({ token }: { token: string }) {
                 ) : (
                   <button
                     className="mini-action"
-                    disabled={busy || !['staminaPotion', 'attributePotion', 'chest'].includes(item.effectType ?? '')}
+                    disabled={busy || !['staminaPotion', 'attributePotion', 'levelBoost', 'chest'].includes(item.effectType ?? '')}
                     onClick={(event) => {
                       event.stopPropagation();
                       useItemMutation.mutate(item);

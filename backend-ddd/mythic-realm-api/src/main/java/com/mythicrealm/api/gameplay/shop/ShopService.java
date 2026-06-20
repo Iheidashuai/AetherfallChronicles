@@ -1,5 +1,7 @@
 package com.mythicrealm.api.gameplay.shop;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.inventory.ItemRecord;
@@ -20,17 +22,20 @@ public class ShopService {
     private final PlayerService playerService;
     private final InventoryService inventoryService;
     private final RechargeService rechargeService;
+    private final ObjectMapper objectMapper;
 
     public ShopService(
         JdbcTemplate jdbcTemplate,
         PlayerService playerService,
         InventoryService inventoryService,
-        RechargeService rechargeService
+        RechargeService rechargeService,
+        ObjectMapper objectMapper
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.playerService = playerService;
         this.inventoryService = inventoryService;
         this.rechargeService = rechargeService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +44,7 @@ public class ShopService {
         return new ShopSnapshot(
             rechargeService.wallet(player),
             offers(player),
-            List.of("all", "gold", "stamina", "enhancement", "chest", "growth")
+            List.of("all", "gold", "stamina", "enhancement", "gem", "chest", "growth")
         );
     }
 
@@ -50,6 +55,14 @@ public class ShopService {
         ShopOfferRow offer = requireOffer(offerId);
         if (player.level() < offer.requiredLevel()) {
             throw ApiException.badRequest("角色等级不足，需要 Lv." + offer.requiredLevel());
+        }
+        int purchaseLimit = purchaseLimit(offer);
+        int purchasedQuantity = purchasedQuantity(player.id(), offer.id(), purchaseLimit);
+        if (purchaseLimit > 0 && purchasedQuantity >= purchaseLimit) {
+            throw ApiException.badRequest("该商品已达到限购次数");
+        }
+        if (purchaseLimit > 0 && purchasedQuantity + count > purchaseLimit) {
+            throw ApiException.badRequest("该商品限购 " + purchaseLimit + " 份，当前还可购买 " + (purchaseLimit - purchasedQuantity) + " 份");
         }
         long totalPrice = safeMultiply(offer.priceRmb(), count);
         if (player.realMoney() < totalPrice) {
@@ -122,7 +135,7 @@ public class ShopService {
             """
             SELECT so.id, so.name, so.description, so.category, so.price_rmb, so.item_template_id,
                    so.item_quantity, so.gold_amount, so.required_level, so.sort_order,
-                   it.name AS item_name, it.item_type, it.item_category, it.quality
+                   it.name AS item_name, it.item_type, it.item_category, it.quality, it.effect_value_json
             FROM shop_offer so
             LEFT JOIN item_template it ON it.id = so.item_template_id
             WHERE so.enabled = TRUE
@@ -137,7 +150,7 @@ public class ShopService {
             """
             SELECT so.id, so.name, so.description, so.category, so.price_rmb, so.item_template_id,
                    so.item_quantity, so.gold_amount, so.required_level, so.sort_order,
-                   it.name AS item_name, it.item_type, it.item_category, it.quality
+                   it.name AS item_name, it.item_type, it.item_category, it.quality, it.effect_value_json
             FROM shop_offer so
             LEFT JOIN item_template it ON it.id = so.item_template_id
             WHERE so.id = ? AND so.enabled = TRUE
@@ -162,11 +175,17 @@ public class ShopService {
             rs.getString("item_name"),
             rs.getString("item_type"),
             rs.getString("item_category"),
-            rs.getString("quality")
+            rs.getString("quality"),
+            rs.getString("effect_value_json")
         );
     }
 
     private ShopOffer offerView(ShopOfferRow row, PlayerRecord player) {
+        int purchaseLimit = purchaseLimit(row);
+        int purchasedQuantity = purchasedQuantity(player.id(), row.id(), purchaseLimit);
+        Integer limitView = purchaseLimit > 0 ? purchaseLimit : null;
+        Integer remainingPurchases = purchaseLimit > 0 ? Math.max(0, purchaseLimit - purchasedQuantity) : null;
+        boolean soldOut = purchaseLimit > 0 && remainingPurchases == 0;
         return new ShopOffer(
             row.id(),
             row.name(),
@@ -183,8 +202,41 @@ public class ShopService {
             row.requiredLevel(),
             player.level() >= row.requiredLevel(),
             player.realMoney() >= row.priceRmb(),
-            row.sortOrder()
+            row.sortOrder(),
+            limitView,
+            purchasedQuantity,
+            remainingPurchases,
+            soldOut
         );
+    }
+
+    private int purchaseLimit(ShopOfferRow row) {
+        if (row.effectValueJson() == null || row.effectValueJson().isBlank()) {
+            return 0;
+        }
+        try {
+            JsonNode effect = objectMapper.readTree(row.effectValueJson());
+            return Math.max(0, effect.path("shopPurchaseLimit").asInt(0));
+        } catch (Exception error) {
+            throw ApiException.badRequest("商品限购配置错误: " + row.itemTemplateId());
+        }
+    }
+
+    private int purchasedQuantity(long playerId, String offerId, int purchaseLimit) {
+        if (purchaseLimit <= 0) {
+            return 0;
+        }
+        Integer quantity = jdbcTemplate.queryForObject(
+            """
+            SELECT COALESCE(SUM(quantity), 0)
+            FROM shop_purchase_log
+            WHERE player_id = ? AND offer_id = ?
+            """,
+            Integer.class,
+            playerId,
+            offerId
+        );
+        return quantity == null ? 0 : Math.max(0, quantity);
     }
 
     private int normalizeQuantity(int quantity) {
@@ -227,7 +279,8 @@ public class ShopService {
         String itemName,
         String itemType,
         String itemCategory,
-        String quality
+        String quality,
+        String effectValueJson
     ) {
     }
 
@@ -254,7 +307,11 @@ public class ShopService {
         int requiredLevel,
         boolean unlocked,
         boolean affordable,
-        int sortOrder
+        int sortOrder,
+        Integer purchaseLimit,
+        int purchasedQuantity,
+        Integer remainingPurchases,
+        boolean soldOut
     ) {
     }
 

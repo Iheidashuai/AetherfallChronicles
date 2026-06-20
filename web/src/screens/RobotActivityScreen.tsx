@@ -162,7 +162,10 @@ import {
 
 export function RobotActivityScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
+  const pendingWorldEventAction = useAppStore((state) => state.pendingWorldEventAction);
+  const clearPendingWorldEventAction = useAppStore((state) => state.clearPendingWorldEventAction);
   const [selectedRobot, setSelectedRobot] = useState<RobotActivityView | null>(null);
+  const [highlightRobotId, setHighlightRobotId] = useState<number | null>(null);
   const [filters, setFilters] = useState<RobotFilters>({
     name: '',
     minGold: '',
@@ -181,15 +184,40 @@ export function RobotActivityScreen({ token }: { token: string }) {
   const filteredRobots = useMemo(() => filterRobots(robots, filters), [robots, filters]);
   const hasRobotFilters = Object.values(filters).some((value) => value.trim().length > 0);
 
+  useEffect(() => {
+    if (pendingWorldEventAction?.targetScreen !== 'robots') {
+      return;
+    }
+    const robotId = Number(pendingWorldEventAction.params?.robotId ?? pendingWorldEventAction.targetId ?? 0);
+    if (robotId > 0) {
+      setHighlightRobotId(robotId);
+    }
+    clearPendingWorldEventAction();
+  }, [pendingWorldEventAction, clearPendingWorldEventAction]);
+
+  useEffect(() => {
+    if (!highlightRobotId || selectedRobot) {
+      return;
+    }
+    const robot = robots.find((entry) => entry.id === highlightRobotId);
+    if (robot) {
+      setSelectedRobot(robot);
+    }
+  }, [highlightRobotId, robots, selectedRobot]);
+
   if (isLoading) {
-    return <LoadingScreen title="读取机器人后台" />;
+    return <LoadingScreen title="读取冒险者动态" />;
   }
   if (error || !data) {
-    return <ErrorScreen message={(error as Error)?.message ?? '机器人动态加载失败'} />;
+    return <ErrorScreen message={(error as Error)?.message ?? '冒险者动态加载失败'} />;
   }
 
   const updateFilter = (key: RobotFilterKey, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
+  };
+  const closeRobotDetail = () => {
+    setSelectedRobot(null);
+    setHighlightRobotId(null);
   };
   const activeCount = filteredRobots.filter((robot) => robot.currentActivityKind !== 'rest').length;
   const marketCount = filteredRobots.filter((robot) => robot.currentActivityKind.startsWith('market')).length;
@@ -200,12 +228,12 @@ export function RobotActivityScreen({ token }: { token: string }) {
 
   return (
     <section className="screen robot-screen">
-      <TopBar title="机器人后台" onBack={() => setScreen('home')} />
+      <TopBar title="冒险者动态" onBack={() => setScreen('home')} />
       <div className="stat-grid robot-stats status-strip">
-        <Metric label="机器人" value={hasRobotFilters ? `${filteredRobots.length}/${data.robots.length}` : data.robots.length.toString()} />
+        <Metric label="冒险者" value={hasRobotFilters ? `${filteredRobots.length}/${data.robots.length}` : data.robots.length.toString()} />
         <Metric label="正在行动" value={activeCount.toString()} />
         <Metric label="商会相关" value={marketCount.toString()} />
-        <Metric label="机器人金币" value={`${formatNumber(totalGold)} 金`} />
+        <Metric label="冒险者金币" value={`${formatNumber(totalGold)} 金`} />
         <Metric label="真实余额" value={`${formatNumber(totalRealMoney)} 元`} />
         <Metric label="累计充值" value={`${formatNumber(totalRecharge)} 元`} />
         <Metric label="最高战力" value={formatNumber(peakPower)} />
@@ -213,13 +241,13 @@ export function RobotActivityScreen({ token }: { token: string }) {
       <div className="robot-workbench desktop-workbench">
         <section className="robot-roster main-panel">
           <div className="robot-list-head">
-            <SectionTitle icon={<Gauge size={18} />} title="机器人列表" />
-            <span>点击机器人查看档案和个人历史动态</span>
+            <SectionTitle icon={<Gauge size={18} />} title="冒险者名册" />
+            <span>点击冒险者查看档案和个人历史动态</span>
           </div>
           <div className="robot-filter-panel">
             <label className="robot-filter-field name">
               <span>名称</span>
-              <input value={filters.name} onChange={(event) => updateFilter('name', event.target.value)} placeholder="机器人名称" />
+              <input value={filters.name} onChange={(event) => updateFilter('name', event.target.value)} placeholder="冒险者名称" />
             </label>
             <RobotRangeFilter
               label="金币"
@@ -247,15 +275,16 @@ export function RobotActivityScreen({ token }: { token: string }) {
             )}
           </div>
           <div className="robot-grid">
-            {filteredRobots.length === 0 && <EmptyState text="当前筛选下没有机器人。" />}
+            {filteredRobots.length === 0 && <EmptyState text="当前筛选下没有冒险者。" />}
             {filteredRobots.map((robot) => (
-              <RobotActivityCard key={robot.id} robot={robot} onSelect={() => setSelectedRobot(robot)} />
+              <div key={robot.id} className={robot.id === highlightRobotId ? 'world-event-highlight' : undefined}>
+                <RobotActivityCard robot={robot} onSelect={() => setSelectedRobot(robot)} />
+              </div>
             ))}
           </div>
         </section>
       </div>
-      {selectedRobot && <RobotActivityDetailModal token={token} robot={selectedRobot} onClose={() => setSelectedRobot(null)} />}
+      {selectedRobot && <RobotActivityDetailModal token={token} robot={selectedRobot} onClose={closeRobotDetail} />}
     </section>
   );
 }
-

@@ -1,13 +1,23 @@
 import { create } from 'zustand';
 
-type Screen = 'auth' | 'create-player' | 'home' | 'character' | 'inventory' | 'item-catalog' | 'skills' | 'blacksmith' | 'quests' | 'market' | 'shop' | 'builds' | 'endgame' | 'arena' | 'arena-result' | 'guild' | 'chat' | 'leaderboard' | 'robots' | 'recharge' | 'dungeons' | 'result' | 'rift-result';
+export type Screen = 'auth' | 'create-player' | 'home' | 'character' | 'inventory' | 'item-catalog' | 'skills' | 'blacksmith' | 'quests' | 'market' | 'shop' | 'builds' | 'endgame' | 'arena' | 'arena-result' | 'guild' | 'chat' | 'leaderboard' | 'robots' | 'recharge' | 'dungeons' | 'result' | 'rift-result';
+
+export type PendingWorldEventAction = {
+  label: string;
+  targetScreen: Screen;
+  targetId?: string;
+  params?: Record<string, string | number | boolean>;
+};
 
 type AppState = {
   token: string | null;
   username: string | null;
   screen: Screen;
+  pendingWorldEventAction: PendingWorldEventAction | null;
   setSession: (token: string, username: string, hasPlayer: boolean) => void;
   setScreen: (screen: Screen) => void;
+  setPendingWorldEventAction: (action: PendingWorldEventAction) => void;
+  clearPendingWorldEventAction: () => void;
   logout: () => void;
 };
 
@@ -19,6 +29,7 @@ export const useAppStore = create<AppState>((set) => ({
   token: storedToken,
   username: storedUsername,
   screen: storedToken ? (storedHasPlayer === 'false' ? 'create-player' : 'home') : 'auth',
+  pendingWorldEventAction: null,
   setSession: (token, username, hasPlayer) => {
     localStorage.setItem('mythic.token', token);
     localStorage.setItem('mythic.username', username);
@@ -26,10 +37,12 @@ export const useAppStore = create<AppState>((set) => ({
     set({ token, username, screen: hasPlayer ? 'home' : 'create-player' });
   },
   setScreen: (screen) => set({ screen }),
+  setPendingWorldEventAction: (action) => set({ pendingWorldEventAction: action }),
+  clearPendingWorldEventAction: () => set({ pendingWorldEventAction: null }),
   logout: () => {
     localStorage.removeItem('mythic.token');
     localStorage.removeItem('mythic.username');
     localStorage.removeItem('mythic.hasPlayer');
-    set({ token: null, username: null, screen: 'auth' });
+    set({ token: null, username: null, screen: 'auth', pendingWorldEventAction: null });
   },
 }));

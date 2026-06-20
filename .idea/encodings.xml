@@ -7,6 +7,8 @@
     <file url="file://$PROJECT_DIR$/backend-ddd/mythic-realm-common/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-announcement/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-announcement/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-arena/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-arena/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-chat/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-chat/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-dungeon/src/main/java" charset="UTF-8" />

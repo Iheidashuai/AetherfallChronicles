@@ -3,6 +3,14 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/AetherfallChronicles.iml" filepath="$PROJECT_DIR$/.idea/AetherfallChronicles.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-announcement/mythic-realm-domain-announcement.iml" filepath="$PROJECT_DIR$/backend-ddd/mythic-realm-domain-announcement/mythic-realm-domain-announcement.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-chat/mythic-realm-domain-chat.iml" filepath="$PROJECT_DIR$/backend-ddd/mythic-realm-domain-chat/mythic-realm-domain-chat.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-dungeon/mythic-realm-domain-dungeon.iml" filepath="$PROJECT_DIR$/backend-ddd/mythic-realm-domain-dungeon/mythic-realm-domain-dungeon.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-inventory/mythic-realm-domain-inventory.iml" filepath="$PROJECT_DIR$/backend-ddd/mythic-realm-domain-inventory/mythic-realm-domain-inventory.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-leaderboard/mythic-realm-domain-leaderboard.iml" filepath="$PROJECT_DIR$/backend-ddd/mythic-realm-domain-leaderboard/mythic-realm-domain-leaderboard.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-market/mythic-realm-domain-market.iml" filepath="$PROJECT_DIR$/backend-ddd/mythic-realm-domain-market/mythic-realm-domain-market.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-quest/mythic-realm-domain-quest.iml" filepath="$PROJECT_DIR$/backend-ddd/mythic-realm-domain-quest/mythic-realm-domain-quest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/backend-ddd/mythic-realm-domain-robot/mythic-realm-domain-robot.iml" filepath="$PROJECT_DIR$/backend-ddd/mythic-realm-domain-robot/mythic-realm-domain-robot.iml" />
     </modules>
   </component>
 </project>

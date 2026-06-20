@@ -10,6 +10,7 @@ import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.ItemTemplate;
 import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
+import com.mythicrealm.api.gameplay.player.PlayerService;
 import com.mythicrealm.api.gameplay.skill.SkillService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService;
 import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
@@ -51,6 +52,17 @@ public class InventoryService {
         "necklace",
         "ring1",
         "ring2"
+    );
+    private static final List<String> LEVEL_BOOST_EQUIPMENT_SLOTS = List.of(
+        "weapon",
+        "helmet",
+        "armor",
+        "legs",
+        "boots",
+        "gloves",
+        "necklace",
+        "ring",
+        "ring"
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -171,7 +183,7 @@ public class InventoryService {
 
     public ItemRecord addLootToInventory(long playerId, ItemTemplate template, Random random) {
         if (template.stackable()) {
-            return addStackableItem(playerId, template, 1);
+            return addStackableItems(playerId, template, 1).getFirst();
         }
         long itemId = createItemInInventory(playerId, template, random);
         return requireItem(itemId);
@@ -185,7 +197,7 @@ public class InventoryService {
         ItemTemplate template = gameConfigService.requireItem(templateId);
         int count = Math.max(1, amount);
         if (template.stackable()) {
-            return List.of(addStackableItem(playerId, template, count));
+            return addStackableItems(playerId, template, count);
         }
         List<ItemRecord> result = new ArrayList<>();
         for (int i = 0; i < count; i++) {
@@ -194,50 +206,85 @@ public class InventoryService {
         return result;
     }
 
-    private ItemRecord addStackableItem(long playerId, ItemTemplate template, int amount) {
+    private List<ItemRecord> addStackableItems(long playerId, ItemTemplate template, int amount) {
         int count = Math.max(1, amount);
-        Optional<ItemRecord> existing = findInventoryStack(playerId, template.id());
-        if (existing.isPresent()) {
-            ItemRecord stack = existing.get();
-            jdbcTemplate.update(
-                "UPDATE item_instance SET quantity = LEAST(?, quantity + ?) WHERE id = ? AND player_id = ?",
-                Math.max(1, template.maxStack()),
-                count,
-                stack.id(),
-                playerId
-            );
-            return requireItem(stack.id());
-        }
+        int maxStack = Math.max(1, template.maxStack());
         synchronized (slotAllocationMonitor) {
-            int slot = nextFreeSlot(playerId);
-            var keyHolder = new GeneratedKeyHolder();
-            jdbcTemplate.update(connection -> {
-                PreparedStatement ps = connection.prepareStatement(
-                    """
-                    INSERT INTO item_instance
-                    (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
-                     defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity)
-                    VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, ?)
-                    """,
-                    Statement.RETURN_GENERATED_KEYS
-                );
-                ps.setLong(1, playerId);
-                ps.setString(2, template.id());
-                ps.setString(3, template.name());
-                ps.setString(4, template.type());
-                ps.setString(5, template.quality());
-                ps.setInt(6, template.requiredLevel());
-                ps.setInt(7, template.sellPrice());
-                ps.setInt(8, Math.min(count, Math.max(1, template.maxStack())));
-                return ps;
-            }, keyHolder);
-            long itemId = keyHolder.getKey().longValue();
-            insertInventorySlot(playerId, slot, itemId);
-            return requireItem(itemId);
+            List<StackableStack> existingStacks = findInventoryStacks(playerId, template.id()).stream()
+                .map(stack -> new StackableStack(stack.id(), stack.quantity()))
+                .toList();
+            List<StackableGrantStep> plan = planStackableGrant(existingStacks, maxStack, count);
+            List<Long> affectedItemIds = new ArrayList<>();
+            for (StackableGrantStep step : plan) {
+                if (step.itemId() == null) {
+                    affectedItemIds.add(createStackableStack(playerId, template, step.quantity()));
+                } else {
+                    jdbcTemplate.update(
+                        "UPDATE item_instance SET quantity = quantity + ? WHERE id = ? AND player_id = ?",
+                        step.quantity(),
+                        step.itemId(),
+                        playerId
+                    );
+                    affectedItemIds.add(step.itemId());
+                }
+            }
+            return affectedItemIds.stream().map(this::requireItem).toList();
         }
     }
 
-    private Optional<ItemRecord> findInventoryStack(long playerId, String templateId) {
+    static List<StackableGrantStep> planStackableGrant(List<StackableStack> existingStacks, int maxStack, int amount) {
+        int stackLimit = Math.max(1, maxStack);
+        int remaining = Math.max(1, amount);
+        List<StackableGrantStep> steps = new ArrayList<>();
+        for (StackableStack stack : existingStacks) {
+            if (remaining <= 0) {
+                break;
+            }
+            int space = stackLimit - Math.max(0, stack.quantity());
+            if (space <= 0) {
+                continue;
+            }
+            int increment = Math.min(space, remaining);
+            steps.add(new StackableGrantStep(stack.itemId(), increment));
+            remaining -= increment;
+        }
+        while (remaining > 0) {
+            int quantity = Math.min(stackLimit, remaining);
+            steps.add(new StackableGrantStep(null, quantity));
+            remaining -= quantity;
+        }
+        return steps;
+    }
+
+    private long createStackableStack(long playerId, ItemTemplate template, int quantity) {
+        int slot = nextFreeSlot(playerId);
+        var keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                """
+                INSERT INTO item_instance
+                (player_id, template_id, name, item_type, quality, required_level, attack_bonus,
+                 defense_bonus, resistance_bonus, hp_bonus, mp_bonus, crit_bonus, sell_price, quantity)
+                VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, ?)
+                """,
+                Statement.RETURN_GENERATED_KEYS
+            );
+            ps.setLong(1, playerId);
+            ps.setString(2, template.id());
+            ps.setString(3, template.name());
+            ps.setString(4, template.type());
+            ps.setString(5, template.quality());
+            ps.setInt(6, template.requiredLevel());
+            ps.setInt(7, template.sellPrice());
+            ps.setInt(8, Math.max(1, Math.min(quantity, Math.max(1, template.maxStack()))));
+            return ps;
+        }, keyHolder);
+        long itemId = keyHolder.getKey().longValue();
+        insertInventorySlot(playerId, slot, itemId);
+        return itemId;
+    }
+
+    private List<ItemRecord> findInventoryStacks(long playerId, String templateId) {
         return jdbcTemplate.query(
             """
             SELECT ii.*, it.item_category, it.stackable, it.effect_type, it.effect_value_json,
@@ -252,7 +299,7 @@ public class InventoryService {
             (rs, rowNum) -> mapItem(rs),
             playerId,
             templateId
-        ).stream().findFirst();
+        );
     }
 
     public ItemRecord addMarketItemToInventory(
@@ -582,6 +629,10 @@ public class InventoryService {
             return new UseItemResult(item.name(), "attributePotion", List.of(), staminaService.snapshot(player.id()), snapshot(playerById(player.id())));
         }
 
+        if ("levelBoost".equals(item.effectType())) {
+            return useLevelBoost(player, item);
+        }
+
         if ("chest".equals(item.effectType())) {
             consumeOne(player.id(), item.id());
             String tieredGear = synthesisChestGear(item.templateId(), player.level());
@@ -596,6 +647,172 @@ public class InventoryService {
         }
 
         throw ApiException.badRequest("This item effect is not implemented: " + item.effectType());
+    }
+
+    private UseItemResult useLevelBoost(PlayerRecord player, ItemRecord item) {
+        PlayerRecord currentPlayer = playerById(player.id());
+        JsonNode effect = effectNode(item);
+        int targetLevel = effect.path("targetLevel").asInt(0);
+        if (targetLevel <= 1 || targetLevel > PlayerService.MAX_LEVEL) {
+            throw ApiException.badRequest("Level boost is missing a valid target level");
+        }
+        if (currentPlayer.level() >= targetLevel) {
+            throw ApiException.badRequest("角色已达到 Lv." + targetLevel + "，无法使用该药水");
+        }
+
+        consumeOne(currentPlayer.id(), item.id());
+        boostPlayerToLevel(currentPlayer, targetLevel);
+        PlayerRecord boostedPlayer = playerById(currentPlayer.id());
+        List<ItemRecord> rewards = grantLevelBoostEquipment(boostedPlayer, effect);
+        announcementService.publishLevelMilestones(boostedPlayer.name(), currentPlayer.level(), boostedPlayer.level());
+        return new UseItemResult(item.name(), "levelBoost", rewards, staminaService.snapshot(boostedPlayer.id()), snapshot(boostedPlayer));
+    }
+
+    private void boostPlayerToLevel(PlayerRecord player, int targetLevel) {
+        int delta = Math.max(0, targetLevel - player.level());
+        int strength = player.strength() + delta;
+        int agility = player.agility() + delta;
+        int constitution = player.constitution() + delta;
+        int intelligence = player.intelligence() + delta;
+        int spirit = player.spirit() + delta;
+        int freePoints = player.freePoints() + delta * 3;
+        switch (player.profession()) {
+            case "warrior" -> {
+                strength += delta;
+                constitution += delta;
+            }
+            case "ranger" -> {
+                agility += delta;
+                strength += delta;
+            }
+            case "mage" -> {
+                intelligence += delta;
+                spirit += delta;
+            }
+            default -> {
+            }
+        }
+        jdbcTemplate.update(
+            """
+            UPDATE player
+            SET level = ?, experience = 0, strength = ?, agility = ?, constitution = ?,
+                intelligence = ?, spirit = ?, free_points = ?
+            WHERE id = ?
+            """,
+            targetLevel,
+            strength,
+            agility,
+            constitution,
+            intelligence,
+            spirit,
+            freePoints,
+            player.id()
+        );
+    }
+
+    private List<ItemRecord> grantLevelBoostEquipment(PlayerRecord player, JsonNode effect) {
+        List<ItemRecord> rewards = new ArrayList<>();
+        int equipmentLevel = effect.path("equipmentLevel").asInt(player.level());
+        String quality = effect.path("equipmentQuality").asText("epic");
+        int ringIndex = 0;
+        for (String slot : LEVEL_BOOST_EQUIPMENT_SLOTS) {
+            if ("ring".equals(slot)) {
+                ringIndex++;
+            }
+            ItemTemplate template = gameConfigService.requireItem(levelBoostTemplateId(effect, slot, quality));
+            EquipmentStats stats = professionAdjustedStats(template, player.profession());
+            rewards.add(addMarketItemToInventory(
+                player.id(),
+                template.id(),
+                professionGearName(player.profession(), template.name(), slot, ringIndex),
+                template.type(),
+                template.quality(),
+                Math.max(equipmentLevel, template.requiredLevel()),
+                stats.attackBonus(),
+                stats.defenseBonus(),
+                stats.resistanceBonus(),
+                stats.hpBonus(),
+                stats.mpBonus(),
+                stats.critBonus(),
+                template.sellPrice(),
+                0,
+                0
+            ));
+        }
+        return rewards;
+    }
+
+    private String levelBoostTemplateId(JsonNode effect, String slot, String quality) {
+        JsonNode templates = effect.path("equipmentTemplates");
+        if (templates.hasNonNull(slot)) {
+            return templates.path(slot).asText();
+        }
+        String tier = effect.path("equipmentTier").asText("");
+        if (tier.isBlank()) {
+            throw ApiException.badRequest("Level boost is missing equipment tier");
+        }
+        return tier + "_" + slot + "_" + qualityCode(quality);
+    }
+
+    private String qualityCode(String quality) {
+        return switch (quality) {
+            case "common" -> "01";
+            case "uncommon" -> "02";
+            case "rare" -> "03";
+            case "epic" -> "04";
+            default -> throw ApiException.badRequest("Unsupported level boost equipment quality: " + quality);
+        };
+    }
+
+    private EquipmentStats professionAdjustedStats(ItemTemplate template, String profession) {
+        int attack = template.attackBonus();
+        int defense = template.defenseBonus();
+        int resistance = template.resistanceBonus();
+        int hp = template.hpBonus();
+        int mp = template.mpBonus();
+        double crit = template.critBonus() == null ? 0 : template.critBonus().doubleValue();
+        return switch (profession) {
+            case "warrior" -> new EquipmentStats(
+                scale(attack, 1.06),
+                scale(defense, 1.08),
+                resistance,
+                scale(hp, 1.10),
+                mp,
+                crit
+            );
+            case "ranger" -> new EquipmentStats(
+                scale(attack, 1.08),
+                defense,
+                resistance,
+                scale(hp, 1.04),
+                mp,
+                crit * 1.08
+            );
+            case "mage" -> new EquipmentStats(
+                scale(attack, 1.05),
+                defense,
+                scale(resistance, 1.06),
+                hp,
+                scale(mp, 1.10),
+                crit * 1.06
+            );
+            default -> new EquipmentStats(attack, defense, resistance, hp, mp, crit);
+        };
+    }
+
+    private int scale(int value, double multiplier) {
+        return Math.max(0, (int) Math.round(value * multiplier));
+    }
+
+    private String professionGearName(String profession, String baseName, String slot, int ringIndex) {
+        String prefix = switch (profession) {
+            case "warrior" -> "战士传承";
+            case "ranger" -> "游侠传承";
+            case "mage" -> "法师传承";
+            default -> "远征传承";
+        };
+        String suffix = "ring".equals(slot) ? (ringIndex == 1 ? "·左戒" : "·右戒") : "";
+        return prefix + "·" + baseName + suffix;
     }
 
     @Transactional
@@ -1444,9 +1661,25 @@ public class InventoryService {
     private record ChestLoot(String rewardTemplateId, int quantity) {
     }
 
+    private record EquipmentStats(
+        int attackBonus,
+        int defenseBonus,
+        int resistanceBonus,
+        int hpBonus,
+        int mpBonus,
+        double critBonus
+    ) {
+    }
+
     private record CraftRecipe(String id, String name, String resultTemplateId, int resultQuantity, int requiredLevel) {
     }
 
     private record CraftCost(String itemTemplateId, int quantity) {
+    }
+
+    record StackableStack(long itemId, int quantity) {
+    }
+
+    record StackableGrantStep(Long itemId, int quantity) {
     }
 }

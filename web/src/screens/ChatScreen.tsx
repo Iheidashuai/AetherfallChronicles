@@ -290,7 +290,7 @@ export function ChatScreen({ token }: { token: string }) {
           <SectionTitle icon={<MessageCircle size={18} />} title="频道情报" />
           <div className="chat-side-metrics">
             <Metric label="消息" value={messages.length.toString()} />
-            <Metric label="机器人" value={robotMessageCount.toString()} />
+            <Metric label="冒险者" value={robotMessageCount.toString()} />
             <Metric label="系统" value={systemMessageCount.toString()} />
             <Metric label="连接" value={streamConnected ? '在线' : '等待'} />
           </div>
@@ -323,4 +323,3 @@ export function ChatScreen({ token }: { token: string }) {
     </section>
   );
 }
-
