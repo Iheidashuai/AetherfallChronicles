@@ -1716,23 +1716,46 @@ export function CompareCard({ title, item, highlight = false, emptyTitle = '空�
   );
 }
 
-export function EnhanceModal({ item, gold, message, loading, stones = [], selectedStoneIds = [], onAddStone, onRemoveStone, onClose, onEnhance }: {
+function stoneStock(stone: Item) {
+  return Math.max(1, stone.quantity ?? 1);
+}
+
+function compareEnhancementStones(left: Item, right: Item) {
+  return right.enhanceBonusRate - left.enhanceBonusRate
+    || qualityRank(right.quality) - qualityRank(left.quality)
+    || right.requiredLevel - left.requiredLevel
+    || right.id - left.id;
+}
+
+export function EnhanceModal({ item, gold, loading, stones = [], selectedStoneIds = [], onAddStone, onRemoveStone, onReplaceStones, onClose, onEnhance }: {
   item: Item;
   gold: number;
-  message: string | null;
   loading: boolean;
   stones?: Item[];
   selectedStoneIds?: number[];
   onAddStone?: (stoneId: number) => void;
   onRemoveStone?: (index: number) => void;
+  onReplaceStones?: (stoneIds: number[]) => void;
   onClose: () => void;
   onEnhance: () => void;
 }) {
+  const [stonePickerOpen, setStonePickerOpen] = useState(false);
   const nextLevel = item.enhancementLevel + 1;
   const cost = enhanceCost(item);
   const stoneBonus = selectedStoneBonus(stones, selectedStoneIds);
   const chance = Math.min(0.95, enhanceChance(item) + stoneBonus);
+  const sortedStones = useMemo(() => [...stones].sort(compareEnhancementStones), [stones]);
+  const bestStoneIds = useMemo(() => sortedStones
+    .flatMap((stone) => Array.from({ length: stoneStock(stone) }, () => stone.id))
+    .slice(0, 3), [sortedStones]);
   const selectedStones = selectedStoneIds.map((stoneId) => stones.find((stone) => stone.id === stoneId) ?? null);
+  const canAddStone = !loading && selectedStoneIds.length < 3;
+  const canAutoFill = !loading && bestStoneIds.length > 0;
+  const hasSelectedStones = selectedStoneIds.length > 0;
+  const selectStone = (stoneId: number) => {
+    onAddStone?.(stoneId);
+    setStonePickerOpen(false);
+  };
   return (
     <div className="detail-backdrop result-modal-backdrop" onClick={onClose}>
       <section className={`decision-modal ${item.quality} ${enhancementEffectClass(item)}`} onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
@@ -1754,17 +1777,33 @@ export function EnhanceModal({ item, gold, message, loading, stones = [], select
           <Metric label="强化石" value={`${selectedStoneIds.length}/3`} />
           <Metric label="石头加成" value={`+${formatPercent(stoneBonus)}`} />
         </div>
-        {message && <div className="modal-notice">{message}</div>}
         <div className="enhance-stone-panel">
+          <div className="enhance-stone-head">
+            <div>
+              <strong>强化石槽</strong>
+              <span>{selectedStoneIds.length}/3 已放入</span>
+            </div>
+            <div className="enhance-stone-actions">
+              {hasSelectedStones && (
+                <button type="button" className="mini-action subtle" disabled={loading} onClick={() => onReplaceStones?.([])}>
+                  清空
+                </button>
+              )}
+              <button type="button" className="mini-action" disabled={!canAutoFill} onClick={() => onReplaceStones?.(bestStoneIds)}>
+                自动放入最佳
+              </button>
+            </div>
+          </div>
           <div className="stone-slot-row">
             {[0, 1, 2].map((slotIndex) => {
               const stone = selectedStones[slotIndex];
               return (
                 <button
                   key={slotIndex}
-                  className={`stone-slot ${stone ? stone.quality : ''}`}
-                  disabled={!stone}
-                  onClick={() => onRemoveStone?.(slotIndex)}
+                  type="button"
+                  className={`stone-slot ${stone ? stone.quality : 'empty'}`}
+                  disabled={loading}
+                  onClick={() => stone ? onRemoveStone?.(slotIndex) : setStonePickerOpen(true)}
                 >
                   {stone ? (
                     <>
@@ -1774,27 +1813,9 @@ export function EnhanceModal({ item, gold, message, loading, stones = [], select
                   ) : (
                     <>
                       <strong>空槽</strong>
-                      <span>可放强化石</span>
+                      <span>{canAddStone ? '选择强化石' : '已满'}</span>
                     </>
                   )}
-                </button>
-              );
-            })}
-          </div>
-          <div className="stone-option-list">
-            {stones.length === 0 && <EmptyState text="当前背包没有适用于下一强化等级的强化石。" />}
-            {stones.map((stone) => {
-              const selectedCount = selectedStoneCount(selectedStoneIds, stone.id);
-              const stock = Math.max(1, stone.quantity);
-              return (
-                <button
-                  key={stone.id}
-                  className={`stone-option ${stone.quality}`}
-                  disabled={loading || selectedStoneIds.length >= 3 || selectedCount >= stock}
-                  onClick={() => onAddStone?.(stone.id)}
-                >
-                  <strong>{equipmentDisplayName(stone)}</strong>
-                  <span>+{formatPercent(stone.enhanceBonusRate)} · {selectedCount}/{stock}</span>
                 </button>
               );
             })}
@@ -1810,6 +1831,38 @@ export function EnhanceModal({ item, gold, message, loading, stones = [], select
             {loading ? '强化中...' : item.enhancementLevel >= 15 ? '已达上限' : '强化一次'}
           </button>
         </div>
+        {stonePickerOpen && (
+          <div className="stone-picker-scrim" onClick={() => setStonePickerOpen(false)}>
+            <section className="stone-picker-sheet" onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
+              <div className="stone-picker-head">
+                <div>
+                  <strong>选择强化石</strong>
+                  <span>{selectedStoneIds.length}/3 已放入</span>
+                </div>
+                <button type="button" className="text-button close-button" onClick={() => setStonePickerOpen(false)}>关闭</button>
+              </div>
+              <div className="stone-option-list stone-picker-list">
+                {sortedStones.length === 0 && <EmptyState text="当前背包没有适用于下一强化等级的强化石。" />}
+                {sortedStones.map((stone) => {
+                  const selectedCount = selectedStoneCount(selectedStoneIds, stone.id);
+                  const stock = stoneStock(stone);
+                  return (
+                    <button
+                      key={stone.id}
+                      type="button"
+                      className={`stone-option ${stone.quality}`}
+                      disabled={loading || selectedStoneIds.length >= 3 || selectedCount >= stock}
+                      onClick={() => selectStone(stone.id)}
+                    >
+                      <strong>{equipmentDisplayName(stone)}</strong>
+                      <span>+{formatPercent(stone.enhanceBonusRate)} · {selectedCount}/{stock}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -2275,6 +2328,23 @@ export function SectionTitle({ icon, title }: { icon: ReactNode; title: string }
 
 export function EmptyState({ text }: { text: string }) {
   return <div className="empty-state">{text}</div>;
+}
+
+export function ToastNotice({ variant, title, message }: {
+  variant: FeedbackVariant | 'warning';
+  title: string;
+  message: string;
+}) {
+  const Icon = variant === 'success' ? CircleCheck : CircleAlert;
+  return (
+    <div className={`toast-notice ${variant}`} role="status" aria-live="polite">
+      <Icon size={20} />
+      <div>
+        <strong>{title}</strong>
+        <p>{message}</p>
+      </div>
+    </div>
+  );
 }
 
 export function FeedbackDialog({ variant, title, message, onClose }: {

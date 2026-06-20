@@ -156,7 +156,7 @@ import {
 
 
 import {
-  GlobalTicker, ProfessionGlyph, InfoPanel, SkillCard, SpecialDungeonPanel, EquipmentProcessingPanel, RiftResultPanel, ArenaProfileCard, ArenaOpponentCard, ArenaShopCard, ArenaMatchPanel, ArenaFighterCard, ArenaRankRow, BuildScorePanel, BuildSimulationPanel, WealthTierCard, RobotRechargeCard, CashIncomeCard, RobotRangeFilter, RobotActivityCard, RobotEventCard, RobotActivityDetailModal, ChatMessageBubble, SpeakerDetailModal, DungeonCard, DropPreviewCard, HomeEquipmentOverview, EquipmentPanel, PowerBreakdownPanel, CombatStatsPanel, StatContributionGrid, CombatStatCell, StatContributionCell, QuestCard, QuestDetailPanel, EnhancementBadge, ItemCard, TransferItemOption, ItemDetail, EquipConfirmModal, CompareCard, EnhanceModal, SellConfirmModal, CombatantCard, HpBar, ResultSummaryModal, SweepSummaryModal, MarketSaleCard, MarketListedCard, ListingCard, LeaderboardCard, CatalogFilterGroup, CatalogDetailPanel, Metric, StaminaPanel, NavTile, SectionTitle, EmptyState, FeedbackDialog, ConfirmDialog, TopBar, LoadingScreen, ErrorScreen,
+  GlobalTicker, ProfessionGlyph, InfoPanel, SkillCard, SpecialDungeonPanel, EquipmentProcessingPanel, RiftResultPanel, ArenaProfileCard, ArenaOpponentCard, ArenaShopCard, ArenaMatchPanel, ArenaFighterCard, ArenaRankRow, BuildScorePanel, BuildSimulationPanel, WealthTierCard, RobotRechargeCard, CashIncomeCard, RobotRangeFilter, RobotActivityCard, RobotEventCard, RobotActivityDetailModal, ChatMessageBubble, SpeakerDetailModal, DungeonCard, DropPreviewCard, HomeEquipmentOverview, EquipmentPanel, PowerBreakdownPanel, CombatStatsPanel, StatContributionGrid, CombatStatCell, StatContributionCell, QuestCard, QuestDetailPanel, EnhancementBadge, ItemCard, TransferItemOption, ItemDetail, EquipConfirmModal, CompareCard, EnhanceModal, SellConfirmModal, CombatantCard, HpBar, ResultSummaryModal, SweepSummaryModal, MarketSaleCard, MarketListedCard, ListingCard, LeaderboardCard, CatalogFilterGroup, CatalogDetailPanel, Metric, StaminaPanel, NavTile, SectionTitle, EmptyState, ToastNotice, FeedbackDialog, ConfirmDialog, TopBar, LoadingScreen, ErrorScreen,
   invalidateGameQueries,
 } from '../components/ui';
 
@@ -170,12 +170,21 @@ export function InventoryScreen({ token }: { token: string }) {
   const [equipCandidate, setEquipCandidate] = useState<Item | null>(null);
   const [enhanceItem, setEnhanceItem] = useState<Item | null>(null);
   const [sellItem, setSellItem] = useState<Item | null>(null);
-  const [enhanceMessage, setEnhanceMessage] = useState<string | null>(null);
+  const [enhanceToast, setEnhanceToast] = useState<{ variant: FeedbackVariant | 'warning'; title: string; message: string } | null>(null);
   const [selectedStoneIds, setSelectedStoneIds] = useState<number[]>([]);
   const { data, isLoading, error } = useQuery({
     queryKey: ['inventory', token],
     queryFn: () => gameApi.inventory(token),
   });
+
+  useEffect(() => {
+    if (!enhanceToast) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setEnhanceToast(null), 2400);
+    return () => window.clearTimeout(timeout);
+  }, [enhanceToast]);
+
   const visibleInventory = useMemo(() => {
     if (!data) {
       return [];
@@ -231,15 +240,22 @@ export function InventoryScreen({ token }: { token: string }) {
     mutationFn: ({ itemId, stoneItemIds }: { itemId: number; stoneItemIds: number[] }) => gameApi.enhance(token, itemId, stoneItemIds),
     onMutate: () => {
       setNotice(null);
+      setEnhanceToast(null);
     },
     onSuccess: async (result) => {
       queryClient.setQueryData(['inventory', token], result.inventory);
-      setEnhanceMessage(result.success ? '强化成功，装备属性已提升。' : '强化失败，幸运值提升，下次成功率提高。');
+      setSelectedStoneIds([]);
+      setEnhanceToast(result.success
+        ? { variant: 'success', title: '强化成功', message: '装备属性已提升。' }
+        : { variant: 'warning', title: '强化失败', message: '幸运值提升，下次成功率提高。' });
       const refreshed = [...result.inventory.inventory, ...Object.values(result.inventory.equippedItems)].find((item) => item.id === enhanceItem?.id);
       if (refreshed) {
         setEnhanceItem(refreshed);
       }
       await invalidateGameQueries(queryClient, token);
+    },
+    onError: (error) => {
+      setEnhanceToast({ variant: 'error', title: '强化失败', message: error.message });
     },
   });
   const useItemMutation = useMutation({
@@ -309,7 +325,6 @@ export function InventoryScreen({ token }: { token: string }) {
     equipBestMutation.error?.message ??
     unequipMutation.error?.message ??
     sellMutation.error?.message ??
-    enhanceMutation.error?.message ??
     useItemMutation.error?.message ??
     craftMutation.error?.message ??
     bulkSellMutation.error?.message ??
@@ -400,7 +415,7 @@ export function InventoryScreen({ token }: { token: string }) {
                       disabled={busy}
                       onClick={(event) => {
                         event.stopPropagation();
-                        setEnhanceMessage(null);
+                        setEnhanceToast(null);
                         setSelectedStoneIds([]);
                         setEnhanceItem(item);
                       }}
@@ -436,7 +451,7 @@ export function InventoryScreen({ token }: { token: string }) {
                     }}>穿戴</button>
                     <button className="mini-action" disabled={busy} onClick={(event) => {
                       event.stopPropagation();
-                      setEnhanceMessage(null);
+                      setEnhanceToast(null);
                       setSelectedStoneIds([]);
                       setEnhanceItem(item);
                     }}>强化</button>
@@ -547,20 +562,21 @@ export function InventoryScreen({ token }: { token: string }) {
         <EnhanceModal
           item={enhanceItem}
           gold={data.gold}
-          message={enhanceMessage}
           loading={enhanceMutation.isPending}
           onClose={() => {
             setEnhanceItem(null);
-            setEnhanceMessage(null);
+            setEnhanceToast(null);
             setSelectedStoneIds([]);
           }}
           stones={enhancementStonesForItem(data.inventory, enhanceItem)}
           selectedStoneIds={selectedStoneIds}
           onAddStone={(stoneId) => setSelectedStoneIds((current) => current.length >= 3 ? current : [...current, stoneId])}
           onRemoveStone={(index) => setSelectedStoneIds((current) => current.filter((_, currentIndex) => currentIndex !== index))}
+          onReplaceStones={setSelectedStoneIds}
           onEnhance={() => enhanceMutation.mutate({ itemId: enhanceItem.id, stoneItemIds: selectedStoneIds })}
         />
       )}
+      {enhanceToast && <ToastNotice variant={enhanceToast.variant} title={enhanceToast.title} message={enhanceToast.message} />}
       {sellItem && (
         <SellConfirmModal
           item={sellItem}
@@ -580,4 +596,3 @@ export function InventoryScreen({ token }: { token: string }) {
     </section>
   );
 }
-
