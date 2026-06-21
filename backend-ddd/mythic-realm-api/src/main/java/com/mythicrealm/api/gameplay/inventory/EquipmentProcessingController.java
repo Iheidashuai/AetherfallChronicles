@@ -82,6 +82,16 @@ public class EquipmentProcessingController {
         return result;
     }
 
+    @PostMapping("/gems/upgrade-batch")
+    EquipmentProcessingService.ProcessingBatchResult upgradeGemBatches(
+        @RequestHeader(name = "Authorization", required = false) String authorization,
+        @RequestBody UpgradeGemBatchesRequest request
+    ) {
+        var result = processingService.upgradeGemBatches(player(authorization), request.gemItemIdBatches());
+        recordProcessingQuest(result);
+        return result;
+    }
+
     @PostMapping("/{itemId}/reforge")
     EquipmentProcessingService.ProcessingResult reforge(
         @RequestHeader(name = "Authorization", required = false) String authorization,
@@ -114,10 +124,19 @@ public class EquipmentProcessingController {
         questService.recordEvent(player.id(), new QuestEvent("combatPowerReached", null, result.powerAfter()));
     }
 
+    private void recordProcessingQuest(EquipmentProcessingService.ProcessingBatchResult result) {
+        PlayerRecord player = playerService.requireById(result.item().playerId());
+        questService.recordEvent(player.id(), new QuestEvent("equipmentProcessed", result.actionType(), result.processedCount()));
+        questService.recordEvent(player.id(), new QuestEvent("combatPowerReached", null, result.powerAfter()));
+    }
+
     record SocketGemRequest(long gemItemId) {
     }
 
     record UpgradeGemsRequest(List<Long> gemItemIds) {
+    }
+
+    record UpgradeGemBatchesRequest(List<List<Long>> gemItemIdBatches) {
     }
 
     record ReforgeRequest(List<Integer> lockedAffixIndexes) {

@@ -121,7 +121,7 @@ import {
 import {
   announcementKindName, announcementSeenKey, ascendBlockReason, assignBuildEquipment, 
   assignSkillToFirstSlot, attributeName, battleEventName, battleFramesForResult, 
-  battleLogTone, bonusText, bossArchetypeName, buildEquipmentStatLine, buildGapWarnings, 
+  battleLogTone, bestEnhancementStoneIds, bonusText, bossArchetypeName, buildEquipmentStatLine, buildGapWarnings,
   buildSlotForItem, buildToDraft, canRefine, catalogCardText, catalogEffectDetail, 
   catalogIconForItem, catalogItemPower, catalogItemToDetail, catalogMatchesLevel, 
   catalogSourceHint, catalogStatRows, catalogSummary, catalogUsageHint, categoryName, 
@@ -134,7 +134,7 @@ import {
   equipmentSlotPairs, filterCatalogItems, filterMarketListings, filterNumber, filterRobots, 
   formatChatTime, formatDropRate, formatMarketActivityTime, formatNumber, formatPercent, 
   formatRelativeTime, formatSigned, formatStaminaTime, formatStatValue, gemEffectText, 
-  gemUpgradeBlockReason, homeSlotShortName, inventoryTemplateQuantity, isEquipmentItem, 
+  homeSlotShortName, inventoryTemplateQuantity, isEquipmentItem,
   isEquipmentUpgrade, isMarketableInventoryItem, isSpecialDungeon, itemCategoryLabel, 
   itemEffectText, itemLocationLabel, itemMatchesCategory, itemPower, itemTypesForCategory, 
   leaderboardEntryToSpeaker, leaderboardEquipmentBonusText, leaderboardEquipmentToDetail, 
@@ -169,11 +169,13 @@ export function BlacksmithScreen({ token }: { token: string }) {
   const [enhanceItem, setEnhanceItem] = useState<Item | null>(null);
   const [enhanceToast, setEnhanceToast] = useState<{ variant: FeedbackVariant | 'warning'; title: string; message: string } | null>(null);
   const [selectedStoneIds, setSelectedStoneIds] = useState<number[]>([]);
+  const [autoEnhanceRunning, setAutoEnhanceRunning] = useState(false);
+  const autoEnhanceStopRef = useRef(false);
+  const autoEnhanceClosedRef = useRef(false);
   const [sourceItemId, setSourceItemId] = useState<number | null>(null);
   const [targetItemId, setTargetItemId] = useState<number | null>(null);
   const [refineFocus, setRefineFocus] = useState('balanced');
   const [selectedGemId, setSelectedGemId] = useState<number | null>(null);
-  const [selectedUpgradeGemIds, setSelectedUpgradeGemIds] = useState<number[]>([]);
   const [lockedAffixIndexes, setLockedAffixIndexes] = useState<number[]>([]);
   const [useAscensionProtector, setUseAscensionProtector] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -215,12 +217,23 @@ export function BlacksmithScreen({ token }: { token: string }) {
   const sourceItems = useMemo(() => allEquipment.filter((item) => item.enhancementLevel > 0), [allEquipment]);
   const targetItems = useMemo(() => allEquipment.filter((item) => item.id !== sourceItemId), [allEquipment, sourceItemId]);
   const selectedSource = allEquipment.find((item) => item.id === sourceItemId) ?? null;
-  const selectedTarget = targetItems.find((item) => item.id === targetItemId) ?? null;
+  const selectableTransferTargets = useMemo(() => {
+    if (!selectedSource) {
+      return [];
+    }
+    return allEquipment.filter((item) =>
+      item.id !== selectedSource.id
+      && item.itemType === selectedSource.itemType
+      && item.enhancementLevel < selectedSource.enhancementLevel,
+    );
+  }, [allEquipment, selectedSource]);
+  const selectedTarget = selectableTransferTargets.find((item) => item.id === targetItemId) ?? null;
   const focusedItem = focusedItemId ? allEquipment.find((item) => item.id === focusedItemId) ?? null : null;
   const canTransfer = Boolean(
     selectedSource
     && selectedTarget
     && selectedSource.id !== selectedTarget.id
+    && selectedSource.itemType === selectedTarget.itemType
     && selectedSource.enhancementLevel > selectedTarget.enhancementLevel,
   );
 
@@ -231,7 +244,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
     if (sourceItemId && !sourceItems.some((item) => item.id === sourceItemId)) {
       setSourceItemId(null);
     }
-    if (targetItemId && !targetItems.some((item) => item.id === targetItemId)) {
+    if (targetItemId && !selectableTransferTargets.some((item) => item.id === targetItemId)) {
       setTargetItemId(null);
     }
     if (focusedItemId && !allEquipment.some((item) => item.id === focusedItemId)) {
@@ -240,7 +253,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
     if (detailItem && !allEquipment.some((item) => item.id === detailItem.id)) {
       setDetailItem(null);
     }
-  }, [allEquipment, data, detailItem, focusedItemId, sourceItemId, sourceItems, targetItemId, targetItems]);
+  }, [allEquipment, data, detailItem, focusedItemId, selectableTransferTargets, sourceItemId, sourceItems, targetItemId]);
 
   const enhanceMutation = useMutation({
     mutationFn: ({ itemId, stoneItemIds }: { itemId: number; stoneItemIds: number[] }) => gameApi.enhance(token, itemId, stoneItemIds),
@@ -268,6 +281,87 @@ export function BlacksmithScreen({ token }: { token: string }) {
       setEnhanceToast({ variant: 'error', title: '强化失败', message: error.message });
     },
   });
+
+  function itemFromInventorySnapshot(snapshot: InventorySnapshot, itemId: number) {
+    return [...snapshot.inventory, ...Object.values(snapshot.equippedItems)].find((item) => item.id === itemId) ?? null;
+  }
+
+  function closeEnhanceModal() {
+    autoEnhanceStopRef.current = true;
+    autoEnhanceClosedRef.current = true;
+    setEnhanceItem(null);
+    setEnhanceToast(null);
+    setSelectedStoneIds([]);
+  }
+
+  function stopAutoEnhance() {
+    autoEnhanceStopRef.current = true;
+    setEnhanceToast({ variant: 'warning', title: '停止中', message: '当前强化完成后会停止。' });
+  }
+
+  async function runAutoEnhance({ targetLevel, useBestStones }: { targetLevel: number; useBestStones: boolean }) {
+    if (!enhanceItem || !data || autoEnhanceRunning) {
+      return;
+    }
+    autoEnhanceStopRef.current = false;
+    autoEnhanceClosedRef.current = false;
+    setAutoEnhanceRunning(true);
+    setSelectedStoneIds([]);
+    setNotice(null);
+    setEnhanceToast(null);
+    let currentItem = enhanceItem;
+    let currentSnapshot = data;
+    let attempts = 0;
+    let successes = 0;
+    try {
+      while (
+        !autoEnhanceStopRef.current
+        && currentItem.enhancementLevel < Math.min(15, targetLevel)
+        && currentItem.enhancementLevel < 15
+      ) {
+        const nextCost = enhanceCost(currentItem);
+        if (currentSnapshot.gold < nextCost) {
+          throw new Error(`金币不足，需要 ${formatNumber(nextCost)} 金`);
+        }
+        const stoneItemIds = useBestStones ? bestEnhancementStoneIds(currentSnapshot.inventory, currentItem) : [];
+        const result = await gameApi.enhance(token, currentItem.id, stoneItemIds);
+        attempts++;
+        if (result.success) {
+          successes++;
+        }
+        currentSnapshot = result.inventory;
+        queryClient.setQueryData(['inventory', token], result.inventory);
+        setSelectedStoneIds([]);
+        const refreshed = itemFromInventorySnapshot(result.inventory, currentItem.id);
+        if (!refreshed) {
+          throw new Error('强化后未找到目标装备');
+        }
+        currentItem = refreshed;
+        if (!autoEnhanceClosedRef.current) {
+          setEnhanceItem(refreshed);
+          setFocusedItemId(refreshed.id);
+          if (detailItem?.id === refreshed.id) {
+            setDetailItem(refreshed);
+          }
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 220));
+      }
+      if (!autoEnhanceClosedRef.current) {
+        const stopped = autoEnhanceStopRef.current && currentItem.enhancementLevel < Math.min(15, targetLevel);
+        setEnhanceToast(stopped
+          ? { variant: 'warning', title: '自动强化已停止', message: `已尝试 ${attempts} 次，成功 ${successes} 次。` }
+          : { variant: 'success', title: '自动强化完成', message: `已强化到 +${currentItem.enhancementLevel}，尝试 ${attempts} 次，成功 ${successes} 次。` });
+      }
+    } catch (error) {
+      if (!autoEnhanceClosedRef.current) {
+        setEnhanceToast({ variant: 'error', title: '自动强化中断', message: (error as Error).message });
+      }
+    } finally {
+      setAutoEnhanceRunning(false);
+      await invalidateGameQueries(queryClient, token);
+    }
+  }
+
   const transferMutation = useMutation({
     mutationFn: () => {
       if (sourceItemId == null || targetItemId == null) {
@@ -278,6 +372,9 @@ export function BlacksmithScreen({ token }: { token: string }) {
       }
       if (!selectedSource || !selectedTarget) {
         throw new Error('请选择有效的来源装备和目标装备');
+      }
+      if (selectedSource.itemType !== selectedTarget.itemType) {
+        throw new Error('强化转移只能转移到相同部位装备');
       }
       if (selectedTarget.enhancementLevel >= selectedSource.enhancementLevel) {
         throw new Error('目标装备强化等级必须低于来源装备');
@@ -312,7 +409,6 @@ export function BlacksmithScreen({ token }: { token: string }) {
     queryClient.setQueryData(['inventory', token], result.snapshot.inventory);
     setFocusedItemId(result.item.id);
     setSelectedGemId(null);
-    setSelectedUpgradeGemIds([]);
     setNotice(`${result.message}，角色战力 ${formatNumber(result.powerBefore)} → ${formatNumber(result.powerAfter)}`);
     await invalidateGameQueries(queryClient, token);
   }
@@ -338,6 +434,11 @@ export function BlacksmithScreen({ token }: { token: string }) {
     onMutate: () => setNotice(null),
     onSuccess: handleProcessingSuccess,
   });
+  const upgradeGemBatchesMutation = useMutation({
+    mutationFn: (gemItemIdBatches: number[][]) => gameApi.upgradeGemBatches(token, gemItemIdBatches),
+    onMutate: () => setNotice(null),
+    onSuccess: handleProcessingSuccess,
+  });
   const reforgeMutation = useMutation({
     mutationFn: ({ itemId, locked }: { itemId: number; locked: number[] }) => gameApi.reforgeEquipment(token, itemId, locked),
     onMutate: () => setNotice(null),
@@ -360,15 +461,17 @@ export function BlacksmithScreen({ token }: { token: string }) {
     || socketGemMutation.isPending
     || unsocketGemMutation.isPending
     || upgradeGemsMutation.isPending
+    || upgradeGemBatchesMutation.isPending
     || reforgeMutation.isPending
     || ascendMutation.isPending;
-  const busy = enhanceMutation.isPending || transferMutation.isPending || refineMutation.isPending || processingBusy;
+  const busy = enhanceMutation.isPending || autoEnhanceRunning || transferMutation.isPending || refineMutation.isPending || processingBusy;
   const blacksmithError = transferMutation.error?.message
     ?? refineMutation.error?.message
     ?? unlockSocketMutation.error?.message
     ?? socketGemMutation.error?.message
     ?? unsocketGemMutation.error?.message
     ?? upgradeGemsMutation.error?.message
+    ?? upgradeGemBatchesMutation.error?.message
     ?? reforgeMutation.error?.message
     ?? ascendMutation.error?.message;
   const feedback = blacksmithError
@@ -386,6 +489,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
     socketGemMutation.reset();
     unsocketGemMutation.reset();
     upgradeGemsMutation.reset();
+    upgradeGemBatchesMutation.reset();
     reforgeMutation.reset();
     ascendMutation.reset();
   }
@@ -393,28 +497,35 @@ export function BlacksmithScreen({ token }: { token: string }) {
   function selectTransferSource(item: Item) {
     setSourceItemId(item.id);
     setNotice(null);
-    const currentTarget = allEquipment.find((equipment) => equipment.id === targetItemId);
-    if (!currentTarget || currentTarget.id === item.id || currentTarget.enhancementLevel >= item.enhancementLevel) {
+    const currentTarget = allEquipment.find((equipment) =>
+      equipment.id === targetItemId
+      && equipment.id !== item.id
+      && equipment.itemType === item.itemType
+      && equipment.enhancementLevel < item.enhancementLevel,
+    );
+    if (!currentTarget) {
       setTargetItemId(null);
     }
   }
 
   const enhanceableCount = allEquipment.filter((item) => item.enhancementLevel < 15).length;
   const transferTargetCount = selectedSource
-    ? targetItems.filter((item) => item.enhancementLevel < selectedSource.enhancementLevel).length
+    ? selectableTransferTargets.length
     : targetItems.length;
   const riftEssence = materialCount(data.inventory, 'mat_abyss_essence');
   const riftShards = materialCount(data.inventory, 'mat_tempering_shard');
   const riftOrbs = materialCount(data.inventory, 'mat_reforge_orb');
   const refineableCount = allEquipment.filter((item) => (item.refineLevel ?? 0) < 5).length;
   const socketableCount = processingData.equipment.filter((entry) => entry.unlockedSocketCount < entry.socketLimit).length;
+  const gemCount = processingData.gems.reduce((total, gem) => total + Math.max(1, gem.quantity ?? 1), 0);
   const reforgeableCount = processingData.equipment.filter((entry) => entry.affixLimit > 0).length;
   const ascendableCount = processingData.equipment.filter((entry) => (entry.item.ascensionLevel ?? 0) < 5).length;
   const forgeViews: Array<{ id: ForgeView; title: string; detail: string; icon: ReactNode; badge: string }> = [
     { id: 'enhance', title: '装备强化', detail: '提升基础属性与战力', icon: <Hammer size={18} />, badge: `${enhanceableCount}` },
     { id: 'transfer', title: '强化转移', detail: '把高强化继承到低强化装备', icon: <Repeat2 size={18} />, badge: `${sourceItems.length}` },
     { id: 'refine', title: '深渊淬炼', detail: '消耗深渊材料定向强化', icon: <Sparkles size={18} />, badge: `${refineableCount}` },
-    { id: 'socket', title: '宝石镶嵌', detail: '开孔 · 镶嵌 · 合成', icon: <Gem size={18} />, badge: `${socketableCount}` },
+    { id: 'socket', title: '宝石镶嵌', detail: '开孔 · 镶嵌', icon: <Gem size={18} />, badge: `${socketableCount}` },
+    { id: 'gem', title: '宝石合成', detail: '三合一 · 一键合成', icon: <Sparkles size={18} />, badge: `${gemCount}` },
     { id: 'reforge', title: '词条重铸', detail: '锁词 · 高风险洗练', icon: <ScrollText size={18} />, badge: `${reforgeableCount}` },
     { id: 'ascend', title: '装备升阶', detail: '突破加工上限', icon: <Shield size={18} />, badge: `${ascendableCount}` },
   ];
@@ -487,24 +598,28 @@ export function BlacksmithScreen({ token }: { token: string }) {
                   <SectionTitle icon={<Hammer size={18} />} title="强化清单" />
                   <strong>{enhanceableCount} 件可强化</strong>
                 </div>
-                <div className="item-grid blacksmith-item-grid forge-equipment-grid">
+                <div className="item-grid blacksmith-item-grid forge-equipment-grid forge-enhancement-list-grid">
                   {allEquipment.length === 0 && <EmptyState text="当前没有可强化装备。" />}
                   {allEquipment.map((item) => (
                     <ItemCard
                       key={item.id}
                       item={item}
                       label={itemLocationLabel(item, data.equippedItems)}
+                      className="forge-equipment-card"
+                      showEffectText={false}
                       onSelect={() => setFocusedItemId(item.id)}
                     >
-                      <button className="mini-action" disabled={busy || item.enhancementLevel >= 15} onClick={(event) => {
-                        event.stopPropagation();
-                        setFocusedItemId(item.id);
-                        setEnhanceToast(null);
-                        setSelectedStoneIds([]);
-                        setEnhanceItem(item);
-                      }}>
-                        {item.enhancementLevel >= 15 ? '满级' : '强化'}
-                      </button>
+                      {item.enhancementLevel < 15 && (
+                        <button className="mini-action forge-equipment-action" disabled={busy} onClick={(event) => {
+                          event.stopPropagation();
+                          setFocusedItemId(item.id);
+                          setEnhanceToast(null);
+                          setSelectedStoneIds([]);
+                          setEnhanceItem(item);
+                        }}>
+                          强化
+                        </button>
+                      )}
                     </ItemCard>
                   ))}
                 </div>
@@ -579,13 +694,12 @@ export function BlacksmithScreen({ token }: { token: string }) {
                 </div>
                 <div className="transfer-list">
                   {!selectedSource && <EmptyState text="先选择来源装备。" />}
-                  {selectedSource && targetItems.length === 0 && <EmptyState text="暂无可继承的目标装备。" />}
-                  {selectedSource && targetItems.map((item) => (
+                  {selectedSource && selectableTransferTargets.length === 0 && <EmptyState text="暂无同部位、低强化的可继承目标。" />}
+                  {selectedSource && selectableTransferTargets.map((item) => (
                     <TransferItemOption
                       key={item.id}
                       item={item}
                       selected={item.id === targetItemId}
-                      disabled={item.id === sourceItemId || item.enhancementLevel >= selectedSource.enhancementLevel}
                       onSelect={() => setTargetItemId(item.id)}
                     />
                   ))}
@@ -605,7 +719,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
                     item={selectedTarget}
                     highlight
                     emptyTitle="未选择"
-                    emptyText="目标装备不能与来源装备相同。"
+                    emptyText="目标装备必须同部位，且强化等级低于来源。"
                     emptyMeta="无目标"
                   />
                 </div>
@@ -627,13 +741,15 @@ export function BlacksmithScreen({ token }: { token: string }) {
                   <SectionTitle icon={<Sparkles size={18} />} title="深渊淬炼清单" />
                   <strong>{refineableCount} 件可淬炼</strong>
                 </div>
-                <div className="item-grid blacksmith-item-grid forge-equipment-grid">
+                <div className="item-grid blacksmith-item-grid forge-equipment-grid forge-enhancement-list-grid">
                   {allEquipment.length === 0 && <EmptyState text="当前没有可淬炼装备。" />}
                   {allEquipment.map((item) => (
                     <ItemCard
                       key={item.id}
                       item={item}
                       label={`${itemLocationLabel(item, data.equippedItems)} · 淬${item.refineLevel ?? 0}/5`}
+                      className="forge-equipment-card"
+                      showEffectText={false}
                       onSelect={() => setFocusedItemId(item.id)}
                     >
                       <button className="mini-action" disabled={busy || (item.refineLevel ?? 0) >= 5} onClick={(event) => {
@@ -702,13 +818,12 @@ export function BlacksmithScreen({ token }: { token: string }) {
             </div>
           )}
 
-          {(activeView === 'socket' || activeView === 'reforge' || activeView === 'ascend') && (
+          {(activeView === 'socket' || activeView === 'gem' || activeView === 'reforge' || activeView === 'ascend') && (
             <EquipmentProcessingPanel
               mode={activeView}
               snapshot={processingData}
               focusedItemId={focusedItemId}
               selectedGemId={selectedGemId}
-              selectedUpgradeGemIds={selectedUpgradeGemIds}
               lockedAffixIndexes={lockedAffixIndexes}
               useProtector={useAscensionProtector}
               busy={busy}
@@ -717,13 +832,6 @@ export function BlacksmithScreen({ token }: { token: string }) {
                 setLockedAffixIndexes([]);
               }}
               onSelectGem={setSelectedGemId}
-              onToggleUpgradeGem={(gemId) => setSelectedUpgradeGemIds((current) => {
-                if (current.includes(gemId)) {
-                  return current.filter((id) => id !== gemId);
-                }
-                return current.length >= 3 ? current : [...current, gemId];
-              })}
-              onClearUpgradeGems={() => setSelectedUpgradeGemIds([])}
               onToggleAffixLock={(index) => setLockedAffixIndexes((current) =>
                 current.includes(index) ? current.filter((value) => value !== index) : [...current, index],
               )}
@@ -732,6 +840,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
               onSocketGem={(itemId, socketIndex, gemItemId) => socketGemMutation.mutate({ itemId, socketIndex, gemItemId })}
               onUnsocketGem={(itemId, socketIndex) => unsocketGemMutation.mutate({ itemId, socketIndex })}
               onUpgradeGems={(gemIds) => upgradeGemsMutation.mutate(gemIds)}
+              onUpgradeGemBatches={(gemIdBatches) => upgradeGemBatchesMutation.mutate(gemIdBatches)}
               onReforge={(itemId, locked) => reforgeMutation.mutate({ itemId, locked })}
               onAscend={(itemId, useProtector) => ascendMutation.mutate({ itemId, useProtector })}
             />
@@ -743,18 +852,17 @@ export function BlacksmithScreen({ token }: { token: string }) {
         <EnhanceModal
           item={enhanceItem}
           gold={data.gold}
-          loading={enhanceMutation.isPending}
-          onClose={() => {
-            setEnhanceItem(null);
-            setEnhanceToast(null);
-            setSelectedStoneIds([]);
-          }}
+          loading={enhanceMutation.isPending || autoEnhanceRunning}
+          autoEnhanceRunning={autoEnhanceRunning}
+          onClose={closeEnhanceModal}
           stones={enhancementStonesForItem(data.inventory, enhanceItem)}
           selectedStoneIds={selectedStoneIds}
           onAddStone={(stoneId) => setSelectedStoneIds((current) => current.length >= 3 ? current : [...current, stoneId])}
           onRemoveStone={(index) => setSelectedStoneIds((current) => current.filter((_, currentIndex) => currentIndex !== index))}
           onReplaceStones={setSelectedStoneIds}
           onEnhance={() => enhanceMutation.mutate({ itemId: enhanceItem.id, stoneItemIds: selectedStoneIds })}
+          onAutoEnhance={runAutoEnhance}
+          onStopAutoEnhance={stopAutoEnhance}
         />
       )}
       {enhanceToast && <ToastNotice variant={enhanceToast.variant} title={enhanceToast.title} message={enhanceToast.message} />}

@@ -290,6 +290,9 @@ export function typeName(type: string) {
   if (type === 'levelBoost') {
     return '成长药水';
   }
+  if (type === 'progressBooster') {
+    return '成长券';
+  }
   if (type === 'fragment') {
     return '碎片';
   }
@@ -304,7 +307,10 @@ export function isEquipmentItem(item: { itemCategory?: string; itemType: string 
     || ['weapon', 'helmet', 'armor', 'legs', 'boots', 'gloves', 'necklace', 'ring'].includes(item.itemType);
 }
 
-export function itemCategoryLabel(item: { itemCategory?: string; itemType: string }) {
+export function itemCategoryLabel(item: { itemCategory?: string; itemType: string; typeLabel?: string }) {
+  if (item.typeLabel) {
+    return item.typeLabel;
+  }
   const category = item.itemCategory ?? (isEquipmentItem(item) ? 'equipment' : 'material');
   const names: Record<string, string> = {
     equipment: '装备',
@@ -316,6 +322,10 @@ export function itemCategoryLabel(item: { itemCategory?: string; itemType: strin
 }
 
 export function itemEffectText(item: Item | EquipmentDetailData) {
+  const configuredSummary = 'effectSummary' in item ? (item as { effectSummary?: string }).effectSummary : undefined;
+  if (configuredSummary) {
+    return configuredSummary;
+  }
   if (item.effectType === 'staminaPotion') {
     return `恢复疲劳 +${effectNumber(item, 'amount')}`;
   }
@@ -326,6 +336,16 @@ export function itemEffectText(item: Item | EquipmentDetailData) {
   if (item.effectType === 'levelBoost') {
     const effect = parseEffectValue(item);
     return `直升 Lv.${Number(effect.targetLevel ?? 60)} · 获得 9 件史诗装备`;
+  }
+  if (item.effectType === 'equipmentSetChest') {
+    const effect = parseEffectValue(item);
+    return `开启获得 Lv.${Number(effect.equipmentLevel ?? item.requiredLevel)} 传说九件套`;
+  }
+  if (item.effectType === 'equipmentProgressBoost') {
+    const effect = parseEffectValue(item);
+    return effect.progression === 'ascension'
+      ? `全部装备升阶至 ${Number(effect.targetLevel ?? 5)} 阶`
+      : `全部装备强化至 +${Number(effect.targetLevel ?? 15)}`;
   }
   if (item.effectType === 'enhancementStone') {
     return `成功率 +${formatPercent(item.enhanceBonusRate ?? 0)} · +${item.minEnhanceLevel ?? 1}-${item.maxEnhanceLevel ?? 15}`;
@@ -370,6 +390,12 @@ export function enhancementStonesForItem(items: Item[], item: Item | null) {
     .filter((stone) => stone.effectType === 'enhancementStone')
     .filter((stone) => stone.minEnhanceLevel <= nextLevel && stone.maxEnhanceLevel >= nextLevel)
     .sort((left, right) => right.enhanceBonusRate - left.enhanceBonusRate || qualityRank(right.quality) - qualityRank(left.quality) || left.id - right.id);
+}
+
+export function bestEnhancementStoneIds(items: Item[], item: Item | null, limit = 3) {
+  return enhancementStonesForItem(items, item)
+    .flatMap((stone) => Array.from({ length: Math.max(1, stone.quantity ?? 1) }, () => stone.id))
+    .slice(0, Math.max(0, limit));
 }
 
 export function selectedStoneBonus(stones: Item[], selectedStoneIds: number[]) {
@@ -889,7 +915,18 @@ export function catalogStatRows(item: ItemCatalogItem) {
 }
 
 export function catalogEffectDetail(item: ItemCatalogItem) {
+  if (item.effectSummary) {
+    return item.effectSummary;
+  }
   const effect = parseEffectValue(catalogItemToDetail(item));
+  if (item.effectType === 'equipmentSetChest') {
+    return `套装等级：Lv.${Number(effect.equipmentLevel ?? item.requiredLevel)} · 品质：${qualityName(String(effect.equipmentQuality ?? item.quality))} · 数量：9 件`;
+  }
+  if (item.effectType === 'equipmentProgressBoost') {
+    return effect.progression === 'ascension'
+      ? `升阶目标：${Number(effect.targetLevel ?? 5)} 阶 · 范围：背包与已穿戴装备`
+      : `强化目标：+${Number(effect.targetLevel ?? 15)} · 范围：背包与已穿戴装备`;
+  }
   const entries = Object.entries(effect);
   if (entries.length === 0) {
     return '';
@@ -911,6 +948,10 @@ export function catalogEffectDetail(item: ItemCatalogItem) {
 }
 
 export function catalogSourceHint(item: ItemCatalogItem) {
+  const effect = parseEffectValue(catalogItemToDetail(item));
+  if (item.shopPurchaseLimit || effect.dropPolicy === 'shopOnly' || Number(effect.shopPurchaseLimit ?? 0) > 0) {
+    return '冒险者商店限购';
+  }
   if (item.effectType === 'levelBoost') {
     return '冒险者商店限购一次';
   }
@@ -930,6 +971,9 @@ export function catalogSourceHint(item: ItemCatalogItem) {
 }
 
 export function catalogUsageHint(item: ItemCatalogItem) {
+  if (item.usageHint) {
+    return item.usageHint;
+  }
   if (item.effectType === 'enhancementStone') {
     return `强化 +${item.minEnhanceLevel} 至 +${item.maxEnhanceLevel} 时可用，成功率 +${formatPercent(item.enhanceBonusRate)}`;
   }
@@ -941,6 +985,15 @@ export function catalogUsageHint(item: ItemCatalogItem) {
   }
   if (item.effectType === 'levelBoost') {
     return '使用后直升指定等级，并获得对应职业的整套等级装备。';
+  }
+  if (item.effectType === 'equipmentSetChest') {
+    return '开启后一次性获得对应等级的九件传说装备。';
+  }
+  if (item.effectType === 'equipmentProgressBoost') {
+    const effect = parseEffectValue(catalogItemToDetail(item));
+    return effect.progression === 'ascension'
+      ? '使用后把背包和已穿戴装备的升阶等级直接补到上限。'
+      : '使用后把背包和已穿戴装备的强化等级直接补到上限。';
   }
   if (item.effectType === 'fragment') {
     return '积攒到配方数量后可合成传说或不朽装备宝箱。';
@@ -1101,7 +1154,7 @@ export function gemEffectText(gem: Item) {
   }
 }
 
-function gemRank(gem: Item) {
+export function gemRankLevel(gem: Item) {
   try {
     const parsed = JSON.parse(gem.effectValueJson || '{}');
     const rank = Number(parsed.rank);
@@ -1113,6 +1166,64 @@ function gemRank(gem: Item) {
   }
   const match = gem.templateId.match(/_(\d+)$/);
   return match ? Number(match[1]) : 1;
+}
+
+function gemRank(gem: Item) {
+  return gemRankLevel(gem);
+}
+
+export type GemInventoryGroup = {
+  templateId: string;
+  representative: Item;
+  gems: Item[];
+  quantity: number;
+  rank: number;
+  dustCostPerCraft: number;
+  craftableByCount: number;
+  craftableByDust: number;
+  craftableCount: number;
+};
+
+const MAX_GEM_BATCH_CRAFTS = 1000;
+
+export function gemInventoryGroups(gems: Item[], materials: Record<string, number> = {}) {
+  const byTemplate = new Map<string, Item[]>();
+  gems.forEach((gem) => {
+    if (gem.effectType !== 'gem') {
+      return;
+    }
+    byTemplate.set(gem.templateId, [...(byTemplate.get(gem.templateId) ?? []), gem]);
+  });
+  const gemDust = materials.mat_gem_dust ?? 0;
+  return Array.from(byTemplate.entries())
+    .map(([templateId, groupedGems]) => {
+      const representative = groupedGems[0];
+      const rank = gemRankLevel(representative);
+      const dustCostPerCraft = Math.max(1, rank) * 8;
+      const quantity = groupedGems.reduce((total, gem) => total + Math.max(1, gem.quantity ?? 1), 0);
+      const craftableByCount = rank >= 9 ? 0 : Math.floor(quantity / 3);
+      const craftableByDust = rank >= 9 ? 0 : Math.floor(gemDust / dustCostPerCraft);
+      const craftableCount = Math.min(craftableByCount, craftableByDust, MAX_GEM_BATCH_CRAFTS);
+      const expandedGemRefs = groupedGems.flatMap((gem) =>
+        Array.from({ length: Math.min(Math.max(1, gem.quantity ?? 1), Math.max(3, craftableCount * 3)) }, () => gem),
+      );
+      return {
+        templateId,
+        representative,
+        gems: expandedGemRefs,
+        quantity,
+        rank,
+        dustCostPerCraft,
+        craftableByCount,
+        craftableByDust,
+        craftableCount,
+      };
+    })
+    .sort((left, right) =>
+      left.rank - right.rank
+      || qualityRank(right.representative.quality) - qualityRank(left.representative.quality)
+      || left.representative.name.localeCompare(right.representative.name, 'zh-Hans-CN')
+    );
 }
 
 export function processingActionName(actionType: string) {
@@ -1233,7 +1344,14 @@ export function formatMarketActivityTime(activity: { createdAt?: string; minutes
 }
 
 export function isMarketableInventoryItem(item: Item) {
-  if (item.effectType === 'levelBoost') {
+  if (typeof item.marketable === 'boolean') {
+    return item.marketable;
+  }
+  const effect = parseEffectValue(item);
+  if (item.effectType === 'levelBoost'
+    || item.effectType === 'equipmentSetChest'
+    || item.effectType === 'equipmentProgressBoost'
+    || effect.dropPolicy === 'shopOnly') {
     return false;
   }
   return item.itemCategory === 'equipment'
@@ -1887,9 +2005,16 @@ export function enhanceCost(item: Item) {
 }
 
 export function enhanceChance(item: Item) {
+  return Math.min(0.95, enhanceBaseChance(item) + enhanceLuckBonus(item));
+}
+
+export function enhanceBaseChance(item: Item) {
   const nextLevel = item.enhancementLevel + 1;
-  const base = nextLevel <= 3 ? 1 : nextLevel <= 6 ? 0.8 : nextLevel <= 9 ? 0.6 : nextLevel <= 12 ? 0.4 : 0.2;
-  return Math.min(0.95, base + item.enhancementLuck * 0.05);
+  return nextLevel <= 3 ? 1 : nextLevel <= 6 ? 0.8 : nextLevel <= 9 ? 0.6 : nextLevel <= 12 ? 0.4 : 0.2;
+}
+
+export function enhanceLuckBonus(item: Item) {
+  return Math.max(0, item.enhancementLuck ?? 0) * 0.05;
 }
 
 export function bonusText(item: Item | EquipmentDetailData) {

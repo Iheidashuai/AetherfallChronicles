@@ -1,6 +1,7 @@
 package com.mythicrealm.api.gameplay.gameconfig;
 
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.ItemTemplate;
+import com.mythicrealm.api.gameplay.inventory.ItemEffectMetadata;
 import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +25,7 @@ public class ConfigController {
     @GetMapping("/items")
     List<ItemCatalogItem> items() {
         return gameConfigService.itemTemplates().stream()
-            .map(ItemCatalogItem::from)
+            .map(item -> ItemCatalogItem.from(item, ItemEffectMetadata.fromTemplate(item)))
             .toList();
     }
 
@@ -50,9 +51,17 @@ public class ConfigController {
         String effectValueJson,
         double enhanceBonusRate,
         int minEnhanceLevel,
-        int maxEnhanceLevel
+        int maxEnhanceLevel,
+        boolean usable,
+        String actionLabel,
+        String typeLabel,
+        String effectSummary,
+        String usageHint,
+        boolean marketable,
+        String robotPolicy,
+        int shopPurchaseLimit
     ) {
-        static ItemCatalogItem from(ItemTemplate item) {
+        static ItemCatalogItem from(ItemTemplate item, ItemEffectMetadata metadata) {
             return new ItemCatalogItem(
                 item.id(),
                 item.name(),
@@ -75,7 +84,15 @@ public class ConfigController {
                 item.effectValueJson(),
                 item.enhanceBonusRate(),
                 item.minEnhanceLevel(),
-                item.maxEnhanceLevel()
+                item.maxEnhanceLevel(),
+                metadata.usable(),
+                metadata.actionLabel(),
+                metadata.typeLabel(),
+                metadata.effectSummary(),
+                metadata.usageHint(),
+                metadata.marketable(),
+                metadata.robotPolicy(),
+                metadata.shopPurchaseLimit()
             );
         }
     }

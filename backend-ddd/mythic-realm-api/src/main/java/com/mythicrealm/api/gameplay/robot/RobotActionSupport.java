@@ -9,6 +9,7 @@ import com.mythicrealm.api.gameplay.endgame.EndgameRiftService;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.inventory.EquipmentProcessingService;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
+import com.mythicrealm.api.gameplay.inventory.ItemEffectEvent;
 import com.mythicrealm.api.gameplay.inventory.ItemRecord;
 import com.mythicrealm.api.gameplay.market.MarketService;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
@@ -16,6 +17,7 @@ import com.mythicrealm.api.gameplay.quest.QuestService;
 import com.mythicrealm.api.gameplay.quest.QuestService.QuestEvent;
 import com.mythicrealm.api.gameplay.recharge.RechargeService;
 import com.mythicrealm.api.gameplay.skill.SkillService;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -284,11 +286,19 @@ public class RobotActionSupport {
             if (rank >= 9 || gemDust < rank * 8) {
                 continue;
             }
-            List<Long> sameGems = gems.stream()
-                .filter(candidate -> candidate.templateId().equals(gem.templateId()))
-                .map(ItemRecord::id)
-                .limit(3)
-                .toList();
+            List<Long> sameGems = new ArrayList<>();
+            for (ItemRecord candidate : gems) {
+                if (!candidate.templateId().equals(gem.templateId())) {
+                    continue;
+                }
+                int available = Math.max(1, candidate.quantity());
+                for (int index = 0; index < available && sameGems.size() < 3; index++) {
+                    sameGems.add(candidate.id());
+                }
+                if (sameGems.size() >= 3) {
+                    break;
+                }
+            }
             if (sameGems.size() == 3) {
                 return sameGems;
             }
@@ -477,7 +487,7 @@ public class RobotActionSupport {
             && context.staminaPotionCount() > 0) {
             RobotActionResult result = useFirstItem(
                 context,
-                item -> "staminaPotion".equals(item.effectType()),
+                item -> hasAnyTag(item, "stamina", "staminaPotion"),
                 Comparator.comparingInt(ItemRecord::sellPrice),
                 "item_stamina",
                 score
@@ -503,7 +513,7 @@ public class RobotActionSupport {
         if (context.chestCount() > 0) {
             RobotActionResult result = useFirstItem(
                 context,
-                ItemRecord::chest,
+                item -> item.chest() || hasAnyTag(item, "chest"),
                 Comparator.comparingInt((ItemRecord item) -> qualityRank(item.quality())).reversed(),
                 "item_chest",
                 score
@@ -516,7 +526,7 @@ public class RobotActionSupport {
         if (context.attributePotionCount() > 0) {
             RobotActionResult result = useFirstItem(
                 context,
-                item -> "attributePotion".equals(item.effectType()),
+                item -> hasAnyTag(item, "attribute", "attributePotion"),
                 Comparator.comparingInt(ItemRecord::requiredLevel),
                 "item_attribute",
                 score
@@ -531,7 +541,7 @@ public class RobotActionSupport {
             && context.staminaPotionCount() > 0) {
             return useFirstItem(
                 context,
-                item -> "staminaPotion".equals(item.effectType()),
+                item -> hasAnyTag(item, "stamina", "staminaPotion"),
                 Comparator.comparingInt(ItemRecord::sellPrice),
                 "item_stamina",
                 score
@@ -683,6 +693,7 @@ public class RobotActionSupport {
         RobotActionScore score
     ) {
         List<ItemRecord> candidates = inventoryService.inventoryItems(context.player().id()).stream()
+            .filter(this::robotCanUse)
             .filter(filter)
             .sorted(comparator)
             .toList();
@@ -726,14 +737,22 @@ public class RobotActionSupport {
     }
 
     private void recordUseItemQuestEvents(long playerId, InventoryService.UseItemResult result) {
-        questService.recordEvent(playerId, new QuestEvent("itemUsed", result.effectType(), 1));
-        if ("chest".equals(result.effectType())) {
-            questService.recordEvent(playerId, QuestEvent.of("chestOpened"));
+        for (ItemEffectEvent event : result.events()) {
+            questService.recordEvent(playerId, new QuestEvent(event.type(), event.targetId(), event.amount()));
         }
-        if ("staminaPotion".equals(result.effectType())) {
-            questService.recordEvent(playerId, QuestEvent.of("staminaPotionUsed"));
+    }
+
+    private boolean robotCanUse(ItemRecord item) {
+        return item.usable() && !"never".equals(item.robotPolicy());
+    }
+
+    private boolean hasAnyTag(ItemRecord item, String... tags) {
+        for (String tag : tags) {
+            if (item.effectTags().contains(tag)) {
+                return true;
+            }
         }
-        questService.recordEvent(playerId, new QuestEvent("combatPowerReached", null, result.inventory().combatPower()));
+        return false;
     }
 
     private int qualityRank(String quality) {

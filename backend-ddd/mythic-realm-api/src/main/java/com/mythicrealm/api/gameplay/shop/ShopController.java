@@ -47,6 +47,6 @@ public class ShopController {
         return shopService.purchase(player, offerId, request.quantity());
     }
 
-    record PurchaseRequest(@Min(1) @Max(99) int quantity) {
+    record PurchaseRequest(@Min(1) @Max(999) int quantity) {
     }
 }

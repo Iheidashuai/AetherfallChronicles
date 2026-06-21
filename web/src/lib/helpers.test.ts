@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '../api';
 import {
+  bestEnhancementStoneIds,
+  enhanceBaseChance,
   enhanceChance,
   enhanceCost,
+  enhanceLuckBonus,
   formatNumber,
   formatStaminaTime,
+  gemInventoryGroups,
   gemUpgradeBlockReason,
+  isMarketableInventoryItem,
+  itemEffectText,
   liveStaminaSnapshot,
   pad2,
   professionName,
@@ -50,6 +56,27 @@ describe('enhanceChance', () => {
   it('adds luck but caps at 0.95', () => {
     expect(enhanceChance(item({ enhancementLevel: 14, enhancementLuck: 3 }))).toBeCloseTo(0.35);
     expect(enhanceChance(item({ enhancementLevel: 0, enhancementLuck: 10 }))).toBe(0.95);
+  });
+
+  it('exposes base chance and blessing bonus separately', () => {
+    const target = item({ enhancementLevel: 9, enhancementLuck: 3 });
+
+    expect(enhanceBaseChance(target)).toBeCloseTo(0.4);
+    expect(enhanceLuckBonus(target)).toBeCloseTo(0.15);
+  });
+});
+
+describe('bestEnhancementStoneIds', () => {
+  it('chooses strongest applicable stones with stack quantity', () => {
+    const target = item({ enhancementLevel: 9 });
+    const stones = [
+      item({ id: 1, effectType: 'enhancementStone', enhanceBonusRate: 0.05, quality: 'uncommon', minEnhanceLevel: 1, maxEnhanceLevel: 15, quantity: 1 }),
+      item({ id: 2, effectType: 'enhancementStone', enhanceBonusRate: 0.22, quality: 'immortal', minEnhanceLevel: 10, maxEnhanceLevel: 15, quantity: 2 }),
+      item({ id: 3, effectType: 'enhancementStone', enhanceBonusRate: 0.16, quality: 'legendary', minEnhanceLevel: 7, maxEnhanceLevel: 15, quantity: 1 }),
+      item({ id: 4, effectType: 'enhancementStone', enhanceBonusRate: 0.5, quality: 'immortal', minEnhanceLevel: 13, maxEnhanceLevel: 15, quantity: 1 }),
+    ];
+
+    expect(bestEnhancementStoneIds(stones, target)).toEqual([2, 2, 3]);
   });
 });
 
@@ -121,5 +148,59 @@ describe('gemUpgradeBlockReason', () => {
     const gems = [gem(1, 'gem_ruby_9', 9), gem(2, 'gem_ruby_9', 9), gem(3, 'gem_ruby_9', 9)];
 
     expect(gemUpgradeBlockReason(gems, [1, 2, 3], { mat_gem_dust: 999 })).toBe('该宝石已达到最高阶。');
+  });
+});
+
+describe('gemInventoryGroups', () => {
+  it('counts stack quantity when grouping gems for crafting', () => {
+    const groups = gemInventoryGroups([
+      item({
+        id: 1,
+        templateId: 'gem_ruby_1',
+        name: '裂纹红宝石 I',
+        quality: 'rare',
+        quantity: 9,
+        effectType: 'gem',
+        effectValueJson: JSON.stringify({ kind: 'ruby', rank: 1, stat: 'attack' }),
+      }),
+    ], { mat_gem_dust: 24 });
+
+    expect(groups[0]).toMatchObject({
+      quantity: 9,
+      craftableByCount: 3,
+      craftableByDust: 3,
+      craftableCount: 3,
+    });
+    expect(groups[0].gems.slice(0, 3).map((entry) => entry.id)).toEqual([1, 1, 1]);
+  });
+});
+
+describe('itemEffectText', () => {
+  it('describes catch-up set chests and progress boosters', () => {
+    expect(itemEffectText(item({
+      effectType: 'equipmentSetChest',
+      itemCategory: 'chest',
+      requiredLevel: 1,
+      effectValueJson: JSON.stringify({ equipmentLevel: 90, equipmentQuality: 'legendary' }),
+    }))).toBe('开启获得 Lv.90 传说九件套');
+
+    expect(itemEffectText(item({
+      effectType: 'equipmentProgressBoost',
+      effectValueJson: JSON.stringify({ progression: 'enhancement', targetLevel: 15 }),
+    }))).toBe('全部装备强化至 +15');
+
+    expect(itemEffectText(item({
+      effectType: 'equipmentProgressBoost',
+      effectValueJson: JSON.stringify({ progression: 'ascension', targetLevel: 5 }),
+    }))).toBe('全部装备升阶至 5 阶');
+  });
+
+  it('keeps shop-only catch-up items out of market listing choices', () => {
+    expect(isMarketableInventoryItem(item({
+      itemCategory: 'chest',
+      itemType: 'chest',
+      effectType: 'equipmentSetChest',
+      effectValueJson: JSON.stringify({ dropPolicy: 'shopOnly' }),
+    }))).toBe(false);
   });
 });

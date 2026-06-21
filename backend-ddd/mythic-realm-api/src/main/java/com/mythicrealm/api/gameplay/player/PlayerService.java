@@ -55,7 +55,7 @@ public class PlayerService {
                     INSERT INTO player
                     (account_id, name, profession, real_money, wealth_tier_level, wealth_tier,
                      strength, agility, constitution, intelligence, spirit)
-                    VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, 1000000, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     Statement.RETURN_GENERATED_KEYS
                 );

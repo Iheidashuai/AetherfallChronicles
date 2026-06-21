@@ -109,14 +109,9 @@ public class InventoryController {
     ) {
         PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
         var result = inventoryService.useItem(player, itemId);
-        questService.recordEvent(player.id(), new QuestEvent("itemUsed", result.effectType(), 1));
-        if ("chest".equals(result.effectType())) {
-            questService.recordEvent(player.id(), QuestEvent.of("chestOpened"));
+        for (ItemEffectEvent event : result.events()) {
+            questService.recordEvent(player.id(), new QuestEvent(event.type(), event.targetId(), event.amount()));
         }
-        if ("staminaPotion".equals(result.effectType())) {
-            questService.recordEvent(player.id(), QuestEvent.of("staminaPotionUsed"));
-        }
-        questService.recordEvent(player.id(), new QuestEvent("combatPowerReached", null, result.inventory().combatPower()));
         return result;
     }
 

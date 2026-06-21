@@ -30,7 +30,7 @@ CREATE TABLE player (
     level INT NOT NULL DEFAULT 1,
     experience INT NOT NULL DEFAULT 0,
     gold BIGINT NOT NULL DEFAULT 100,
-    real_money BIGINT NOT NULL DEFAULT 0,
+    real_money BIGINT NOT NULL DEFAULT 1000000,
     guild_coin BIGINT NOT NULL DEFAULT 0,
     wealth_tier_level INT NOT NULL DEFAULT 0,
     wealth_tier VARCHAR(64) NOT NULL DEFAULT '贫民',
@@ -82,7 +82,7 @@ CREATE TABLE item_template (
     stackable BOOLEAN NOT NULL DEFAULT FALSE,
     max_stack INT NOT NULL DEFAULT 1,
     effect_type VARCHAR(64) NULL,
-    effect_value_json VARCHAR(1000) NULL,
+    effect_value_json TEXT NULL,
     tradeable BOOLEAN NOT NULL DEFAULT TRUE,
     market_category VARCHAR(32) NOT NULL DEFAULT 'equipment',
     market_min_unit_price INT NOT NULL DEFAULT 1,
@@ -9815,7 +9815,10 @@ INSERT INTO item_template
     ('potion_stamina_medium', '中瓶疲劳药水', 'staminaPotion', 'consumable', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 50 点疲劳，疲劳值不会超过 1000。', 35, TRUE, 99, 'staminaPotion', '{"amount":50}', 0, 1, 15),
     ('potion_stamina_large', '大瓶疲劳药水', 'staminaPotion', 'consumable', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 100 点疲劳，疲劳值不会超过 1000。', 80, TRUE, 99, 'staminaPotion', '{"amount":100}', 0, 1, 15),
     ('potion_stamina_elite', '远征疲劳药水', 'staminaPotion', 'consumable', 'legendary', 20, 0, 0, 0, 0, 0, 0, 0, '使用后恢复 150 点疲劳，适合长线刷本前补满状态。', 140, TRUE, 99, 'staminaPotion', '{"amount":150}', 0, 1, 15),
-    ('potion_level_60_boost', '一键60级药水', 'levelBoost', 'consumable', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '使用后直升 Lv.60，并获得当前职业九件 60 级史诗传承装备。商店限购一次。', 1, FALSE, 1, 'levelBoost', '{"targetLevel":60,"equipmentLevel":60,"equipmentQuality":"epic","equipmentTier":"eq_t48","shopPurchaseLimit":1,"dropPolicy":"shopOnly"}', 0, 1, 15),
+    ('potion_level_60_boost', '一键60级药水', 'levelBoost', 'consumable', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '使用后直升 Lv.60，并获得当前职业九件 60 级史诗传承装备。商店限购一次。', 1, FALSE, 1, 'configured', '{"version":1,"tags":["leveling","equipment","shopOnly"],"ui":{"typeLabel":"成长药水","actionLabel":"使用","summary":"直升 Lv.60 · 获得 9 件史诗装备","usageHint":"使用后立即生效。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"setLevel","targetLevel":60},{"op":"grantEquipmentPackage","equipmentLevel":60,"equipmentQuality":"epic","equipmentTier":"eq_t48","professionNamed":true}],"events":[]},"market":{"tradeable":false},"shop":{"purchaseLimit":1},"robot":{"policy":"never"}}', 0, 1, 15),
+    ('potion_level_70_boost', '一键70级药水', 'levelBoost', 'consumable', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '使用后直升 Lv.70，并获得当前职业九件 70 级史诗传承装备。商店限购一次。', 120, FALSE, 1, 'configured', '{"version":1,"tags":["leveling","equipment","shopOnly"],"ui":{"typeLabel":"成长药水","actionLabel":"使用","summary":"直升 Lv.70 · 获得 9 件史诗装备","usageHint":"使用后立即生效。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"setLevel","targetLevel":70},{"op":"grantEquipmentPackage","equipmentLevel":70,"equipmentQuality":"epic","equipmentTier":"eq_t58","professionNamed":true}],"events":[]},"market":{"tradeable":false},"shop":{"purchaseLimit":1},"robot":{"policy":"never"}}', 0, 1, 15),
+    ('potion_level_80_boost', '一键80级药水', 'levelBoost', 'consumable', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '使用后直升 Lv.80，并获得当前职业九件 80 级史诗传承装备。商店限购一次。', 240, FALSE, 1, 'configured', '{"version":1,"tags":["leveling","equipment","shopOnly"],"ui":{"typeLabel":"成长药水","actionLabel":"使用","summary":"直升 Lv.80 · 获得 9 件史诗装备","usageHint":"使用后立即生效。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"setLevel","targetLevel":80},{"op":"grantEquipmentPackage","equipmentLevel":80,"equipmentQuality":"epic","equipmentTier":"eq_t68","professionNamed":true}],"events":[]},"market":{"tradeable":false},"shop":{"purchaseLimit":1},"robot":{"policy":"never"}}', 0, 1, 15),
+    ('potion_level_90_boost', '一键90级药水', 'levelBoost', 'consumable', 'immortal', 1, 0, 0, 0, 0, 0, 0, 0, '使用后直升 Lv.90，并获得当前职业九件 90 级史诗传承装备。商店限购一次。', 420, FALSE, 1, 'configured', '{"version":1,"tags":["leveling","equipment","shopOnly"],"ui":{"typeLabel":"成长药水","actionLabel":"使用","summary":"直升 Lv.90 · 获得 9 件史诗装备","usageHint":"使用后立即生效。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"setLevel","targetLevel":90},{"op":"grantEquipmentPackage","equipmentLevel":90,"equipmentQuality":"epic","equipmentTier":"eq_t78","professionNamed":true}],"events":[]},"market":{"tradeable":false},"shop":{"purchaseLimit":1},"robot":{"policy":"never"}}', 0, 1, 15),
     ('potion_strength_low', '初级力量药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点力量，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"strength","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_agility_low', '初级敏捷药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点敏捷，适合低等级阶段补强主属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"agility","amount":1,"maxLevel":30}', 0, 1, 15),
     ('potion_constitution_low', '初级体质药水', 'attributePotion', 'consumable', 'uncommon', 1, 0, 0, 0, 0, 0, 0, 0, '使用后永久增加 1 点体质，适合低等级阶段补强生存属性。', 18, TRUE, 99, 'attributePotion', '{"attribute":"constitution","amount":1,"maxLevel":30}', 0, 1, 15),
@@ -9835,6 +9838,11 @@ INSERT INTO item_template
     ('chest_guild_supply', '公会补给宝箱', 'chest', 'chest', 'rare', 1, 0, 0, 0, 0, 0, 0, 0, '开启后可获得疲劳药水、低阶强化石或少量装备碎片。', 45, TRUE, 99, 'chest', NULL, 0, 1, 15),
     ('chest_forge_cache', '锻炉秘藏宝箱', 'chest', 'chest', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '开启后可获得强化石和装备碎片，是铁匠铺成长的重要补给。', 90, TRUE, 99, 'chest', NULL, 0, 1, 15),
     ('chest_spider_trove', '蛛影秘宝箱', 'chest', 'chest', 'epic', 1, 0, 0, 0, 0, 0, 0, 0, '蛛影林地出产的副本宝箱，内含补给和早期稀有装备。', 120, TRUE, 99, 'chest', NULL, 0, 1, 15),
+    ('chest_legendary_set_70', '70级传说九件套宝箱', 'chest', 'chest', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '开启后获得九件 70 级血月传说装备。商店限购一次。', 260, FALSE, 1, 'configured', '{"version":1,"tags":["chest","equipment","shopOnly"],"ui":{"typeLabel":"套装宝箱","actionLabel":"开启","summary":"获得 Lv.70 传说九件套装备","usageHint":"开启后一次性获得九件装备。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"grantEquipmentPackage","equipmentLevel":70,"equipmentQuality":"legendary","equipmentTemplatePrefix":"eq_bloodmoon_l70"}],"events":[{"type":"chestOpened"}]},"market":{"tradeable":false},"shop":{"purchaseLimit":1},"robot":{"policy":"never"}}', 0, 1, 15),
+    ('chest_legendary_set_80', '80级传说九件套宝箱', 'chest', 'chest', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '开启后获得九件 80 级血月传说装备。商店限购一次。', 520, FALSE, 1, 'configured', '{"version":1,"tags":["chest","equipment","shopOnly"],"ui":{"typeLabel":"套装宝箱","actionLabel":"开启","summary":"获得 Lv.80 传说九件套装备","usageHint":"开启后一次性获得九件装备。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"grantEquipmentPackage","equipmentLevel":80,"equipmentQuality":"legendary","equipmentTemplatePrefix":"eq_bloodmoon_l80"}],"events":[{"type":"chestOpened"}]},"market":{"tradeable":false},"shop":{"purchaseLimit":1},"robot":{"policy":"never"}}', 0, 1, 15),
+    ('chest_legendary_set_90', '90级传说九件套宝箱', 'chest', 'chest', 'legendary', 1, 0, 0, 0, 0, 0, 0, 0, '开启后获得九件 90 级血月传说装备。商店限购一次。', 880, FALSE, 1, 'configured', '{"version":1,"tags":["chest","equipment","shopOnly"],"ui":{"typeLabel":"套装宝箱","actionLabel":"开启","summary":"获得 Lv.90 传说九件套装备","usageHint":"开启后一次性获得九件装备。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"grantEquipmentPackage","equipmentLevel":90,"equipmentQuality":"legendary","equipmentTemplatePrefix":"eq_bloodmoon_l90"}],"events":[{"type":"chestOpened"}]},"market":{"tradeable":false},"shop":{"purchaseLimit":1},"robot":{"policy":"never"}}', 0, 1, 15),
+    ('scroll_enhancement_max_all', '全装强化满级券', 'progressBooster', 'consumable', 'immortal', 1, 0, 0, 0, 0, 0, 0, 0, '使用后将背包和已穿戴装备的强化等级全部提升至 +15。商店限购 10 次。', 1200, FALSE, 1, 'configured', '{"version":1,"tags":["equipment","progression","shopOnly"],"ui":{"typeLabel":"成长券","actionLabel":"使用","summary":"全部可玩装备强化至 +15","usageHint":"使用后直接补齐背包和已穿戴装备。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"setEquipmentProgress","progression":"enhancement","targetLevel":15,"scope":"playableEquipment"}],"events":[]},"market":{"tradeable":false},"shop":{"purchaseLimit":10},"robot":{"policy":"never"}}', 0, 1, 15),
+    ('scroll_ascension_max_all', '全装升阶满级券', 'progressBooster', 'consumable', 'immortal', 1, 0, 0, 0, 0, 0, 0, 0, '使用后将背包和已穿戴装备的升阶等级全部提升至 5 阶。商店限购 10 次。', 1600, FALSE, 1, 'configured', '{"version":1,"tags":["equipment","progression","shopOnly"],"ui":{"typeLabel":"成长券","actionLabel":"使用","summary":"全部可玩装备升阶至 5 阶","usageHint":"使用后直接补齐背包和已穿戴装备。"},"use":{"conditions":[],"consumeSelf":1,"effects":[{"op":"setEquipmentProgress","progression":"ascension","targetLevel":5,"scope":"playableEquipment"}],"events":[]},"market":{"tradeable":false},"shop":{"purchaseLimit":10},"robot":{"policy":"never"}}', 0, 1, 15),
     ('chest_legendary_cache', '传说装备宝箱', 'chest', 'chest', 'legendary', 20, 0, 0, 0, 0, 0, 0, 0, '开启后可获得传说装备或高阶强化补给。', 250, TRUE, 99, 'chest', NULL, 0, 1, 15),
     ('chest_immortal_cache', '不朽装备宝箱', 'chest', 'chest', 'immortal', 60, 0, 0, 0, 0, 0, 0, 0, '开启后可获得不朽装备或龙血级强化材料。', 600, TRUE, 99, 'chest', NULL, 0, 1, 15)
 ON DUPLICATE KEY UPDATE name = VALUES(name), item_type = VALUES(item_type), item_category = VALUES(item_category), quality = VALUES(quality), required_level = VALUES(required_level), attack_bonus = VALUES(attack_bonus), defense_bonus = VALUES(defense_bonus), resistance_bonus = VALUES(resistance_bonus), hp_bonus = VALUES(hp_bonus), mp_bonus = VALUES(mp_bonus), crit_bonus = VALUES(crit_bonus), random_range = VALUES(random_range), description = VALUES(description), sell_price = VALUES(sell_price), stackable = VALUES(stackable), max_stack = VALUES(max_stack), effect_type = VALUES(effect_type), effect_value_json = VALUES(effect_value_json), enhance_bonus_rate = VALUES(enhance_bonus_rate), min_enhance_level = VALUES(min_enhance_level), max_enhance_level = VALUES(max_enhance_level);
@@ -10315,6 +10323,10 @@ INSERT INTO item_template
     ('chest_abyss_weekly', '深渊周箱', 'chest', 'chest', 'legendary', 60, 0, 0, 0, 0, 0, 0.000000, 0, '根据本周最高深渊层数发放的奖励宝箱。', 1200, TRUE, 99, 'chest', '{"source":"riftWeekly"}', 0.0000, 1, 15)
 ON DUPLICATE KEY UPDATE name = VALUES(name), item_type = VALUES(item_type), item_category = VALUES(item_category), quality = VALUES(quality), required_level = VALUES(required_level), description = VALUES(description), sell_price = VALUES(sell_price), stackable = VALUES(stackable), max_stack = VALUES(max_stack), effect_type = VALUES(effect_type), effect_value_json = VALUES(effect_value_json);
 
+-- 背包内除装备外的物品按模板聚合到一个 item_instance.quantity 中；max_stack 不再用于拆分背包槽位。
+UPDATE item_template SET stackable = TRUE, max_stack = 2147483647 WHERE item_category <> 'equipment';
+UPDATE item_template SET max_stack = 2147483647 WHERE stackable = TRUE;
+
 INSERT INTO gem_template
 (template_id, gem_kind, rank_level, stat_key, stat_value, slot_kind, next_template_id, sort_order) VALUES
     ('gem_ruby_1', 'ruby', 1, 'attack', 18.0000, 'any', 'gem_ruby_2', 110),
@@ -10391,12 +10403,36 @@ INSERT INTO shop_offer
     ('processing_ascension_pack', '升阶核心补给包', '购买 2 个升阶核心，核心来源仍以深渊为主。', 'enhancement', 68, 'mat_ascension_core', 2, 0, 60, 280, TRUE),
     ('processing_guard_pack', '护阶符', '购买 1 个护阶符，保护 +3 以上装备升阶失败不掉阶。', 'enhancement', 118, 'mat_ascension_guard', 1, 0, 60, 286, TRUE),
     ('growth_level_60_boost', '一键60级药水', '购买后在背包使用，直升 Lv.60 并获得当前职业九件 60 级史诗传承装备。限购一次。', 'growth', 1, 'potion_level_60_boost', 1, 0, 1, 300, TRUE),
+    ('growth_level_70_boost', '一键70级药水', '购买后在背包使用，直升 Lv.70 并获得当前职业九件 70 级史诗传承装备。限购一次。', 'growth', 18, 'potion_level_70_boost', 1, 0, 1, 302, TRUE),
+    ('growth_level_80_boost', '一键80级药水', '购买后在背包使用，直升 Lv.80 并获得当前职业九件 80 级史诗传承装备。限购一次。', 'growth', 38, 'potion_level_80_boost', 1, 0, 1, 304, TRUE),
+    ('growth_level_90_boost', '一键90级药水', '购买后在背包使用，直升 Lv.90 并获得当前职业九件 90 级史诗传承装备。限购一次。', 'growth', 68, 'potion_level_90_boost', 1, 0, 1, 306, TRUE),
     ('chest_growth_pack', '远征成长宝箱', '购买 1 个成长宝箱，随机获得属性药水、疲劳药水或强化石。', 'growth', 16, 'chest_growth_cache', 1, 0, 15, 310, TRUE),
+    ('growth_enhancement_max_all', '全装强化满级券', '购买后在背包使用，将背包和已穿戴装备的强化全部提升至 +15。最多购买 10 次。', 'growth', 188, 'scroll_enhancement_max_all', 1, 0, 1, 360, TRUE),
+    ('growth_ascension_max_all', '全装升阶满级券', '购买后在背包使用，将背包和已穿戴装备的升阶全部提升至 5 阶。最多购买 10 次。', 'growth', 288, 'scroll_ascension_max_all', 1, 0, 1, 370, TRUE),
     ('chest_forge_pack', '锻炉秘藏宝箱', '购买 1 个锻炉秘藏宝箱，随机获得强化石或装备碎片。', 'chest', 28, 'chest_forge_cache', 1, 0, 1, 320, TRUE),
-    ('gem_ruby_starter', '裂纹红宝石', '购买 1 颗 1 级红宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 42, 'gem_ruby_1', 1, 0, 60, 410, TRUE),
-    ('gem_sapphire_starter', '裂纹蓝宝石', '购买 1 颗 1 级蓝宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 38, 'gem_sapphire_1', 1, 0, 60, 420, TRUE),
-    ('gem_emerald_starter', '裂纹绿宝石', '购买 1 颗 1 级绿宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 42, 'gem_emerald_1', 1, 0, 60, 430, TRUE),
-    ('gem_topaz_starter', '裂纹黄玉', '购买 1 颗 1 级黄玉，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 48, 'gem_topaz_1', 1, 0, 60, 440, TRUE)
+    ('chest_legendary_set_70_pack', '70级传说九件套宝箱', '购买后在背包开启，获得九件 70 级血月传说装备。限购一次。', 'chest', 35, 'chest_legendary_set_70', 1, 0, 1, 330, TRUE),
+    ('chest_legendary_set_80_pack', '80级传说九件套宝箱', '购买后在背包开启，获得九件 80 级血月传说装备。限购一次。', 'chest', 75, 'chest_legendary_set_80', 1, 0, 1, 340, TRUE),
+    ('chest_legendary_set_90_pack', '90级传说九件套宝箱', '购买后在背包开启，获得九件 90 级血月传说装备。限购一次。', 'chest', 128, 'chest_legendary_set_90', 1, 0, 1, 350, TRUE),
+    ('gem_ruby_starter', '裂纹红宝石 I', '购买 1 颗 1 级红宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 42, 'gem_ruby_1', 1, 0, 60, 410, TRUE),
+    ('gem_sapphire_starter', '裂纹蓝宝石 I', '购买 1 颗 1 级蓝宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 38, 'gem_sapphire_1', 1, 0, 60, 420, TRUE),
+    ('gem_emerald_starter', '裂纹绿宝石 I', '购买 1 颗 1 级绿宝石，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 42, 'gem_emerald_1', 1, 0, 60, 430, TRUE),
+    ('gem_topaz_starter', '裂纹黄玉 I', '购买 1 颗 1 级黄玉，三颗同类同阶可在铁匠铺合成为更高等级。', 'gem', 48, 'gem_topaz_1', 1, 0, 60, 440, TRUE),
+    ('gem_ruby_rank_2', '凝光红宝石 II', '购买 1 颗 2 级红宝石，可继续三合一升级。', 'gem', 98, 'gem_ruby_2', 1, 0, 60, 450, TRUE),
+    ('gem_sapphire_rank_2', '凝光蓝宝石 II', '购买 1 颗 2 级蓝宝石，可继续三合一升级。', 'gem', 92, 'gem_sapphire_2', 1, 0, 60, 460, TRUE),
+    ('gem_emerald_rank_2', '凝光绿宝石 II', '购买 1 颗 2 级绿宝石，可继续三合一升级。', 'gem', 98, 'gem_emerald_2', 1, 0, 60, 470, TRUE),
+    ('gem_topaz_rank_2', '凝光黄玉 II', '购买 1 颗 2 级黄玉，可继续三合一升级。', 'gem', 118, 'gem_topaz_2', 1, 0, 60, 480, TRUE),
+    ('gem_ruby_rank_3', '深渊红宝石 III', '购买 1 颗 3 级红宝石，可继续三合一升级。', 'gem', 220, 'gem_ruby_3', 1, 0, 60, 490, TRUE),
+    ('gem_sapphire_rank_3', '深渊蓝宝石 III', '购买 1 颗 3 级蓝宝石，可继续三合一升级。', 'gem', 210, 'gem_sapphire_3', 1, 0, 60, 500, TRUE),
+    ('gem_emerald_rank_3', '深渊绿宝石 III', '购买 1 颗 3 级绿宝石，可继续三合一升级。', 'gem', 220, 'gem_emerald_3', 1, 0, 60, 510, TRUE),
+    ('gem_topaz_rank_3', '深渊黄玉 III', '购买 1 颗 3 级黄玉，可继续三合一升级。', 'gem', 268, 'gem_topaz_3', 1, 0, 60, 520, TRUE),
+    ('gem_ruby_rank_4', '熔心红宝石 IV', '购买 1 颗 4 级红宝石，可继续三合一升级。', 'gem', 410, 'gem_ruby_4', 1, 0, 60, 530, TRUE),
+    ('gem_sapphire_rank_4', '熔心蓝宝石 IV', '购买 1 颗 4 级蓝宝石，可继续三合一升级。', 'gem', 380, 'gem_sapphire_4', 1, 0, 60, 540, TRUE),
+    ('gem_emerald_rank_4', '熔心绿宝石 IV', '购买 1 颗 4 级绿宝石，可继续三合一升级。', 'gem', 410, 'gem_emerald_4', 1, 0, 60, 550, TRUE),
+    ('gem_topaz_rank_4', '熔心黄玉 IV', '购买 1 颗 4 级黄玉，可继续三合一升级。', 'gem', 496, 'gem_topaz_4', 1, 0, 60, 560, TRUE),
+    ('gem_ruby_rank_5', '星辉红宝石 V', '购买 1 颗 5 级红宝石，可继续三合一升级。', 'gem', 720, 'gem_ruby_5', 1, 0, 60, 570, TRUE),
+    ('gem_sapphire_rank_5', '星辉蓝宝石 V', '购买 1 颗 5 级蓝宝石，可继续三合一升级。', 'gem', 660, 'gem_sapphire_5', 1, 0, 60, 580, TRUE),
+    ('gem_emerald_rank_5', '星辉绿宝石 V', '购买 1 颗 5 级绿宝石，可继续三合一升级。', 'gem', 720, 'gem_emerald_5', 1, 0, 60, 590, TRUE),
+    ('gem_topaz_rank_5', '星辉黄玉 V', '购买 1 颗 5 级黄玉，可继续三合一升级。', 'gem', 860, 'gem_topaz_5', 1, 0, 60, 600, TRUE)
 ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), category = VALUES(category), price_rmb = VALUES(price_rmb), item_template_id = VALUES(item_template_id), item_quantity = VALUES(item_quantity), gold_amount = VALUES(gold_amount), required_level = VALUES(required_level), sort_order = VALUES(sort_order), enabled = VALUES(enabled);
 
 INSERT INTO arena_shop_offer
@@ -10423,4 +10459,16 @@ SET market_category = CASE
 
 UPDATE item_template
 SET tradeable = FALSE
-WHERE id IN ('chest_growth_cache', 'chest_forge_cache', 'potion_level_60_boost');
+WHERE id IN (
+    'chest_growth_cache',
+    'chest_forge_cache',
+    'potion_level_60_boost',
+    'potion_level_70_boost',
+    'potion_level_80_boost',
+    'potion_level_90_boost',
+    'chest_legendary_set_70',
+    'chest_legendary_set_80',
+    'chest_legendary_set_90',
+    'scroll_enhancement_max_all',
+    'scroll_ascension_max_all'
+);

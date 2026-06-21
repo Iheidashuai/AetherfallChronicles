@@ -1,5 +1,6 @@
 package com.mythicrealm.api.gameplay.inventory;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -133,6 +134,50 @@ public record ItemRecord(
 
     public boolean chest() {
         return "chest".equals(itemCategory) || "chest".equals(effectType);
+    }
+
+    @JsonProperty("usable")
+    public boolean usable() {
+        return effectMetadata().usable();
+    }
+
+    @JsonProperty("actionLabel")
+    public String actionLabel() {
+        return effectMetadata().actionLabel();
+    }
+
+    @JsonProperty("typeLabel")
+    public String typeLabel() {
+        return effectMetadata().typeLabel();
+    }
+
+    @JsonProperty("effectSummary")
+    public String effectSummary() {
+        return effectMetadata().effectSummary();
+    }
+
+    @JsonProperty("usageHint")
+    public String usageHint() {
+        return effectMetadata().usageHint();
+    }
+
+    @JsonProperty("marketable")
+    public boolean marketable() {
+        return effectMetadata().marketable();
+    }
+
+    @JsonProperty("robotPolicy")
+    public String robotPolicy() {
+        return effectMetadata().robotPolicy();
+    }
+
+    @JsonProperty("effectTags")
+    public List<String> effectTags() {
+        return effectMetadata().tags();
+    }
+
+    private ItemEffectMetadata effectMetadata() {
+        return ItemEffectMetadata.fromItemRecord(this);
     }
 
     public int enhancedAttackBonus() {

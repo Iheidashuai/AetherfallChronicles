@@ -61,6 +61,14 @@ export type Item = {
   affixes?: EquipmentAffix[];
   displayName?: string;
   description?: string;
+  usable?: boolean;
+  actionLabel?: string;
+  typeLabel?: string;
+  effectSummary?: string;
+  usageHint?: string;
+  marketable?: boolean;
+  robotPolicy?: string;
+  effectTags?: string[];
 };
 
 export type EquipmentSocket = {
@@ -106,6 +114,14 @@ export type ItemCatalogItem = {
   enhanceBonusRate: number;
   minEnhanceLevel: number;
   maxEnhanceLevel: number;
+  usable?: boolean;
+  actionLabel?: string;
+  typeLabel?: string;
+  effectSummary?: string;
+  usageHint?: string;
+  marketable?: boolean;
+  robotPolicy?: string;
+  shopPurchaseLimit?: number;
 };
 
 export type StaminaSnapshot = {
@@ -137,9 +153,17 @@ export type EnhanceResult = {
 export type UseItemResult = {
   itemName: string;
   effectType: string;
+  message?: string;
   rewards: Item[];
   stamina?: StaminaSnapshot;
   inventory: InventorySnapshot;
+  events?: ItemEffectEvent[];
+};
+
+export type ItemEffectEvent = {
+  type: string;
+  targetId?: string | null;
+  amount: number;
 };
 
 export type CraftResult = {
@@ -239,6 +263,11 @@ export type EquipmentProcessingResult = {
   powerBefore: number;
   powerAfter: number;
   snapshot: EquipmentProcessingSnapshot;
+};
+
+export type EquipmentProcessingBatchResult = EquipmentProcessingResult & {
+  items: Item[];
+  processedCount: number;
 };
 
 export type QuestRow = {
@@ -1262,6 +1291,11 @@ export const gameApi = {
     api<EquipmentProcessingResult>(`/api/equipment-processing/${itemId}/sockets/${socketIndex}/unsocket`, { method: 'POST' }, token),
   upgradeGems: (token: string, gemItemIds: number[]) =>
     api<EquipmentProcessingResult>('/api/equipment-processing/gems/upgrade', { method: 'POST', body: JSON.stringify({ gemItemIds }) }, token),
+  upgradeGemBatches: (token: string, gemItemIdBatches: number[][]) =>
+    api<EquipmentProcessingBatchResult>('/api/equipment-processing/gems/upgrade-batch', {
+      method: 'POST',
+      body: JSON.stringify({ gemItemIdBatches }),
+    }, token),
   reforgeEquipment: (token: string, itemId: number, lockedAffixIndexes: number[]) =>
     api<EquipmentProcessingResult>(
       `/api/equipment-processing/${itemId}/reforge`,

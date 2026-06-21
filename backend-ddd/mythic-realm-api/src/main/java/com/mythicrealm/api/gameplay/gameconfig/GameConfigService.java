@@ -5,6 +5,7 @@ import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.ItemTemplate;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.MonsterConfig;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.QuestConfig;
+import com.mythicrealm.api.gameplay.inventory.ItemEffectMetadata;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -107,6 +108,10 @@ public class GameConfigService {
     }
 
     private void validateReferences() {
+        for (ItemTemplate item : itemTemplates) {
+            ItemEffectMetadata.validateTemplate(item, itemById.keySet());
+        }
+
         for (MonsterConfig monster : monsters) {
             if (monster.lootTable() == null) {
                 continue;

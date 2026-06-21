@@ -21,7 +21,7 @@ export type MarketQualityFilter = 'all' | 'common' | 'uncommon' | 'rare' | 'epic
 export type MarketLedgerTab = 'listed' | 'unlisted' | 'sold';
 export type ShopCategoryFilter = 'all' | 'gold' | 'stamina' | 'enhancement' | 'gem' | 'growth' | 'chest';
 export type RobotFilterKey = 'name' | 'minGold' | 'maxGold' | 'minPower' | 'maxPower' | 'minLevel' | 'maxLevel';
-export type ForgeView = 'enhance' | 'transfer' | 'refine' | 'socket' | 'reforge' | 'ascend';
+export type ForgeView = 'enhance' | 'transfer' | 'refine' | 'socket' | 'gem' | 'reforge' | 'ascend';
 export type BuildTab = 'overview' | 'equipment' | 'skills' | 'talents' | 'simulate';
 
 export type BuildDraft = {
@@ -97,4 +97,12 @@ export type EquipmentDetailData = {
   origin?: string;
   power?: number;
   description?: string;
+  usable?: boolean;
+  actionLabel?: string;
+  typeLabel?: string;
+  effectSummary?: string;
+  usageHint?: string;
+  marketable?: boolean;
+  robotPolicy?: string;
+  effectTags?: string[];
 };

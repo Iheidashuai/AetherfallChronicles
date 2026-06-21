@@ -130,15 +130,15 @@ public class EquipmentProcessingService {
         }
         requireGemTemplate(gem.templateId());
         int beforePower = inventoryService.combatPower(player);
-        inventoryService.removeFromInventory(player.id(), gemItemId);
+        ItemRecord socketedGem = inventoryService.detachOneFromInventory(player.id(), gemItemId);
         jdbcTemplate.update(
             "UPDATE equipment_socket SET gem_item_id = ? WHERE item_id = ? AND socket_index = ?",
-            gemItemId,
+            socketedGem.id(),
             itemId,
             socketIndex
         );
         return result(player.id(), itemId, "socket", true,
-            "已镶嵌 " + gem.displayName(),
+            "已镶嵌 " + socketedGem.displayName(),
             beforePower,
             List.of()
         );
@@ -163,36 +163,49 @@ public class EquipmentProcessingService {
 
     @Transactional
     public ProcessingResult upgradeGems(PlayerRecord player, List<Long> gemItemIds) {
-        if (gemItemIds == null || gemItemIds.size() != 3) {
-            throw ApiException.badRequest("宝石升级需要 3 颗同类同阶宝石");
-        }
-        List<ItemRecord> gems = gemItemIds.stream().map(id -> inventoryService.requireOwnedItem(player.id(), id)).toList();
-        for (ItemRecord gem : gems) {
-            inventoryService.inventorySlot(player.id(), gem.id()).orElseThrow(() -> ApiException.badRequest("宝石必须在背包中"));
-            if (!"gem".equals(gem.effectType())) {
-                throw ApiException.badRequest("只能升级宝石");
-            }
-        }
-        String templateId = gems.getFirst().templateId();
-        if (gems.stream().anyMatch(gem -> !templateId.equals(gem.templateId()))) {
-            throw ApiException.badRequest("请选择 3 颗同类同阶宝石");
-        }
-        GemTemplate gemTemplate = requireGemTemplate(templateId);
-        if (gemTemplate.nextTemplateId() == null || gemTemplate.nextTemplateId().isBlank()) {
-            throw ApiException.badRequest("该宝石已达到最高阶");
-        }
-        requireMaterials(player, 0, Map.of("mat_gem_dust", 8 * gemTemplate.rankLevel()));
+        List<GemUpgradePlan> plans = planGemUpgradeBatches(player.id(), gemItemIds == null ? null : List.of(gemItemIds), 1);
+        GemUpgradePlan plan = plans.getFirst();
         int beforePower = inventoryService.combatPower(player);
-        consumeMaterials(player, 0, List.of(new MaterialCost("mat_gem_dust", 8 * gemTemplate.rankLevel())));
-        for (ItemRecord gem : gems) {
-            inventoryService.removeFromInventory(player.id(), gem.id());
-            jdbcTemplate.update("DELETE FROM item_instance WHERE id = ? AND player_id = ?", gem.id(), player.id());
-        }
-        ItemRecord created = inventoryService.addRewardItem(player.id(), gemTemplate.nextTemplateId(), new Random(System.nanoTime()));
+        List<ItemRecord> createdItems = applyGemUpgradePlans(player, plans);
+        ItemRecord created = createdItems.getFirst();
         return result(player.id(), created.id(), "gem_upgrade", true,
             "合成 " + created.displayName(),
             beforePower,
-            List.of(new MaterialCost("mat_gem_dust", 8 * gemTemplate.rankLevel()))
+            List.of(new MaterialCost("mat_gem_dust", plan.dustCost()))
+        );
+    }
+
+    @Transactional
+    public ProcessingBatchResult upgradeGemBatches(PlayerRecord player, List<List<Long>> gemItemIdBatches) {
+        List<GemUpgradePlan> plans = planGemUpgradeBatches(player.id(), gemItemIdBatches, 1000);
+        int beforePower = inventoryService.combatPower(player);
+        List<ItemRecord> createdItems = applyGemUpgradePlans(player, plans);
+        ItemRecord lastCreated = createdItems.getLast();
+        PlayerRecord updatedPlayer = playerService.requireById(player.id());
+        int afterPower = inventoryService.combatPower(updatedPlayer);
+        int totalDust = plans.stream().mapToInt(GemUpgradePlan::dustCost).sum();
+        String message = "批量合成 " + createdItems.size() + " 次宝石，最后获得 " + lastCreated.displayName();
+        jdbcTemplate.update(
+            "INSERT INTO equipment_processing_log (player_id, item_id, action_type, success, summary, power_before, power_after) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            player.id(),
+            lastCreated.id(),
+            "gem_upgrade",
+            true,
+            message,
+            beforePower,
+            afterPower
+        );
+        return new ProcessingBatchResult(
+            "gem_upgrade",
+            true,
+            message,
+            lastCreated,
+            createdItems,
+            List.of(new MaterialCost("mat_gem_dust", totalDust)),
+            createdItems.size(),
+            beforePower,
+            afterPower,
+            snapshot(updatedPlayer)
         );
     }
 
@@ -374,6 +387,77 @@ public class EquipmentProcessingService {
             ),
             templateId
         ).stream().findFirst().orElseThrow(() -> ApiException.badRequest("宝石配置不存在"));
+    }
+
+    private List<GemUpgradePlan> planGemUpgradeBatches(long playerId, List<List<Long>> gemItemIdBatches, int maxBatches) {
+        if (gemItemIdBatches == null || gemItemIdBatches.isEmpty()) {
+            throw ApiException.badRequest("请选择要合成的宝石");
+        }
+        if (gemItemIdBatches.size() > maxBatches) {
+            throw ApiException.badRequest("单次最多批量合成 " + maxBatches + " 次");
+        }
+        Map<Long, Integer> requestedGemCounts = new LinkedHashMap<>();
+        Map<Long, ItemRecord> requestedGems = new LinkedHashMap<>();
+        List<GemUpgradePlan> plans = new ArrayList<>();
+        for (List<Long> gemItemIds : gemItemIdBatches) {
+            if (gemItemIds == null || gemItemIds.size() != 3) {
+                throw ApiException.badRequest("宝石升级需要 3 颗同类同阶宝石");
+            }
+            for (Long gemItemId : gemItemIds) {
+                if (gemItemId == null || gemItemId <= 0) {
+                    throw ApiException.badRequest("请选择要合成的宝石");
+                }
+                requestedGemCounts.merge(gemItemId, 1, Integer::sum);
+                if (!requestedGems.containsKey(gemItemId)) {
+                    ItemRecord gem = inventoryService.requireOwnedItem(playerId, gemItemId);
+                    inventoryService.inventorySlot(playerId, gem.id()).orElseThrow(() -> ApiException.badRequest("宝石必须在背包中"));
+                    if (!"gem".equals(gem.effectType())) {
+                        throw ApiException.badRequest("只能升级宝石");
+                    }
+                    requestedGems.put(gemItemId, gem);
+                }
+            }
+            List<ItemRecord> gems = gemItemIds.stream().map(requestedGems::get).toList();
+            String templateId = gems.getFirst().templateId();
+            if (gems.stream().anyMatch(gem -> !templateId.equals(gem.templateId()))) {
+                throw ApiException.badRequest("请选择 3 颗同类同阶宝石");
+            }
+            GemTemplate gemTemplate = requireGemTemplate(templateId);
+            if (gemTemplate.nextTemplateId() == null || gemTemplate.nextTemplateId().isBlank()) {
+                throw ApiException.badRequest("该宝石已达到最高阶");
+            }
+            plans.add(new GemUpgradePlan(gems, gemTemplate.nextTemplateId(), 8 * gemTemplate.rankLevel()));
+        }
+        for (var entry : requestedGemCounts.entrySet()) {
+            ItemRecord gem = requestedGems.get(entry.getKey());
+            int available = gem.stackable() ? Math.max(1, gem.quantity()) : 1;
+            if (entry.getValue() > available) {
+                throw ApiException.badRequest(gem.name() + " 数量不足");
+            }
+        }
+        int totalDust = plans.stream().mapToInt(GemUpgradePlan::dustCost).sum();
+        requireMaterials(playerService.requireById(playerId), 0, Map.of("mat_gem_dust", totalDust));
+        return plans;
+    }
+
+    private List<ItemRecord> applyGemUpgradePlans(PlayerRecord player, List<GemUpgradePlan> plans) {
+        int totalDust = plans.stream().mapToInt(GemUpgradePlan::dustCost).sum();
+        consumeMaterials(player, 0, List.of(new MaterialCost("mat_gem_dust", totalDust)));
+        Random random = new Random(System.nanoTime());
+        List<ItemRecord> createdItems = new ArrayList<>();
+        Map<Long, Integer> consumedGemCounts = new LinkedHashMap<>();
+        for (GemUpgradePlan plan : plans) {
+            for (ItemRecord gem : plan.gems()) {
+                consumedGemCounts.merge(gem.id(), 1, Integer::sum);
+            }
+        }
+        for (var entry : consumedGemCounts.entrySet()) {
+            inventoryService.consumeInventoryQuantity(player.id(), entry.getKey(), entry.getValue());
+        }
+        for (GemUpgradePlan plan : plans) {
+            createdItems.add(inventoryService.addRewardItem(player.id(), plan.nextTemplateId(), random));
+        }
+        return createdItems;
     }
 
     private int unlockedSocketCount(long itemId) {
@@ -609,6 +693,9 @@ public class EquipmentProcessingService {
     private record GemTemplate(String templateId, String gemKind, int rankLevel, String statKey, double statValue, String nextTemplateId) {
     }
 
+    private record GemUpgradePlan(List<ItemRecord> gems, String nextTemplateId, int dustCost) {
+    }
+
     public record MaterialCost(String templateId, int quantity) {
     }
 
@@ -651,6 +738,20 @@ public class EquipmentProcessingService {
         String message,
         ItemRecord item,
         List<MaterialCost> consumed,
+        int powerBefore,
+        int powerAfter,
+        ProcessingSnapshot snapshot
+    ) {
+    }
+
+    public record ProcessingBatchResult(
+        String actionType,
+        boolean success,
+        String message,
+        ItemRecord item,
+        List<ItemRecord> items,
+        List<MaterialCost> consumed,
+        int processedCount,
         int powerBefore,
         int powerAfter,
         ProcessingSnapshot snapshot

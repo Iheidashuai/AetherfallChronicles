@@ -160,6 +160,8 @@ import {
   invalidateGameQueries,
 } from '../components/ui';
 
+const MAX_SHOP_PURCHASE_QUANTITY = 999;
+
 export function ShopScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
@@ -198,8 +200,8 @@ export function ShopScreen({ token }: { token: string }) {
     ?? visibleOffers[0]
     ?? data.offers[0]
     ?? null;
-  const selectedRemaining = selectedOffer?.remainingPurchases ?? 99;
-  const maxQuantity = Math.max(1, Math.min(99, selectedRemaining <= 0 ? 1 : selectedRemaining));
+  const selectedRemaining = selectedOffer?.remainingPurchases ?? MAX_SHOP_PURCHASE_QUANTITY;
+  const maxQuantity = Math.max(1, Math.min(MAX_SHOP_PURCHASE_QUANTITY, selectedRemaining <= 0 ? 1 : selectedRemaining));
   const safeQuantity = Math.max(1, Math.min(maxQuantity, quantity));
   const totalPrice = selectedOffer ? selectedOffer.priceRmb * safeQuantity : 0;
   const canBuySelected = Boolean(selectedOffer?.unlocked && !selectedOffer.soldOut && totalPrice <= data.wallet.realMoney && !purchaseMutation.isPending);
@@ -262,7 +264,7 @@ export function ShopScreen({ token }: { token: string }) {
             {visibleOffers.map((offer) => (
               <article
                 key={offer.id}
-                className={`shop-offer-card ${selectedOffer?.id === offer.id ? 'selected' : ''} ${offer.quality ?? offer.category}`}
+                className={`shop-offer-card category-${offer.category} ${selectedOffer?.id === offer.id ? 'selected' : ''} ${offer.quality ?? offer.category}`}
                 onClick={() => setSelectedOfferId(offer.id)}
               >
                 <div className="shop-offer-head">

@@ -129,13 +129,13 @@ import {
   categoryNameForInventory, chatAvatarLabel, combinedDropChance, conditionName, 
   defaultTriggerForIndex, draftToRequest, dropBonusText, dropTypeRank, 
   dungeonMatchesLevelFilter, dungeonRisk, effectNumber, emptyMarketFilters, 
-  emptyRobotFilters, enhanceChance, enhanceCost, enhancedCritValue, enhancedStatValue, 
+  emptyRobotFilters, enhanceBaseChance, enhanceChance, enhanceCost, enhanceLuckBonus, enhancedCritValue, enhancedStatValue,
   enhancementBadgeText, enhancementEffectClass, enhancementStage, enhancementStonesForItem, 
   equipmentCompactText, equipmentDisplayName, equipmentOriginText, equipmentSlotOrder, 
   equipmentSlotPairs, filterCatalogItems, filterMarketListings, filterNumber, filterRobots, 
   formatChatTime, formatDropRate, formatMarketActivityTime, formatNumber, formatPercent, 
   formatRelativeTime, formatSigned, formatStaminaTime, formatStatValue, gemEffectText, 
-  gemUpgradeBlockReason, homeSlotShortName, inventoryTemplateQuantity, isEquipmentItem, 
+  gemInventoryGroups, homeSlotShortName, inventoryTemplateQuantity, isEquipmentItem,
   isEquipmentUpgrade, isMarketableInventoryItem, isSpecialDungeon, itemCategoryLabel, 
   itemEffectText, itemLocationLabel, itemMatchesCategory, itemPower, itemTypesForCategory, 
   leaderboardEntryToSpeaker, leaderboardEquipmentBonusText, leaderboardEquipmentToDetail, 
@@ -371,41 +371,37 @@ export function EquipmentProcessingPanel({
   snapshot,
   focusedItemId,
   selectedGemId,
-  selectedUpgradeGemIds,
   lockedAffixIndexes,
   useProtector,
   busy,
   onFocusItem,
   onSelectGem,
-  onToggleUpgradeGem,
-  onClearUpgradeGems,
   onToggleAffixLock,
   onUseProtectorChange,
   onUnlockSocket,
   onSocketGem,
   onUnsocketGem,
   onUpgradeGems,
+  onUpgradeGemBatches,
   onReforge,
   onAscend,
 }: {
-  mode: Extract<ForgeView, 'socket' | 'reforge' | 'ascend'>;
+  mode: Extract<ForgeView, 'socket' | 'gem' | 'reforge' | 'ascend'>;
   snapshot: EquipmentProcessingSnapshot;
   focusedItemId: number | null;
   selectedGemId: number | null;
-  selectedUpgradeGemIds: number[];
   lockedAffixIndexes: number[];
   useProtector: boolean;
   busy: boolean;
   onFocusItem: (itemId: number) => void;
   onSelectGem: (gemId: number | null) => void;
-  onToggleUpgradeGem: (gemId: number) => void;
-  onClearUpgradeGems: () => void;
   onToggleAffixLock: (index: number) => void;
   onUseProtectorChange: (value: boolean) => void;
   onUnlockSocket: (itemId: number) => void;
   onSocketGem: (itemId: number, socketIndex: number, gemItemId: number) => void;
   onUnsocketGem: (itemId: number, socketIndex: number) => void;
   onUpgradeGems: (gemIds: number[]) => void;
+  onUpgradeGemBatches?: (gemIdBatches: number[][]) => void;
   onReforge: (itemId: number, locked: number[]) => void;
   onAscend: (itemId: number, useProtector: boolean) => void;
 }) {
@@ -413,12 +409,99 @@ export function EquipmentProcessingPanel({
   const item = selected?.item ?? null;
   const materials = snapshot.materials;
   const selectedGem = snapshot.gems.find((gem) => gem.id === selectedGemId) ?? null;
+  const gemGroups = useMemo(() => gemInventoryGroups(snapshot.gems, materials), [snapshot.gems, materials]);
   const socketReason = selected ? socketBlockReason(selected, materials, snapshot.inventory.gold) : '请选择装备。';
   const reforgeReason = selected ? reforgeBlockReason(selected, lockedAffixIndexes, materials, snapshot.inventory.gold) : '请选择装备。';
   const ascendReason = selected ? ascendBlockReason(selected, materials, snapshot.inventory.gold, useProtector) : '请选择装备。';
-  const upgradeReason = gemUpgradeBlockReason(snapshot.gems, selectedUpgradeGemIds, materials);
   const sockets = selected ? socketSlotsFor(selected) : [];
   const affixes = item?.affixes ?? [];
+
+  if (mode === 'gem') {
+    const craftableGroups = gemGroups.filter((group) => group.craftableCount > 0);
+    return (
+      <div className="forge-gem-craft-view">
+        <section className="forge-list-panel gem-craft-list-panel">
+          <div className="inventory-main-title">
+            <SectionTitle icon={<Sparkles size={18} />} title="宝石合成库存" />
+            <strong>{gemGroups.length} 类宝石</strong>
+          </div>
+          <div className="gem-group-list">
+            {gemGroups.length === 0 && <EmptyState text="背包中没有可合成宝石。" />}
+            {gemGroups.map((group) => {
+              const oneBatch = group.gems.slice(0, 3).map((gem) => gem.id);
+              const allBatches = Array.from({ length: group.craftableCount }, (_, index) =>
+                group.gems.slice(index * 3, index * 3 + 3).map((gem) => gem.id),
+              );
+              const disabledReason = group.rank >= 9
+                ? '已满级'
+                : group.craftableByCount <= 0
+                  ? '数量不足'
+                  : group.craftableByDust <= 0
+                    ? '宝石尘不足'
+                    : null;
+              return (
+                <article key={group.templateId} className={`gem-group-card ${group.craftableCount > 0 ? 'craftable' : ''}`}>
+                  <div>
+                    <strong className={`quality ${group.representative.quality}`}>{group.representative.name}</strong>
+                    <small>{gemEffectText(group.representative)}</small>
+                  </div>
+                  <div className="gem-group-meta">
+                    <span>x{group.quantity}</span>
+                    <span>R{group.rank}</span>
+                    <span>{group.dustCostPerCraft} 尘/次</span>
+                  </div>
+                  <div className="gem-group-actions">
+                    <button
+                      className="mini-action"
+                      disabled={busy || group.craftableCount <= 0}
+                      title={disabledReason ?? '合成 1 颗高一级宝石'}
+                      onClick={() => oneBatch.length === 3 && onUpgradeGems(oneBatch)}
+                    >
+                      合成 1 次
+                    </button>
+                    <button
+                      className="primary-action compact"
+                      disabled={busy || group.craftableCount <= 0 || !onUpgradeGemBatches}
+                      title={disabledReason ?? `连续合成 ${group.craftableCount} 次`}
+                      onClick={() => onUpgradeGemBatches?.(allBatches)}
+                    >
+                      一键 {group.craftableCount} 次
+                    </button>
+                  </div>
+                  {disabledReason && <small className="gem-group-reason">{disabledReason}</small>}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+        <section className="gem-craft-summary-panel">
+          <SectionTitle icon={<Gem size={18} />} title="合成结算" />
+          <div className="forge-stat-grid">
+            <Metric label="宝石尘" value={(materials.mat_gem_dust ?? 0).toString()} />
+            <Metric label="可合成种类" value={craftableGroups.length.toString()} />
+            <Metric label="预计次数" value={craftableGroups.reduce((total, group) => total + group.craftableCount, 0).toString()} />
+            <Metric label="最高等级" value="R9" />
+          </div>
+          <div className="modal-notice">
+            <strong>三合一规则</strong>
+            <span>同类型、同等级的 3 颗宝石会合成 1 颗高一级宝石；一键合成会按当前库存和宝石尘自动拆分批次。</span>
+          </div>
+          {snapshot.recentLogs.length > 0 && (
+            <div className="processing-log-list">
+              <SectionTitle icon={<Clock3 size={18} />} title="近期合成" />
+              {snapshot.recentLogs.slice(0, 5).map((log, index) => (
+                <div key={`${log.createdAt}-${index}`} className={`processing-log ${log.success ? 'success' : 'failed'}`}>
+                  <strong>{processingActionName(log.actionType)}</strong>
+                  <span>{log.summary}</span>
+                  <small>{formatNumber(log.powerBefore)} → {formatNumber(log.powerAfter)}</small>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="forge-processing-view">
@@ -540,26 +623,20 @@ export function EquipmentProcessingPanel({
               {selected.unlockedSocketCount >= selected.socketLimit ? '孔位已满' : '开启孔位'}
             </button>
             <div className="gem-pick-list">
-              {snapshot.gems.length === 0 && <EmptyState text="背包中没有可镶嵌宝石。" />}
-              {snapshot.gems.map((gem) => (
-                <button key={gem.id} className={`gem-pick ${selectedGemId === gem.id ? 'active' : ''}`} onClick={() => onSelectGem(selectedGemId === gem.id ? null : gem.id)}>
-                  <strong className={`quality ${gem.quality}`}>{gem.name}</strong>
-                  <small>{gemEffectText(gem)}</small>
-                </button>
-              ))}
-            </div>
-            <SectionTitle icon={<Sparkles size={18} />} title="三合一升级" />
-            <div className="gem-upgrade-list">
-              {snapshot.gems.map((gem) => (
-                <button key={`upgrade-${gem.id}`} className={selectedUpgradeGemIds.includes(gem.id) ? 'active' : ''} onClick={() => onToggleUpgradeGem(gem.id)}>
-                  {gem.name}
-                </button>
-              ))}
-            </div>
-            {upgradeReason && <div className="modal-warning">{upgradeReason}</div>}
-            <div className="forge-detail-actions">
-              <button className="mini-action subtle" disabled={busy || selectedUpgradeGemIds.length === 0} onClick={onClearUpgradeGems}>清空</button>
-              <button className="primary-action" disabled={busy || Boolean(upgradeReason)} onClick={() => onUpgradeGems(selectedUpgradeGemIds)}>升级宝石</button>
+              {gemGroups.length === 0 && <EmptyState text="背包中没有可镶嵌宝石。" />}
+              {gemGroups.map((group) => {
+                const active = selectedGem?.templateId === group.templateId;
+                return (
+                  <button
+                    key={group.templateId}
+                    className={`gem-pick ${active ? 'active' : ''}`}
+                    onClick={() => onSelectGem(active ? null : group.representative.id)}
+                  >
+                    <strong className={`quality ${group.representative.quality}`}>{group.representative.name}</strong>
+                    <small>{gemEffectText(group.representative)} · x{group.quantity}</small>
+                  </button>
+                );
+              })}
             </div>
           </>
         )}
@@ -1560,9 +1637,25 @@ export function EnhancementBadge({ level }: { level?: number }) {
   return <span className={`enhance-badge enhance-${enhancementStage(level ?? 0)}`}>{text}</span>;
 }
 
-export function ItemCard({ item, label, children, powerIncrease = false, onSelect }: { item: Item; label?: string; children?: ReactNode; powerIncrease?: boolean; onSelect?: () => void }) {
+export function ItemCard({
+  item,
+  label,
+  children,
+  powerIncrease = false,
+  showEffectText = true,
+  className = '',
+  onSelect,
+}: {
+  item: Item;
+  label?: string;
+  children?: ReactNode;
+  powerIncrease?: boolean;
+  showEffectText?: boolean;
+  className?: string;
+  onSelect?: () => void;
+}) {
   return (
-    <article className={`item-card ${enhancementEffectClass(item)} item-category-${item.itemCategory ?? 'equipment'} ${onSelect ? 'selectable' : ''}`} onClick={onSelect}>
+    <article className={`item-card ${className} ${enhancementEffectClass(item)} item-category-${item.itemCategory ?? 'equipment'} ${onSelect ? 'selectable' : ''}`} onClick={onSelect}>
       {powerIncrease && (
         <span className="power-up-indicator" aria-label="穿戴后战力提升" title="穿戴后战力提升">
           <ArrowUp size={16} strokeWidth={3} />
@@ -1579,7 +1672,7 @@ export function ItemCard({ item, label, children, powerIncrease = false, onSelec
             <EnhancementBadge level={item.enhancementLevel} />
           </div>
           <h2 className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</h2>
-          <p>{itemEffectText(item)}</p>
+          {showEffectText && <p>{itemEffectText(item)}</p>}
         </div>
       </div>
       {children && <div className="inline-actions">{children}</div>}
@@ -1727,42 +1820,115 @@ function compareEnhancementStones(left: Item, right: Item) {
     || right.id - left.id;
 }
 
-export function EnhanceModal({ item, gold, loading, stones = [], selectedStoneIds = [], onAddStone, onRemoveStone, onReplaceStones, onClose, onEnhance }: {
+export function EnhanceModal({
+  item,
+  gold,
+  loading,
+  stones = [],
+  selectedStoneIds = [],
+  autoEnhanceRunning = false,
+  onAddStone,
+  onRemoveStone,
+  onReplaceStones,
+  onClose,
+  onEnhance,
+  onAutoEnhance,
+  onStopAutoEnhance,
+}: {
   item: Item;
   gold: number;
   loading: boolean;
   stones?: Item[];
   selectedStoneIds?: number[];
+  autoEnhanceRunning?: boolean;
   onAddStone?: (stoneId: number) => void;
   onRemoveStone?: (index: number) => void;
   onReplaceStones?: (stoneIds: number[]) => void;
   onClose: () => void;
   onEnhance: () => void;
+  onAutoEnhance?: (options: { targetLevel: number; useBestStones: boolean }) => void;
+  onStopAutoEnhance?: () => void;
 }) {
   const [stonePickerOpen, setStonePickerOpen] = useState(false);
-  const nextLevel = item.enhancementLevel + 1;
+  const [autoTargetLevel, setAutoTargetLevel] = useState(Math.min(15, item.enhancementLevel + 1));
+  const [autoUseBestStones, setAutoUseBestStones] = useState(true);
+  const isMaxEnhancement = item.enhancementLevel >= 15;
+  const nextLevel = isMaxEnhancement ? item.enhancementLevel : item.enhancementLevel + 1;
   const cost = enhanceCost(item);
+  const baseChance = enhanceBaseChance(item);
+  const luckBonus = enhanceLuckBonus(item);
   const stoneBonus = selectedStoneBonus(stones, selectedStoneIds);
-  const chance = Math.min(0.95, enhanceChance(item) + stoneBonus);
+  const chance = isMaxEnhancement ? 0 : Math.min(0.95, enhanceChance(item) + stoneBonus);
+  const uncappedChance = baseChance + luckBonus + stoneBonus;
+  const cappedByLimit = !isMaxEnhancement && uncappedChance > chance;
+  const luckTargetBonus = Math.max(0, 0.95 - baseChance);
+  const luckProgress = luckTargetBonus <= 0 ? 1 : Math.min(1, luckBonus / luckTargetBonus);
   const sortedStones = useMemo(() => [...stones].sort(compareEnhancementStones), [stones]);
   const bestStoneIds = useMemo(() => sortedStones
     .flatMap((stone) => Array.from({ length: stoneStock(stone) }, () => stone.id))
     .slice(0, 3), [sortedStones]);
   const selectedStones = selectedStoneIds.map((stoneId) => stones.find((stone) => stone.id === stoneId) ?? null);
-  const canAddStone = !loading && selectedStoneIds.length < 3;
-  const canAutoFill = !loading && bestStoneIds.length > 0;
+  const canAddStone = !loading && !isMaxEnhancement && selectedStoneIds.length < 3;
+  const canAutoFill = !loading && !isMaxEnhancement && bestStoneIds.length > 0;
   const hasSelectedStones = selectedStoneIds.length > 0;
+  const minAutoTarget = Math.min(15, item.enhancementLevel + 1);
+  const canEnhanceOnce = !isMaxEnhancement && gold >= cost;
   const selectStone = (stoneId: number) => {
+    if (!canAddStone) {
+      return;
+    }
     onAddStone?.(stoneId);
     setStonePickerOpen(false);
   };
+  useEffect(() => {
+    if (isMaxEnhancement) {
+      setStonePickerOpen(false);
+      if (selectedStoneIds.length > 0) {
+        onReplaceStones?.([]);
+      }
+      return;
+    }
+    setAutoTargetLevel((current) => Math.min(15, Math.max(minAutoTarget, current)));
+  }, [isMaxEnhancement, minAutoTarget, onReplaceStones, selectedStoneIds.length]);
+  const stonePicker = stonePickerOpen && !isMaxEnhancement ? (
+    <div className="stone-picker-scrim" onClick={() => setStonePickerOpen(false)}>
+      <section className="stone-picker-sheet" onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
+        <div className="stone-picker-head">
+          <div>
+            <strong>选择强化石</strong>
+            <span>{selectedStoneIds.length}/3 已放入</span>
+          </div>
+          <button type="button" className="text-button close-button" onClick={() => setStonePickerOpen(false)}>关闭</button>
+        </div>
+        <div className="stone-option-list stone-picker-list">
+          {sortedStones.length === 0 && <EmptyState text="当前背包没有适用于下一强化等级的强化石。" />}
+          {sortedStones.map((stone) => {
+            const selectedCount = selectedStoneCount(selectedStoneIds, stone.id);
+            const stock = stoneStock(stone);
+            return (
+              <button
+                key={stone.id}
+                type="button"
+                className={`stone-option ${stone.quality}`}
+                disabled={loading || selectedStoneIds.length >= 3 || selectedCount >= stock}
+                onClick={() => selectStone(stone.id)}
+              >
+                <strong>{equipmentDisplayName(stone)}</strong>
+                <span>+{formatPercent(stone.enhanceBonusRate)} · {selectedCount}/{stock}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  ) : null;
   return (
     <div className="detail-backdrop result-modal-backdrop enhance-modal-backdrop" onClick={onClose}>
       <section className={`decision-modal enhance-modal ${item.quality} ${enhancementEffectClass(item)}`} onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
         <div className="result-modal-head">
           <div>
             <div className="item-meta-line">
-              <span className="eyebrow">装备强化 · +{item.enhancementLevel} → +{nextLevel}</span>
+              <span className="eyebrow">{isMaxEnhancement ? `装备强化 · +${item.enhancementLevel}` : `装备强化 · +${item.enhancementLevel} → +${nextLevel}`}</span>
               <EnhancementBadge level={item.enhancementLevel} />
             </div>
             <h2 className={`quality ${item.quality}`}>{equipmentDisplayName(item)}</h2>
@@ -1771,11 +1937,28 @@ export function EnhanceModal({ item, gold, loading, stones = [], selectedStoneId
           <button className="text-button close-button" onClick={onClose}>关闭</button>
         </div>
         <div className="result-modal-metrics">
-          <Metric label="强化费用" value={`${cost} 金`} />
-          <Metric label="成功率" value={`${Math.round(chance * 100)}%`} />
+          <Metric label="强化费用" value={isMaxEnhancement ? '已达上限' : `${cost} 金`} />
+          <Metric label="最终成功率" value={isMaxEnhancement ? '已达上限' : formatPercent(chance)} />
           <Metric label="当前金币" value={`${gold} 金`} />
-          <Metric label="强化石" value={`${selectedStoneIds.length}/3`} />
+          <Metric label="基础成功率" value={isMaxEnhancement ? '--' : formatPercent(baseChance)} />
+          <Metric label="祝福加成" value={isMaxEnhancement ? '--' : `+${formatPercent(luckBonus)}`} />
           <Metric label="石头加成" value={`+${formatPercent(stoneBonus)}`} />
+        </div>
+        <div className="enhance-progress-panel">
+          <div className="enhance-progress-row">
+            <span>成功率进度</span>
+            <strong>{isMaxEnhancement ? '已达上限' : `${formatPercent(chance)}${cappedByLimit ? ' · 上限 95%' : ''}`}</strong>
+          </div>
+          <div className="enhance-progress-track">
+            <i style={{ width: `${isMaxEnhancement ? 100 : Math.round(chance * 100)}%` }} />
+          </div>
+          <div className="enhance-progress-row">
+            <span>祝福值进度</span>
+            <strong>{isMaxEnhancement ? '已达上限' : `${item.enhancementLuck ?? 0} 层 · +${formatPercent(luckBonus)}`}</strong>
+          </div>
+          <div className="enhance-progress-track blessing">
+            <i style={{ width: `${Math.round((isMaxEnhancement ? 1 : luckProgress) * 100)}%` }} />
+          </div>
         </div>
         <div className="enhance-stone-panel">
           <div className="enhance-stone-head">
@@ -1785,7 +1968,7 @@ export function EnhanceModal({ item, gold, loading, stones = [], selectedStoneId
             </div>
             <div className="enhance-stone-actions">
               {hasSelectedStones && (
-                <button type="button" className="mini-action subtle" disabled={loading} onClick={() => onReplaceStones?.([])}>
+                <button type="button" className="mini-action subtle" disabled={loading || isMaxEnhancement} onClick={() => onReplaceStones?.([])}>
                   清空
                 </button>
               )}
@@ -1802,8 +1985,14 @@ export function EnhanceModal({ item, gold, loading, stones = [], selectedStoneId
                   key={slotIndex}
                   type="button"
                   className={`stone-slot ${stone ? stone.quality : 'empty'}`}
-                  disabled={loading}
-                  onClick={() => stone ? onRemoveStone?.(slotIndex) : setStonePickerOpen(true)}
+                  disabled={loading || isMaxEnhancement || (!stone && !canAddStone)}
+                  onClick={() => {
+                    if (stone) {
+                      onRemoveStone?.(slotIndex);
+                    } else if (canAddStone) {
+                      setStonePickerOpen(true);
+                    }
+                  }}
                 >
                   {stone ? (
                     <>
@@ -1813,7 +2002,7 @@ export function EnhanceModal({ item, gold, loading, stones = [], selectedStoneId
                   ) : (
                     <>
                       <strong>空槽</strong>
-                      <span>{canAddStone ? '选择强化石' : '已满'}</span>
+                      <span>{isMaxEnhancement ? '已达上限' : canAddStone ? '选择强化石' : '已满'}</span>
                     </>
                   )}
                 </button>
@@ -1825,44 +2014,51 @@ export function EnhanceModal({ item, gold, loading, stones = [], selectedStoneId
           <span>失败规则</span>
           <strong>+7 后失败可能降级，幸运值会提高下一次成功率。</strong>
         </div>
+        <div className="enhance-auto-panel">
+          <div className="enhance-auto-fields">
+            <label>
+              <span>自动强化目标</span>
+              <input
+                type="number"
+                min={minAutoTarget}
+                max={15}
+                value={autoTargetLevel}
+                disabled={loading || isMaxEnhancement}
+                onChange={(event) => setAutoTargetLevel(Math.min(15, Math.max(minAutoTarget, Number(event.target.value) || minAutoTarget)))}
+              />
+            </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={autoUseBestStones}
+                disabled={loading || isMaxEnhancement}
+                onChange={(event) => setAutoUseBestStones(event.target.checked)}
+              />
+              <span>自动使用最优强化石</span>
+            </label>
+          </div>
+          <div className="enhance-auto-actions">
+            {autoEnhanceRunning ? (
+              <button type="button" className="mini-action danger" onClick={onStopAutoEnhance}>停止自动强化</button>
+            ) : (
+              <button
+                type="button"
+                className="mini-action"
+                disabled={!onAutoEnhance || loading || isMaxEnhancement || autoTargetLevel <= item.enhancementLevel}
+                onClick={() => onAutoEnhance?.({ targetLevel: autoTargetLevel, useBestStones: autoUseBestStones })}
+              >
+                开始自动强化
+              </button>
+            )}
+          </div>
+        </div>
         <div className="result-modal-actions">
           <button className="mini-action subtle" onClick={onClose}>结束强化</button>
-          <button className="primary-action" disabled={loading || gold < cost || item.enhancementLevel >= 15} onClick={onEnhance}>
-            {loading ? '强化中...' : item.enhancementLevel >= 15 ? '已达上限' : '强化一次'}
+          <button className="primary-action" disabled={loading || !canEnhanceOnce} onClick={onEnhance}>
+            {loading ? autoEnhanceRunning ? '自动强化中...' : '强化中...' : isMaxEnhancement ? '已达上限' : gold < cost ? '金币不足' : '强化一次'}
           </button>
         </div>
-        {stonePickerOpen && (
-          <div className="stone-picker-scrim" onClick={() => setStonePickerOpen(false)}>
-            <section className="stone-picker-sheet" onClick={(event: MouseEvent<HTMLElement>) => event.stopPropagation()}>
-              <div className="stone-picker-head">
-                <div>
-                  <strong>选择强化石</strong>
-                  <span>{selectedStoneIds.length}/3 已放入</span>
-                </div>
-                <button type="button" className="text-button close-button" onClick={() => setStonePickerOpen(false)}>关闭</button>
-              </div>
-              <div className="stone-option-list stone-picker-list">
-                {sortedStones.length === 0 && <EmptyState text="当前背包没有适用于下一强化等级的强化石。" />}
-                {sortedStones.map((stone) => {
-                  const selectedCount = selectedStoneCount(selectedStoneIds, stone.id);
-                  const stock = stoneStock(stone);
-                  return (
-                    <button
-                      key={stone.id}
-                      type="button"
-                      className={`stone-option ${stone.quality}`}
-                      disabled={loading || selectedStoneIds.length >= 3 || selectedCount >= stock}
-                      onClick={() => selectStone(stone.id)}
-                    >
-                      <strong>{equipmentDisplayName(stone)}</strong>
-                      <span>+{formatPercent(stone.enhanceBonusRate)} · {selectedCount}/{stock}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          </div>
-        )}
+        {stonePicker && createPortal(stonePicker, document.body)}
       </section>
     </div>
   );

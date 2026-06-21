@@ -274,11 +274,13 @@ public class RobotBrainService {
             FROM inventory_slot s
             JOIN item_instance ii ON ii.id = s.item_id
             JOIN item_template it ON it.id = ii.template_id
-            WHERE s.player_id = ? AND it.effect_type = ?
+            WHERE s.player_id = ?
+              AND (it.effect_type = ? OR it.effect_value_json LIKE ?)
             """,
             Integer.class,
             playerId,
-            effectType
+            effectType,
+            "%\"" + effectType + "\"%"
         );
         return count == null ? 0 : count;
     }

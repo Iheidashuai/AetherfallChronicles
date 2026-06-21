@@ -121,7 +121,7 @@ import {
 import {
   announcementKindName, announcementSeenKey, ascendBlockReason, assignBuildEquipment, 
   assignSkillToFirstSlot, attributeName, battleEventName, battleFramesForResult, 
-  battleLogTone, bonusText, bossArchetypeName, buildEquipmentStatLine, buildGapWarnings, 
+  battleLogTone, bestEnhancementStoneIds, bonusText, bossArchetypeName, buildEquipmentStatLine, buildGapWarnings,
   buildSlotForItem, buildToDraft, canRefine, catalogCardText, catalogEffectDetail, 
   catalogIconForItem, catalogItemPower, catalogItemToDetail, catalogMatchesLevel, 
   catalogSourceHint, catalogStatRows, catalogSummary, catalogUsageHint, categoryName, 
@@ -172,6 +172,9 @@ export function InventoryScreen({ token }: { token: string }) {
   const [sellItem, setSellItem] = useState<Item | null>(null);
   const [enhanceToast, setEnhanceToast] = useState<{ variant: FeedbackVariant | 'warning'; title: string; message: string } | null>(null);
   const [selectedStoneIds, setSelectedStoneIds] = useState<number[]>([]);
+  const [autoEnhanceRunning, setAutoEnhanceRunning] = useState(false);
+  const autoEnhanceStopRef = useRef(false);
+  const autoEnhanceClosedRef = useRef(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ['inventory', token],
     queryFn: () => gameApi.inventory(token),
@@ -258,6 +261,83 @@ export function InventoryScreen({ token }: { token: string }) {
       setEnhanceToast({ variant: 'error', title: '强化失败', message: error.message });
     },
   });
+
+  function itemFromInventorySnapshot(snapshot: InventorySnapshot, itemId: number) {
+    return [...snapshot.inventory, ...Object.values(snapshot.equippedItems)].find((item) => item.id === itemId) ?? null;
+  }
+
+  function closeEnhanceModal() {
+    autoEnhanceStopRef.current = true;
+    autoEnhanceClosedRef.current = true;
+    setEnhanceItem(null);
+    setEnhanceToast(null);
+    setSelectedStoneIds([]);
+  }
+
+  function stopAutoEnhance() {
+    autoEnhanceStopRef.current = true;
+    setEnhanceToast({ variant: 'warning', title: '停止中', message: '当前强化完成后会停止。' });
+  }
+
+  async function runAutoEnhance({ targetLevel, useBestStones }: { targetLevel: number; useBestStones: boolean }) {
+    if (!enhanceItem || !data || autoEnhanceRunning) {
+      return;
+    }
+    autoEnhanceStopRef.current = false;
+    autoEnhanceClosedRef.current = false;
+    setAutoEnhanceRunning(true);
+    setSelectedStoneIds([]);
+    setNotice(null);
+    setEnhanceToast(null);
+    let currentItem = enhanceItem;
+    let currentSnapshot = data;
+    let attempts = 0;
+    let successes = 0;
+    try {
+      while (
+        !autoEnhanceStopRef.current
+        && currentItem.enhancementLevel < Math.min(15, targetLevel)
+        && currentItem.enhancementLevel < 15
+      ) {
+        const nextCost = enhanceCost(currentItem);
+        if (currentSnapshot.gold < nextCost) {
+          throw new Error(`金币不足，需要 ${formatNumber(nextCost)} 金`);
+        }
+        const stoneItemIds = useBestStones ? bestEnhancementStoneIds(currentSnapshot.inventory, currentItem) : [];
+        const result = await gameApi.enhance(token, currentItem.id, stoneItemIds);
+        attempts++;
+        if (result.success) {
+          successes++;
+        }
+        currentSnapshot = result.inventory;
+        queryClient.setQueryData(['inventory', token], result.inventory);
+        setSelectedStoneIds([]);
+        const refreshed = itemFromInventorySnapshot(result.inventory, currentItem.id);
+        if (!refreshed) {
+          throw new Error('强化后未找到目标装备');
+        }
+        currentItem = refreshed;
+        if (!autoEnhanceClosedRef.current) {
+          setEnhanceItem(refreshed);
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 220));
+      }
+      if (!autoEnhanceClosedRef.current) {
+        const stopped = autoEnhanceStopRef.current && currentItem.enhancementLevel < Math.min(15, targetLevel);
+        setEnhanceToast(stopped
+          ? { variant: 'warning', title: '自动强化已停止', message: `已尝试 ${attempts} 次，成功 ${successes} 次。` }
+          : { variant: 'success', title: '自动强化完成', message: `已强化到 +${currentItem.enhancementLevel}，尝试 ${attempts} 次，成功 ${successes} 次。` });
+      }
+    } catch (error) {
+      if (!autoEnhanceClosedRef.current) {
+        setEnhanceToast({ variant: 'error', title: '自动强化中断', message: (error as Error).message });
+      }
+    } finally {
+      setAutoEnhanceRunning(false);
+      await invalidateGameQueries(queryClient, token);
+    }
+  }
+
   const useItemMutation = useMutation({
     mutationFn: (item: Item) => gameApi.useItem(token, item.id),
     onMutate: () => {
@@ -266,9 +346,17 @@ export function InventoryScreen({ token }: { token: string }) {
     onSuccess: async (result) => {
       queryClient.setQueryData(['inventory', token], result.inventory);
       setSelectedStoneIds([]);
+      if (result.message) {
+        const staminaText = result.stamina ? `，疲劳 ${result.stamina.current}/${result.stamina.max}` : '';
+        setNotice(`${result.message}${staminaText}`);
+        await invalidateGameQueries(queryClient, token);
+        return;
+      }
       const rewardText = result.rewards.length > 0
-        ? result.effectType === 'levelBoost'
-          ? `，获得 ${result.rewards.length} 件 60 级史诗装备`
+        ? ['levelBoost', 'equipmentSetChest'].includes(result.effectType)
+          ? `，获得 ${result.rewards.length} 件 ${result.rewards[0]?.requiredLevel ?? ''} 级${qualityName(result.rewards[0]?.quality ?? 'epic')}装备`
+          : result.effectType === 'equipmentProgressBoost'
+            ? `，已更新 ${result.rewards.length} 件装备`
           : `，获得 ${result.rewards.map((item) => equipmentDisplayName(item)).join('、')}`
         : '';
       const staminaText = result.stamina ? `，疲劳 ${result.stamina.current}/${result.stamina.max}` : '';
@@ -321,7 +409,7 @@ export function InventoryScreen({ token }: { token: string }) {
   const activeTypes = itemTypesForCategory(category === 'all' ? 'equipment' : category);
   const legendaryFragments = inventoryTemplateQuantity(data.inventory, 'mat_fragment_legendary');
   const immortalFragments = inventoryTemplateQuantity(data.inventory, 'mat_fragment_immortal');
-  const busy = equipMutation.isPending || equipBestMutation.isPending || unequipMutation.isPending || sellMutation.isPending || enhanceMutation.isPending || useItemMutation.isPending || craftMutation.isPending || bulkSellMutation.isPending || organizeMutation.isPending;
+  const busy = equipMutation.isPending || equipBestMutation.isPending || unequipMutation.isPending || sellMutation.isPending || enhanceMutation.isPending || autoEnhanceRunning || useItemMutation.isPending || craftMutation.isPending || bulkSellMutation.isPending || organizeMutation.isPending;
   const inventoryActionError =
     equipMutation.error?.message ??
     equipBestMutation.error?.message ??
@@ -461,13 +549,13 @@ export function InventoryScreen({ token }: { token: string }) {
                 ) : (
                   <button
                     className="mini-action"
-                    disabled={busy || !['staminaPotion', 'attributePotion', 'levelBoost', 'chest'].includes(item.effectType ?? '')}
+                    disabled={busy || !(item.usable ?? Boolean(item.effectType || item.itemCategory === 'chest'))}
                     onClick={(event) => {
                       event.stopPropagation();
                       useItemMutation.mutate(item);
                     }}
                   >
-                    {item.effectType === 'chest' ? '开启' : '使用'}
+                    {item.actionLabel ?? (['chest', 'equipmentSetChest'].includes(item.effectType ?? '') ? '开启' : '使用')}
                   </button>
                 )}
                 <button className="mini-action danger" disabled={busy} onClick={(event) => {
@@ -564,18 +652,17 @@ export function InventoryScreen({ token }: { token: string }) {
         <EnhanceModal
           item={enhanceItem}
           gold={data.gold}
-          loading={enhanceMutation.isPending}
-          onClose={() => {
-            setEnhanceItem(null);
-            setEnhanceToast(null);
-            setSelectedStoneIds([]);
-          }}
+          loading={enhanceMutation.isPending || autoEnhanceRunning}
+          autoEnhanceRunning={autoEnhanceRunning}
+          onClose={closeEnhanceModal}
           stones={enhancementStonesForItem(data.inventory, enhanceItem)}
           selectedStoneIds={selectedStoneIds}
           onAddStone={(stoneId) => setSelectedStoneIds((current) => current.length >= 3 ? current : [...current, stoneId])}
           onRemoveStone={(index) => setSelectedStoneIds((current) => current.filter((_, currentIndex) => currentIndex !== index))}
           onReplaceStones={setSelectedStoneIds}
           onEnhance={() => enhanceMutation.mutate({ itemId: enhanceItem.id, stoneItemIds: selectedStoneIds })}
+          onAutoEnhance={runAutoEnhance}
+          onStopAutoEnhance={stopAutoEnhance}
         />
       )}
       {enhanceToast && <ToastNotice variant={enhanceToast.variant} title={enhanceToast.title} message={enhanceToast.message} />}

@@ -2065,6 +2065,10 @@ input:focus {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
 }
 
+.item-detail.enhance-effect::after {
+  inset: 0;
+}
+
 .close-button {
   float: right;
   min-width: 58px;
@@ -5240,6 +5244,19 @@ body {
   overflow: hidden;
 }
 
+.forge-screen,
+.forge-screen * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.forge-screen::-webkit-scrollbar,
+.forge-screen *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 .forge-status-strip {
   flex: 0 0 auto;
   display: grid;
@@ -5442,7 +5459,7 @@ body {
 
 .forge-equipment-grid {
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  grid-auto-rows: minmax(168px, auto);
+  grid-auto-rows: minmax(132px, auto);
 }
 
 .forge-list-panel > .forge-equipment-grid {
@@ -5454,13 +5471,80 @@ body {
 }
 
 .forge-equipment-grid .item-card {
-  min-height: 168px;
-  align-content: start;
+  min-height: 132px;
+  align-content: stretch;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .forge-equipment-grid .item-main,
 .forge-equipment-grid .item-main > div {
   min-width: 0;
+}
+
+.forge-equipment-card .item-main h2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.forge-equipment-card .inline-actions {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  align-self: end;
+  justify-content: flex-end;
+}
+
+.forge-equipment-card .forge-equipment-action {
+  min-width: 72px;
+}
+
+.forge-enhancement-list-grid {
+  grid-auto-rows: 112px;
+  gap: 8px;
+}
+
+.forge-list-panel > .forge-enhancement-list-grid {
+  padding-top: 4px;
+}
+
+.forge-enhancement-list-grid .forge-equipment-card {
+  height: 112px;
+  min-height: 112px;
+  padding: 10px;
+  padding-bottom: 44px;
+  gap: 0;
+  align-content: start;
+  grid-template-rows: auto;
+  overflow: hidden;
+}
+
+.forge-enhancement-list-grid .forge-equipment-card .item-main {
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.forge-enhancement-list-grid .forge-equipment-card .item-meta-line {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.forge-enhancement-list-grid .forge-equipment-card .eyebrow {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.forge-enhancement-list-grid .forge-equipment-card .enhance-badge {
+  flex: 0 0 auto;
+}
+
+.forge-enhancement-list-grid .forge-equipment-card h2 {
+  margin-top: 5px;
+  font-size: 14px;
+  line-height: 1.2;
 }
 
 .forge-detail-panel {
@@ -5487,6 +5571,98 @@ body {
 .enhance-stone-panel {
   display: grid;
   gap: 10px;
+}
+
+.enhance-progress-panel,
+.enhance-auto-panel {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.enhance-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #a8a39e;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.enhance-progress-row strong {
+  color: #fff5dc;
+  text-align: right;
+}
+
+.enhance-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.enhance-progress-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8bc7d0, #d5c17a);
+}
+
+.enhance-progress-track.blessing i {
+  background: linear-gradient(90deg, #d49cff, #d5c17a);
+}
+
+.enhance-auto-panel {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.enhance-auto-fields {
+  display: grid;
+  grid-template-columns: minmax(140px, 180px) minmax(180px, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.enhance-auto-fields label {
+  gap: 6px;
+}
+
+.enhance-auto-fields input[type="number"] {
+  min-height: 38px;
+}
+
+.toggle-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 38px;
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.enhance-auto-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .enhance-auto-panel,
+  .enhance-auto-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .enhance-auto-actions,
+  .enhance-auto-actions .mini-action {
+    width: 100%;
+  }
 }
 
 .enhance-stone-head,
@@ -5604,7 +5780,7 @@ body {
 .stone-picker-scrim {
   position: fixed;
   inset: 0;
-  z-index: 46;
+  z-index: 80;
   display: grid;
   align-items: center;
   justify-items: center;
@@ -5656,9 +5832,18 @@ body {
   overflow: hidden;
 }
 
+.forge-gem-craft-view {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(300px, 380px);
+  gap: 12px;
+  overflow: hidden;
+}
+
 .processing-equipment-list,
 .gem-pick-list,
 .gem-upgrade-list,
+.gem-group-list,
 .processing-log-list {
   min-height: 0;
   overflow: auto;
@@ -5671,6 +5856,7 @@ body {
 .processing-equipment-card,
 .gem-pick,
 .gem-upgrade-list button,
+.gem-group-card,
 .socket-cell,
 .affix-row,
 .processing-log {
@@ -5729,6 +5915,88 @@ body {
 
 .processing-detail-panel {
   align-content: start;
+}
+
+.gem-craft-list-panel,
+.gem-craft-summary-panel {
+  min-height: 0;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gem-craft-list-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.gem-craft-summary-panel {
+  align-content: start;
+  overflow: auto;
+}
+
+.gem-group-card {
+  min-height: 96px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.gem-group-card.craftable {
+  border-color: rgba(213, 193, 122, 0.38);
+  background: rgba(213, 193, 122, 0.08);
+}
+
+.gem-group-card strong,
+.gem-group-card small {
+  overflow-wrap: anywhere;
+}
+
+.gem-group-card small,
+.gem-group-reason {
+  color: #a8a39e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gem-group-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.gem-group-meta span {
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #fff5dc;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.gem-group-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gem-group-reason {
+  grid-column: 1 / -1;
+  text-align: right;
+}
+
+.primary-action.compact {
+  min-height: 34px;
+  padding: 0 12px;
 }
 
 .socket-grid {
@@ -5988,7 +6256,7 @@ body {
 .enhance-modal {
   width: min(calc(100vw - 72px), 760px);
   max-height: calc(100vh - 48px);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .compare-grid,
@@ -6761,7 +7029,7 @@ body {
   min-height: 0;
   overflow: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   align-content: start;
   gap: 12px;
   padding-right: 0;
@@ -6776,15 +7044,20 @@ body {
 }
 
 .shop-offer-card {
-  min-height: 236px;
+  min-height: 252px;
   padding: 14px;
   border-radius: 8px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025));
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: grid;
-  grid-template-rows: auto 1fr auto auto auto;
+  grid-template-rows: auto minmax(58px, 1fr) auto auto auto;
   gap: 10px;
   cursor: pointer;
+  overflow: hidden;
+}
+
+.shop-offer-card.category-growth {
+  min-height: 272px;
 }
 
 .shop-offer-card.selected {
@@ -6808,6 +7081,8 @@ body {
 .shop-offer-head strong {
   color: #fff5dc;
   font-size: 18px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .shop-offer-card p,
@@ -6818,6 +7093,17 @@ body {
   line-height: 1.55;
 }
 
+.shop-offer-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.shop-offer-card.category-growth p {
+  -webkit-line-clamp: 4;
+}
+
 .shop-offer-reward {
   display: flex;
   align-items: flex-end;
@@ -6826,8 +7112,10 @@ body {
 }
 
 .shop-offer-reward strong {
+  min-width: 0;
   color: #fff6d7;
   font-size: 16px;
+  line-height: 1.25;
 }
 
 .shop-offer-reward span {
@@ -6851,6 +7139,11 @@ body {
   border: 1px solid rgba(139, 199, 208, 0.18);
   font-size: 11px;
   font-weight: 900;
+}
+
+.shop-offer-card > .mini-action {
+  width: 100%;
+  min-height: 38px;
 }
 
 .shop-selected-card h2 {
@@ -7525,6 +7818,29 @@ body {
 .inventory-main .item-grid {
   flex: 1 1 auto;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-auto-rows: minmax(172px, auto);
+  align-items: stretch;
+}
+
+.inventory-main .item-grid .item-card {
+  min-height: 172px;
+  align-content: start;
+}
+
+.inventory-main .item-grid .item-card .item-main,
+.inventory-main .item-grid .item-card .item-main > div {
+  min-width: 0;
+}
+
+.inventory-main .item-grid .item-card .item-main h2 {
+  overflow-wrap: anywhere;
+}
+
+.inventory-main .item-grid .item-card .item-main p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .market-workbench {
@@ -7689,6 +8005,8 @@ body {
   .forge-status-strip,
   .forge-enhance-view,
   .forge-transfer-view,
+  .forge-processing-view,
+  .forge-gem-craft-view,
   .quest-workbench,
   .market-workbench,
   .shop-workbench,

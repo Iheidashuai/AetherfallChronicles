@@ -1,8 +1,7 @@
 package com.mythicrealm.api.gameplay.shop;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mythicrealm.api.gameplay.common.ApiException;
+import com.mythicrealm.api.gameplay.inventory.ItemEffectEngine;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.inventory.ItemRecord;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
@@ -16,26 +15,26 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ShopService {
-    private static final int MAX_PURCHASE_QUANTITY = 99;
+    private static final int MAX_PURCHASE_QUANTITY = 999;
 
     private final JdbcTemplate jdbcTemplate;
     private final PlayerService playerService;
     private final InventoryService inventoryService;
     private final RechargeService rechargeService;
-    private final ObjectMapper objectMapper;
+    private final ItemEffectEngine itemEffectEngine;
 
     public ShopService(
         JdbcTemplate jdbcTemplate,
         PlayerService playerService,
         InventoryService inventoryService,
         RechargeService rechargeService,
-        ObjectMapper objectMapper
+        ItemEffectEngine itemEffectEngine
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.playerService = playerService;
         this.inventoryService = inventoryService;
         this.rechargeService = rechargeService;
-        this.objectMapper = objectMapper;
+        this.itemEffectEngine = itemEffectEngine;
     }
 
     @Transactional(readOnly = true)
@@ -135,7 +134,7 @@ public class ShopService {
             """
             SELECT so.id, so.name, so.description, so.category, so.price_rmb, so.item_template_id,
                    so.item_quantity, so.gold_amount, so.required_level, so.sort_order,
-                   it.name AS item_name, it.item_type, it.item_category, it.quality, it.effect_value_json
+                   it.name AS item_name, it.item_type, it.item_category, it.quality, it.effect_type, it.effect_value_json
             FROM shop_offer so
             LEFT JOIN item_template it ON it.id = so.item_template_id
             WHERE so.enabled = TRUE
@@ -150,7 +149,7 @@ public class ShopService {
             """
             SELECT so.id, so.name, so.description, so.category, so.price_rmb, so.item_template_id,
                    so.item_quantity, so.gold_amount, so.required_level, so.sort_order,
-                   it.name AS item_name, it.item_type, it.item_category, it.quality, it.effect_value_json
+                   it.name AS item_name, it.item_type, it.item_category, it.quality, it.effect_type, it.effect_value_json
             FROM shop_offer so
             LEFT JOIN item_template it ON it.id = so.item_template_id
             WHERE so.id = ? AND so.enabled = TRUE
@@ -176,6 +175,7 @@ public class ShopService {
             rs.getString("item_type"),
             rs.getString("item_category"),
             rs.getString("quality"),
+            rs.getString("effect_type"),
             rs.getString("effect_value_json")
         );
     }
@@ -211,15 +211,7 @@ public class ShopService {
     }
 
     private int purchaseLimit(ShopOfferRow row) {
-        if (row.effectValueJson() == null || row.effectValueJson().isBlank()) {
-            return 0;
-        }
-        try {
-            JsonNode effect = objectMapper.readTree(row.effectValueJson());
-            return Math.max(0, effect.path("shopPurchaseLimit").asInt(0));
-        } catch (Exception error) {
-            throw ApiException.badRequest("商品限购配置错误: " + row.itemTemplateId());
-        }
+        return itemEffectEngine.purchaseLimit(row.effectType(), row.effectValueJson());
     }
 
     private int purchasedQuantity(long playerId, String offerId, int purchaseLimit) {
@@ -280,6 +272,7 @@ public class ShopService {
         String itemType,
         String itemCategory,
         String quality,
+        String effectType,
         String effectValueJson
     ) {
     }
