@@ -1663,6 +1663,13 @@ input:focus {
   font-weight: 800;
 }
 
+.gate-hint {
+  margin: 0;
+  color: #b9b4a5;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .clear-state {
   border-radius: 999px;
   padding: 4px 8px;
@@ -2115,15 +2122,17 @@ input:focus {
 
 .compact-action {
   min-height: 40px;
+  min-width: 0;
   border-radius: 8px;
   background: rgba(139, 199, 208, 0.2);
   color: #bff4fb;
   font-weight: 800;
+  white-space: normal;
 }
 
 .dungeon-action-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -4672,6 +4681,11 @@ body {
   grid-template-rows: minmax(260px, 0.9fr) minmax(220px, 1fr);
 }
 
+.rift-battle-screen .combat-main {
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
 .arena-battle-fighter-stack,
 .arena-battle-side,
 .rift-battle-side {
@@ -4791,12 +4805,32 @@ body {
 .rift-battle-replay {
   min-height: 0;
   height: 100%;
+  overflow: hidden;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
-.rift-battle-log {
+.rift-battle-log,
+.rift-event-log.replay.rift-battle-log {
+  align-content: start;
   min-height: 0;
   max-height: none;
   overflow: auto;
+  scrollbar-color: rgba(255, 245, 220, 0.42) rgba(255, 255, 255, 0.04);
+  scrollbar-width: thin;
+}
+
+.rift-battle-log::-webkit-scrollbar {
+  width: 8px;
+}
+
+.rift-battle-log::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+.rift-battle-log::-webkit-scrollbar-thumb {
+  background: rgba(213, 193, 122, 0.46);
+  border-radius: 999px;
 }
 
 .rift-battle-materials {
@@ -5058,26 +5092,54 @@ body {
   gap: 8px;
 }
 
-.recipe-button {
+.recipe-card {
   min-height: 54px;
   border-radius: 8px;
   border: 1px solid rgba(213, 193, 122, 0.18);
   background: rgba(213, 193, 122, 0.08);
   color: #f4f0e8;
   display: grid;
-  gap: 4px;
+  gap: 8px;
   padding: 9px 10px;
   text-align: left;
 }
 
-.recipe-button strong {
+.recipe-card.disabled {
+  opacity: 0.62;
+}
+
+.recipe-card-main {
+  display: grid;
+  gap: 4px;
+}
+
+.recipe-card strong {
   color: #fff5dc;
 }
 
-.recipe-button span {
+.recipe-card span {
   color: #a8a39e;
   font-size: 12px;
   font-weight: 800;
+}
+
+.recipe-card-controls {
+  display: grid;
+  grid-template-columns: minmax(54px, 0.7fr) minmax(58px, 1fr) minmax(58px, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.recipe-quantity-input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff7e6;
+  font-weight: 900;
+  padding: 0 8px;
 }
 
 .quality-sell {
@@ -6705,6 +6767,68 @@ body {
   white-space: nowrap;
 }
 
+.robot-speed-admin {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(139, 213, 225, 0.055);
+  border: 1px solid rgba(139, 213, 225, 0.18);
+}
+
+.robot-speed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.robot-speed-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.robot-speed-segment {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(58px, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.robot-speed-segment button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  color: #d8d1c8;
+  background: transparent;
+  font-weight: 900;
+}
+
+.robot-speed-segment button.active {
+  color: #11131a;
+  background: #d5c17a;
+}
+
+.robot-speed-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.robot-speed-notes {
+  display: flex;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  color: #a8a39e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .robot-filter-panel {
   display: grid;
   grid-template-columns: minmax(180px, 1.2fr) repeat(3, minmax(190px, 1fr)) auto;
@@ -7968,6 +8092,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .ai-model-chip {
@@ -7986,6 +8111,22 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #d5c17a;
+}
+
+.ai-price-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(244, 240, 232, 0.66);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ai-price-chip span {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(213, 193, 122, 0.1);
+  border: 1px solid rgba(213, 193, 122, 0.18);
 }
 
 .ai-usage-table-wrap {
@@ -8138,13 +8279,26 @@ body {
 .chat-speaker-card {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
   padding: 10px;
   border-radius: 8px;
   color: #f4f0e8;
   text-align: left;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(139, 199, 208, 0.16);
+}
+
+.chat-speaker-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
 }
 
 .chat-speaker-card span,
@@ -8156,6 +8310,25 @@ body {
 
 .chat-speaker-card strong {
   color: #fff5dc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-mention-button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #d5c17a;
+  background: rgba(213, 193, 122, 0.12);
+  border: 1px solid rgba(213, 193, 122, 0.22);
+}
+
+.chat-mention-button:hover {
+  color: #14120c;
+  background: #d5c17a;
 }
 
 @media (max-width: 900px) {
@@ -8406,6 +8579,16 @@ body {
 
   .result-screen .combat-main {
     grid-template-rows: minmax(240px, 42vh) minmax(180px, 1fr);
+  }
+
+  .rift-battle-screen .combat-main {
+    grid-template-rows: auto;
+    overflow: visible;
+  }
+
+  .rift-battle-replay {
+    height: auto;
+    overflow: visible;
   }
 
   .arena-duel-fighters {

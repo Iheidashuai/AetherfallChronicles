@@ -63,6 +63,21 @@ class ItemEffectEngineTest {
         assertThat(result.events()).contains(new ItemEffectEvent("customEvent", "mat_test", 3));
     }
 
+    @Test
+    void refineProgressBoostPreservesExistingFocusWhenNotConfigured() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        assertThat(ItemEffectEngine.progressBoostRefineFocus(
+            objectMapper.readTree("{\"op\":\"setEquipmentProgress\",\"progression\":\"refine\"}"),
+            equipment("crit")
+        )).isEqualTo("crit");
+
+        assertThat(ItemEffectEngine.progressBoostRefineFocus(
+            objectMapper.readTree("{\"op\":\"setEquipmentProgress\",\"progression\":\"refine\",\"focus\":\"attack\"}"),
+            equipment("crit")
+        )).isEqualTo("attack");
+    }
+
     private static ItemRecord consumable(String effectValueJson) {
         return new ItemRecord(
             1,
@@ -91,6 +106,54 @@ class ItemEffectEngineTest {
             0,
             0,
             "balanced",
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            List.of(),
+            List.of(),
+            ""
+        );
+    }
+
+    private static ItemRecord equipment(String refineFocus) {
+        return new ItemRecord(
+            2,
+            10,
+            "eq_test",
+            "测试装备",
+            "weapon",
+            "equipment",
+            "rare",
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            BigDecimal.ZERO,
+            1,
+            1,
+            false,
+            null,
+            null,
+            0,
+            1,
+            15,
+            0,
+            0,
+            2,
+            refineFocus,
             0,
             0,
             0,

@@ -13,6 +13,10 @@ spring:
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 40
+      minimum-idle: 10
+      connection-timeout: 3000
 
   redis:
     host: localhost
@@ -35,11 +39,11 @@ mythic:
     schema-location: classpath:db/latest_schema.sql
     rebuild-on-start: false
   admin:
-    usernames: 123456
+    usernames: 123456,hero
   ai:
     provider: openai-compatible
     chat:
-      enabled: false
+      enabled: true
       dry-run: false
       max-calls-per-minute: 6
       channel-cooldown-seconds: 10
@@ -51,11 +55,31 @@ mythic:
 # roughly every few minutes while the world stays busy.
 mythicrealm:
   robot:
+    full-population-enabled: true
+    max-robots-per-tick: 400
+    tick-time-budget-ms: 4500
+    healthy-tick-time-ms: 3500
+    decision-virtual-concurrency: 400
+    execution-parallelism: 16
     robots-per-tick: 48
     min-actions-per-tick: 28
     extra-action-range: 13
     world-chat-retention: 400
+    world-chat-cooldown-seconds: 6
     activity-log-retention: 4000
+    action-budgets:
+      combat-base: 100
+      combat-cap: 240
+      equipment-base: 80
+      equipment-cap: 200
+      market-base: 100
+      market-cap: 220
+      light-base: 160
+      light-cap: 320
+      world-chat-base: 6
+      world-chat-cap: 12
+      activity-log-base: 220
+      activity-log-cap: 320
     # 被动成长：按真实时间持续给机器人加经验/战力（离线也长），让榜单梯队不断往上爬。
     passive-growth-interval-ms: 180000
     passive-levels-per-hour: 0.5

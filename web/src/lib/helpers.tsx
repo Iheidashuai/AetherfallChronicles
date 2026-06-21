@@ -296,8 +296,14 @@ export function typeName(type: string) {
   if (type === 'fragment') {
     return '碎片';
   }
+  if (type === 'sweep_ticket') {
+    return '扫荡符';
+  }
   if (type === 'chest') {
     return '宝箱';
+  }
+  if (type === 'ring') {
+    return '戒指';
   }
   return slotName(type === 'ring' ? 'ring1' : type);
 }
@@ -359,7 +365,7 @@ export function itemEffectText(item: Item | EquipmentDetailData) {
   return bonusText(item);
 }
 
-export function parseEffectValue(item: Item | EquipmentDetailData) {
+export function parseEffectValue(item: { effectValueJson?: string | null }) {
   if (!item.effectValueJson) {
     return {} as Record<string, string | number>;
   }
@@ -735,6 +741,7 @@ export function categoryNameForInventory(category: string) {
 export function shopCategoryName(category: string) {
   const names: Record<string, string> = {
     all: '全部',
+    sweep: '扫荡',
     gold: '金币',
     stamina: '疲劳',
     enhancement: '强化',
@@ -918,7 +925,7 @@ export function catalogEffectDetail(item: ItemCatalogItem) {
   if (item.effectSummary) {
     return item.effectSummary;
   }
-  const effect = parseEffectValue(catalogItemToDetail(item));
+  const effect = parseEffectValue(item);
   if (item.effectType === 'equipmentSetChest') {
     return `套装等级：Lv.${Number(effect.equipmentLevel ?? item.requiredLevel)} · 品质：${qualityName(String(effect.equipmentQuality ?? item.quality))} · 数量：9 件`;
   }
@@ -948,7 +955,7 @@ export function catalogEffectDetail(item: ItemCatalogItem) {
 }
 
 export function catalogSourceHint(item: ItemCatalogItem) {
-  const effect = parseEffectValue(catalogItemToDetail(item));
+  const effect = parseEffectValue(item);
   if (item.shopPurchaseLimit || effect.dropPolicy === 'shopOnly' || Number(effect.shopPurchaseLimit ?? 0) > 0) {
     return '冒险者商店限购';
   }
@@ -963,6 +970,9 @@ export function catalogSourceHint(item: ItemCatalogItem) {
   }
   if (item.effectType === 'fragment') {
     return '日常活跃、宝箱与高阶副本';
+  }
+  if (item.effectType === 'sweepTicket') {
+    return '副本掉落、商店购买和市场流转';
   }
   if (item.itemCategory === 'consumable') {
     return '任务奖励、宝箱和冒险补给';
@@ -990,13 +1000,16 @@ export function catalogUsageHint(item: ItemCatalogItem) {
     return '开启后一次性获得对应等级的九件传说装备。';
   }
   if (item.effectType === 'equipmentProgressBoost') {
-    const effect = parseEffectValue(catalogItemToDetail(item));
+    const effect = parseEffectValue(item);
     return effect.progression === 'ascension'
       ? '使用后把背包和已穿戴装备的升阶等级直接补到上限。'
       : '使用后把背包和已穿戴装备的强化等级直接补到上限。';
   }
   if (item.effectType === 'fragment') {
     return '积攒到配方数量后可合成传说或不朽装备宝箱。';
+  }
+  if (item.effectType === 'sweepTicket') {
+    return '在副本大厅扫荡时自动消耗，不能直接使用。';
   }
   if (item.itemCategory === 'chest') {
     return '开启后按权重产出装备、材料或药水。';
@@ -1369,6 +1382,7 @@ export function marketCategoryName(category?: string) {
     material: '材料',
     consumable: '消耗品',
     chest: '宝箱',
+    sweepTicket: '扫荡符',
   } as Record<string, string>)[category ?? ''] ?? '物品';
 }
 
@@ -1387,6 +1401,9 @@ export function marketItemSummary(item: MarketListing['item']) {
       item.mpBonus > 0 ? `法力 +${item.mpBonus}` : '',
     ].filter(Boolean).join(' · ');
     return [statLine, item.processingSummary].filter(Boolean).join(' · ') || '可装备成长物品';
+  }
+  if (item.marketCategory === 'sweepTicket' || item.effectType === 'sweepTicket') {
+    return item.description || '副本扫荡时自动消耗';
   }
   return item.description || item.effectType || '成长物资';
 }
@@ -1976,14 +1993,20 @@ export function processedCritValue(value: number, level: number, refineLevel: nu
 export function marketPriceEstimate(item: Pick<EquipmentDetailData, 'attackBonus' | 'defenseBonus' | 'resistanceBonus' | 'hpBonus' | 'mpBonus' | 'critBonus' | 'enhancementLevel' | 'quality' | 'sellPrice' | 'requiredLevel' | 'refineLevel' | 'ascensionLevel' | 'itemCategory' | 'itemType' | 'effectType'>) {
   if (item.itemCategory && item.itemCategory !== 'equipment') {
     const rank = qualityRank(item.quality);
-    const category = item.itemType === 'gem' || item.effectType === 'gem' ? 'gem' : item.itemCategory;
+    const category = item.effectType === 'sweepTicket'
+      ? 'sweepTicket'
+      : item.itemType === 'gem' || item.effectType === 'gem'
+        ? 'gem'
+        : item.itemCategory;
     const multiplier = category === 'gem'
       ? 18 + rank * 5
       : category === 'material'
         ? 10 + rank * 3
         : category === 'chest'
           ? 16 + rank * 4
-          : 9 + rank * 2;
+          : category === 'sweepTicket'
+            ? 12 + rank * 4
+            : 9 + rank * 2;
     return Math.max(5, Math.round(item.sellPrice * multiplier / 2 + Math.max(1, item.requiredLevel) * Math.max(1, rank)));
   }
   const statScore = item.attackBonus * 16

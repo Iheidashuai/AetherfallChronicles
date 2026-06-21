@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -56,8 +57,22 @@ public class RobotEquipmentService {
     public DropResolution resolveDropIfUpgrade(PlayerRecord robot, ItemRecord item, Random random) {
         ensureEquipment(robot);
         String slot = slotForDrop(robot.id(), item.itemType(), random);
-        int oldPower = currentSlotPower(robot.id(), slot);
+        ItemRecord currentItem = currentSlotItem(robot.id(), slot).orElse(null);
+        int oldPower = currentItem == null ? 0 : itemPower(currentItem);
         int itemPower = itemPower(item);
+        if (currentItem != null
+            && InventoryService.canTransferEquipmentProgressBetween(currentItem, item)
+            && InventoryService.hasTransferableEquipmentProgress(currentItem)) {
+            int projectedPower = itemPower(projectTransferredProgress(currentItem, item));
+            if (projectedPower > oldPower) {
+                try {
+                    item = inventoryService.transferEnhancement(robot, currentItem.id(), item.id()).targetItem();
+                    itemPower = itemPower(item);
+                } catch (ApiException ignored) {
+                    itemPower = itemPower(item);
+                }
+            }
+        }
         if (itemPower <= oldPower) {
             return new DropResolution(item, null);
         }
@@ -342,17 +357,68 @@ public class RobotEquipmentService {
     }
 
     private int currentSlotPower(long playerId, String slot) {
-        return jdbcTemplate.query(
+        return currentSlotItem(playerId, slot).map(this::itemPower).orElse(0);
+    }
+
+    private Optional<ItemRecord> currentSlotItem(long playerId, String slot) {
+        return jdbcTemplate.queryForList(
             """
-            SELECT ii.*
+            SELECT es.item_id
             FROM equipment_slot es
-            JOIN item_instance ii ON ii.id = es.item_id
             WHERE es.player_id = ? AND es.slot_name = ?
             """,
-            (rs, rowNum) -> itemPower(mapItem(rs)),
+            Long.class,
             playerId,
             slot
-        ).stream().findFirst().orElse(0);
+        ).stream().findFirst().map(inventoryService::requireItem);
+    }
+
+    private ItemRecord projectTransferredProgress(ItemRecord source, ItemRecord target) {
+        return new ItemRecord(
+            target.id(),
+            target.playerId(),
+            target.templateId(),
+            target.name(),
+            target.itemType(),
+            target.itemCategory(),
+            target.quality(),
+            target.requiredLevel(),
+            target.attackBonus(),
+            target.defenseBonus(),
+            target.resistanceBonus(),
+            target.hpBonus(),
+            target.mpBonus(),
+            target.critBonus(),
+            target.sellPrice(),
+            target.quantity(),
+            target.stackable(),
+            target.effectType(),
+            target.effectValueJson(),
+            target.enhanceBonusRate(),
+            target.minEnhanceLevel(),
+            target.maxEnhanceLevel(),
+            source.enhancementLevel(),
+            source.enhancementLuck(),
+            source.refineLevel(),
+            source.refineFocus(),
+            source.ascensionLevel(),
+            source.ascensionLuck(),
+            source.socketAttackBonus(),
+            source.socketDefenseBonus(),
+            source.socketResistanceBonus(),
+            source.socketHpBonus(),
+            source.socketMpBonus(),
+            source.socketCritBonus(),
+            source.affixAttackBonus(),
+            source.affixDefenseBonus(),
+            source.affixResistanceBonus(),
+            source.affixHpBonus(),
+            source.affixMpBonus(),
+            source.affixCritBonus(),
+            source.sockets(),
+            source.affixes(),
+            target.description()
+        );
     }
 
     private void equipIntoSlot(long playerId, long itemId, String slot) {

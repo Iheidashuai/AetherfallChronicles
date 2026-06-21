@@ -2,6 +2,7 @@ import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 'rea
 import type { CSSProperties, ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AtSign,
   ArrowUp,
   Backpack,
   Bell,
@@ -168,7 +169,9 @@ export function ChatScreen({ token }: { token: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamConnected, setStreamConnected] = useState(false);
   const chatListRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const lastMessageIdRef = useRef(0);
+  const streamConnectedRef = useRef(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ['chat', token, 'world'],
     queryFn: () => gameApi.chatMessages(token, 'world'),
@@ -194,14 +197,42 @@ export function ChatScreen({ token }: { token: string }) {
     if (!message || !Number.isFinite(message.id)) {
       return;
     }
+    appendIncomingMessages([message]);
+  }
+
+  function appendIncomingMessages(incoming: ChatMessage[]) {
+    if (incoming.length === 0) {
+      return;
+    }
     setMessages((previous) => {
-      if (previous.some((item) => item.id === message.id)) {
-        return previous;
+      const byId = new Map<number, ChatMessage>();
+      for (const item of previous) {
+        byId.set(item.id, item);
       }
-      const next = [...previous, message].sort((left, right) => left.id - right.id).slice(-120);
+      for (const item of incoming) {
+        if (item && Number.isFinite(item.id)) {
+          byId.set(item.id, item);
+        }
+      }
+      const next = [...byId.values()].sort((left, right) => left.id - right.id).slice(-120);
       lastMessageIdRef.current = next.at(-1)?.id ?? lastMessageIdRef.current;
       return next;
     });
+  }
+
+  function mentionSpeaker(speaker: ChatSpeaker) {
+    const name = speaker.name?.trim();
+    if (!name) {
+      return;
+    }
+    setText((current) => {
+      const prefix = `@${name} `;
+      if (current.includes(prefix)) {
+        return current;
+      }
+      return current.trim() ? `${prefix}${current}` : prefix;
+    });
+    window.requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   useEffect(() => {
@@ -227,6 +258,7 @@ export function ChatScreen({ token }: { token: string }) {
     source.onerror = () => {
       if (!closed) {
         setStreamConnected(false);
+        gameApi.chatMessages(token, 'world').then(appendIncomingMessages).catch(() => undefined);
       }
     };
     source.addEventListener('message', (event: MessageEvent) => {
@@ -241,6 +273,22 @@ export function ChatScreen({ token }: { token: string }) {
       source.close();
       setStreamConnected(false);
     };
+  }, [token, Boolean(data)]);
+
+  useEffect(() => {
+    streamConnectedRef.current = streamConnected;
+  }, [streamConnected]);
+
+  useEffect(() => {
+    if (!data) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      if (!streamConnectedRef.current) {
+        gameApi.chatMessages(token, 'world').then(appendIncomingMessages).catch(() => undefined);
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, [token, Boolean(data)]);
 
   useEffect(() => {
@@ -280,7 +328,13 @@ export function ChatScreen({ token }: { token: string }) {
             ))}
           </div>
           <form className="chat-form" onSubmit={submit}>
-            <input value={text} maxLength={120} onChange={(event) => setText(event.target.value)} />
+            <input
+              ref={inputRef}
+              value={text}
+              maxLength={120}
+              placeholder="@名字 可以点名聊天"
+              onChange={(event) => setText(event.target.value)}
+            />
             <button className="icon-button send-button" disabled={sendMutation.isPending} aria-label="发送">
               <Send size={18} />
             </button>
@@ -298,15 +352,24 @@ export function ChatScreen({ token }: { token: string }) {
           <div className="chat-speaker-list">
             {recentSpeakers.length === 0 && <EmptyState text="暂时没有发言者。" />}
             {recentSpeakers.map((message) => (
-              <button
+              <div
                 key={`${message.id}-${message.senderName}`}
                 className="chat-speaker-card"
-                onClick={() => setSelectedSpeaker(message.speaker)}
               >
-                <span>{message.speaker.title || '冒险者'}</span>
-                <strong>{message.speaker.name || message.senderName}</strong>
-                <small>Lv.{message.speaker.level} · 战力 {formatNumber(message.speaker.power)}</small>
-              </button>
+                <button className="chat-speaker-main" onClick={() => setSelectedSpeaker(message.speaker)}>
+                  <span>{message.speaker.title || '冒险者'}</span>
+                  <strong>{message.speaker.name || message.senderName}</strong>
+                  <small>Lv.{message.speaker.level} · 战力 {formatNumber(message.speaker.power)}</small>
+                </button>
+                <button
+                  className="chat-mention-button"
+                  title={`@${message.speaker.name || message.senderName}`}
+                  aria-label={`@${message.speaker.name || message.senderName}`}
+                  onClick={() => mentionSpeaker(message.speaker)}
+                >
+                  <AtSign size={14} />
+                </button>
+              </div>
             ))}
           </div>
         </aside>

@@ -14,7 +14,9 @@ import com.mythicrealm.api.gameplay.quest.QuestService.QuestEvent;
 import com.mythicrealm.api.gameplay.recharge.RechargeService;
 import com.mythicrealm.api.gameplay.robot.RobotActivityLogService;
 import com.mythicrealm.api.gameplay.robot.RobotEquipmentService;
+import com.mythicrealm.api.gameplay.robot.RobotSpeedService;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -29,10 +32,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MarketService {
-    private static final int ROBOT_LISTING_TARGET = 1200;
     private static final int LISTING_PAGE_LIMIT = 1200;
     private static final int PRICE_CAP_MULTIPLIER = 3;
     private static final int MARKET_TAX_RATE = 8;
+    private static final int ROBOT_LISTING_RECLAIM_RATE = 30;
+    private static final int ROBOT_LISTING_TTL_HOURS = 24;
     static final String MARK_LISTING_SOLD_SQL =
         "UPDATE market_listing SET status = 'sold', item_id = NULL, buyer_player_id = ?, sold_at = CURRENT_TIMESTAMP WHERE id = ?";
     static final String MARK_LISTING_CANCELED_SQL =
@@ -56,9 +60,9 @@ public class MarketService {
     private final RobotEquipmentService robotEquipmentService;
     private final DungeonService dungeonService;
     private final RechargeService rechargeService;
+    private final RobotSpeedService robotSpeedService;
     private final Map<String, String> originCache = new ConcurrentHashMap<>();
-    private final Object robotListingMonitor = new Object();
-    private Instant nextMarketPulseAt = Instant.now().plusSeconds(5);
+    private final AtomicBoolean marketPulseRunning = new AtomicBoolean(false);
 
     public MarketService(
         JdbcTemplate jdbcTemplate,
@@ -68,7 +72,8 @@ public class MarketService {
         RobotActivityLogService robotActivityLogService,
         RobotEquipmentService robotEquipmentService,
         DungeonService dungeonService,
-        RechargeService rechargeService
+        RechargeService rechargeService,
+        RobotSpeedService robotSpeedService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.gameConfigService = gameConfigService;
@@ -78,11 +83,11 @@ public class MarketService {
         this.robotEquipmentService = robotEquipmentService;
         this.dungeonService = dungeonService;
         this.rechargeService = rechargeService;
+        this.robotSpeedService = robotSpeedService;
     }
 
     @Transactional
     public MarketSnapshot listings(PlayerRecord player) {
-        ensureRobotListings(Math.max(12, player.level() + 14));
         List<MarketListingView> listings = activeListings();
         int playerListings = (int) listings.stream().filter(MarketListingView::playerListing).count();
         int robotListings = listings.size() - playerListings;
@@ -315,52 +320,98 @@ public class MarketService {
         );
     }
 
-    private void ensureRobotListings(int maxRequiredLevel) {
-        synchronized (robotListingMonitor) {
-            ensureRobotListingsLocked(maxRequiredLevel);
-        }
-    }
-
-    private void ensureRobotListingsLocked(int maxRequiredLevel) {
-        Integer activeRobotListings = jdbcTemplate.queryForObject(
-            """
-            SELECT COUNT(*)
-            FROM market_listing ml
-            JOIN player seller ON seller.id = ml.seller_player_id
-            WHERE ml.status = 'listed'
-              AND seller.controller_type = 'robot'
-            """,
-            Integer.class
-        );
-        int activeCount = activeRobotListings == null ? 0 : activeRobotListings;
-        if (activeCount >= ROBOT_LISTING_TARGET) {
-            return;
-        }
-        List<RobotSeller> robots = robotSellers(80, new Random());
-        Random random = new Random(Objects.hash(activeCount, System.currentTimeMillis() / 600_000));
-        int needed = ROBOT_LISTING_TARGET - activeCount;
-        int listed = 0;
-        int attempts = Math.max(40, needed * 6);
-        for (int i = 0; listed < needed && i < attempts && !robots.isEmpty(); i++) {
-            RobotSeller robot = robots.get(random.nextInt(robots.size()));
-            listed += resolveRobotDungeonLoot(robot, maxRequiredLevel, random, false).listedCount();
-        }
-    }
-
     @Scheduled(initialDelay = 5_000, fixedDelay = 5_000)
     public void simulateMarketPulse() {
+        int multiplier = robotSpeedService.multiplier();
+        if (!marketPulseRunning.compareAndSet(false, true)) {
+            robotSpeedService.markMarketPulseSkipped("scheduled", multiplier);
+            return;
+        }
+        long startedAt = System.nanoTime();
+        int actionCount = 0;
+        robotSpeedService.markMarketPulseStarted("scheduled", multiplier);
+        try {
+            if (!hasHumanPlayer()) {
+                return;
+            }
+            actionCount += reclaimExpiredRobotListings(multiplier);
+            for (int round = 0; round < multiplier; round++) {
+                actionCount += simulateMarketRound();
+            }
+        } finally {
+            long durationMs = Math.max(0, (System.nanoTime() - startedAt) / 1_000_000L);
+            robotSpeedService.markMarketPulseFinished("scheduled", multiplier, actionCount, durationMs);
+            marketPulseRunning.set(false);
+        }
+    }
+
+    private int simulateMarketRound() {
         if (!hasHumanPlayer()) {
-            return;
+            return 0;
         }
-        Instant now = Instant.now();
-        if (now.isBefore(nextMarketPulseAt)) {
-            return;
+        Random random = new Random();
+        if (random.nextInt(100) < 42) {
+            return listRobotDrop() ? 1 : robotBuyListing(null, null) ? 1 : 0;
         }
-        nextMarketPulseAt = now.plusSeconds(5 + new Random().nextInt(16));
-        ensureRobotListings(90);
-        if (new Random().nextInt(100) >= 58 || !listRobotDrop()) {
-            robotBuyListing(null, null);
+        return robotBuyListing(null, null) ? 1 : 0;
+    }
+
+    int reclaimExpiredRobotListings(int multiplier) {
+        int ttlMinutes = robotListingTtlMinutes(multiplier);
+        Instant expiresBefore = Instant.now().minus(ttlMinutes, ChronoUnit.MINUTES);
+        List<ExpiredRobotListing> listings = jdbcTemplate.query(
+            """
+            SELECT ml.id, ml.seller_player_id, ml.item_id, ml.price,
+                   COALESCE(ml.snapshot_name, it.name) AS item_name
+            FROM market_listing ml
+            JOIN player seller ON seller.id = ml.seller_player_id
+            JOIN item_template it ON it.id = ml.item_template_id
+            WHERE ml.status = 'listed'
+              AND seller.controller_type = 'robot'
+              AND ml.created_at <= ?
+            ORDER BY ml.created_at ASC, ml.id ASC
+            """,
+            (rs, rowNum) -> new ExpiredRobotListing(
+                rs.getLong("id"),
+                rs.getLong("seller_player_id"),
+                rs.getObject("item_id") == null ? null : rs.getLong("item_id"),
+                rs.getLong("price"),
+                rs.getString("item_name")
+            ),
+            java.sql.Timestamp.from(expiresBefore)
+        );
+        int reclaimed = 0;
+        for (ExpiredRobotListing listing : listings) {
+            int updated = jdbcTemplate.update(
+                "UPDATE market_listing SET status = 'canceled', item_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'listed'",
+                listing.id()
+            );
+            if (updated <= 0) {
+                continue;
+            }
+            if (listing.itemId() != null) {
+                jdbcTemplate.update("DELETE FROM item_instance WHERE id = ? AND player_id = ?", listing.itemId(), listing.sellerPlayerId());
+            }
+            int gold = robotListingReclaimGold(listing.price());
+            jdbcTemplate.update("UPDATE player SET gold = gold + ? WHERE id = ?", gold, listing.sellerPlayerId());
+            robotActivityLogService.record(
+                listing.sellerPlayerId(),
+                "market_reclaim",
+                "清理滞销寄售【" + listing.itemName() + "】，商会回收返还 " + gold + " 金。"
+            );
+            reclaimed++;
         }
+        return reclaimed;
+    }
+
+    static int robotListingReclaimGold(long price) {
+        long gold = Math.max(1L, price) * ROBOT_LISTING_RECLAIM_RATE / 100;
+        return (int) Math.min(Integer.MAX_VALUE, Math.max(1L, gold));
+    }
+
+    static int robotListingTtlMinutes(int multiplier) {
+        int safeMultiplier = multiplier <= 0 ? 1 : multiplier;
+        return Math.max(1, ROBOT_LISTING_TTL_HOURS * 60 / safeMultiplier);
     }
 
     private boolean hasHumanPlayer() {
@@ -448,7 +499,12 @@ public class MarketService {
                     );
                 }
                 if (shouldRobotListItem(item, random)) {
-                    MarketListingView listing = listRobotOwnedItem(updatedRobot, robot.title(), item, "机器人副本掉落 · " + runResult.dungeonName(), random, false);
+                    MarketListingView listing;
+                    try {
+                        listing = listRobotOwnedItem(updatedRobot, robot.title(), item, "机器人副本掉落 · " + runResult.dungeonName(), random, false);
+                    } catch (ApiException error) {
+                        continue;
+                    }
                     listed++;
                     if (recordActivity) {
                         robotActivityLogService.record(
@@ -478,7 +534,12 @@ public class MarketService {
                 continue;
             }
 
-            MarketListingView listing = listRobotOwnedItem(updatedRobot, robot.title(), item, "机器人副本掉落 · " + runResult.dungeonName(), random, false);
+            MarketListingView listing;
+            try {
+                listing = listRobotOwnedItem(updatedRobot, robot.title(), item, "机器人副本掉落 · " + runResult.dungeonName(), random, false);
+            } catch (ApiException error) {
+                continue;
+            }
             listed++;
             if (recordActivity) {
                 robotActivityLogService.record(
@@ -672,6 +733,9 @@ public class MarketService {
         if ("consumable".equals(item.marketCategory())) {
             return "restoreStamina".equals(item.effectType()) || "grantGold".equals(item.effectType());
         }
+        if ("sweepTicket".equals(item.marketCategory())) {
+            return true;
+        }
         if ("material".equals(item.marketCategory())) {
             return qualityRank(item.quality()) >= 2 || item.effectValueJson().contains("ascension") || item.effectValueJson().contains("reforge") || item.effectValueJson().contains("socket");
         }
@@ -690,6 +754,7 @@ public class MarketService {
             case "material" -> qualityRank(item.quality()) >= 4 ? 12 : 24;
             case "gem" -> 2;
             case "consumable" -> 4;
+            case "sweepTicket" -> "ticket_sweep_special".equals(item.templateId()) ? 10 : 60;
             case "chest" -> 1;
             default -> 6;
         };
@@ -700,6 +765,7 @@ public class MarketService {
             case "gem" -> 52;
             case "material" -> 38 + qualityRank(item.quality()) * 4;
             case "consumable" -> 32;
+            case "sweepTicket" -> 30;
             case "chest" -> 45;
             default -> 22;
         };
@@ -998,6 +1064,7 @@ public class MarketService {
                 case "gem" -> 18 + rank * 5;
                 case "material" -> 10 + rank * 3;
                 case "consumable" -> 9 + rank * 2;
+                case "sweepTicket" -> 12 + rank * 4;
                 case "chest" -> 16 + rank * 4;
                 default -> 8 + rank * 2;
             };
@@ -1215,6 +1282,7 @@ public class MarketService {
             case "gem" -> "宝石";
             case "material" -> "材料";
             case "consumable" -> "消耗品";
+            case "sweepTicket" -> "扫荡符";
             case "chest" -> "宝箱";
             default -> item.marketCategory();
         };
@@ -1273,6 +1341,15 @@ public class MarketService {
             rs.getInt("price"),
             rs.getString("status")
         );
+    }
+
+    private record ExpiredRobotListing(
+        long id,
+        long sellerPlayerId,
+        Long itemId,
+        long price,
+        String itemName
+    ) {
     }
 
     private record RobotSeller(long id, String name, String title, String profession, int level, int power, long gold, long realMoney, int wealthTierLevel) {

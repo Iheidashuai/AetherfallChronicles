@@ -23,7 +23,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ItemEffectEngine {
     private static final String[] SYNTHESIS_CHEST_SLOTS =
-        {"weapon", "helmet", "armor", "legs", "boots", "gloves", "necklace", "ring"};
+        {"weapon", "helmet", "armor", "legs", "boots", "gloves", "necklace", "ring1", "ring2"};
 
     private final JdbcTemplate jdbcTemplate;
     private final PlayerService playerService;
@@ -155,7 +155,7 @@ public class ItemEffectEngine {
             case "grantRealMoney" -> grantRealMoney(context.player().id(), amountLong(effect, "amount", 0));
             case "restoreStamina" -> context.stamina(staminaService.add(context.player().id(), amountInt(effect, "amount", 0)));
             case "gainExperience" -> playerService.applyRewards(context.player().id(), amountInt(effect, "amount", 0), 0);
-            case "setLevel" -> setLevel(context, targetLevel(effect));
+            case "setLevel" -> setLevel(context, targetLevel(effect), effect.path("skipIfReached").asBoolean(false));
             case "addAttributes" -> addAttributes(context.player().id(), effect.path("attributes"));
             case "grantItems" -> grantItems(context, effect);
             case "consumeItems" -> consumeItems(context.player().id(), effect.path("items"));
@@ -169,12 +169,16 @@ public class ItemEffectEngine {
         }
     }
 
-    private void setLevel(EffectContext context, int targetLevel) {
+    private void setLevel(EffectContext context, int targetLevel, boolean skipIfReached) {
         if (targetLevel <= 1 || targetLevel > PlayerService.MAX_LEVEL) {
             throw ApiException.badRequest("Level boost is missing a valid target level");
         }
         PlayerRecord current = playerService.requireById(context.player().id());
         if (current.level() >= targetLevel) {
+            if (skipIfReached) {
+                context.player(current);
+                return;
+            }
             throw ApiException.badRequest("角色已达到 Lv." + targetLevel + "，无法使用该道具");
         }
         inventory().boostPlayerToLevel(current, targetLevel);
@@ -278,9 +282,14 @@ public class ItemEffectEngine {
 
     private void applyLootTableRef(EffectContext context, JsonNode effect) {
         String chestTemplateId = effect.path("chestTemplateId").asText(context.item().templateId());
-        String tieredGear = synthesisChestGear(chestTemplateId, playerService.requireById(context.player().id()).level(), context.random());
+        SynthesizedGear tieredGear = synthesisChestGear(chestTemplateId, playerService.requireById(context.player().id()).level(), context.random());
         if (tieredGear != null) {
-            context.rewards().addAll(inventory().grantItem(context.player().id(), tieredGear, 1, context.random()));
+            context.rewards().add(inventory().grantSynthesizedChestGear(
+                context.player().id(),
+                tieredGear.templateId(),
+                tieredGear.slot(),
+                context.random()
+            ));
             return;
         }
         ChestLoot loot = rollChestLoot(chestTemplateId, context.random());
@@ -320,7 +329,6 @@ public class ItemEffectEngine {
         if (targets.isEmpty()) {
             throw ApiException.badRequest("当前没有需要提升的装备");
         }
-        String focus = effect.path("focus").asText("balanced");
         for (ItemRecord target : targets) {
             switch (progression) {
                 case "enhancement" -> jdbcTemplate.update(
@@ -338,7 +346,7 @@ public class ItemEffectEngine {
                 case "refine" -> jdbcTemplate.update(
                     "UPDATE item_instance SET refine_level = ?, refine_focus = ? WHERE id = ? AND player_id = ?",
                     targetLevel,
-                    focus,
+                    progressBoostRefineFocus(effect, target),
                     target.id(),
                     context.player().id()
                 );
@@ -346,6 +354,17 @@ public class ItemEffectEngine {
             }
         }
         context.rewards().addAll(targets.stream().map(target -> inventory().requireItem(target.id())).toList());
+    }
+
+    static String progressBoostRefineFocus(JsonNode effect, ItemRecord target) {
+        String configured = effect.hasNonNull("focus") ? effect.path("focus").asText("") : "";
+        String value = configured.isBlank()
+            ? (target.refineFocus() == null || target.refineFocus().isBlank() ? "balanced" : target.refineFocus().trim())
+            : configured.trim();
+        return switch (value) {
+            case "attack", "defense", "resistance", "hp", "mp", "crit", "balanced" -> value;
+            default -> throw ApiException.badRequest("Unsupported refine focus: " + value);
+        };
     }
 
     private List<ItemRecord> equipmentTargets(long playerId, String scope) {
@@ -469,7 +488,19 @@ public class ItemEffectEngine {
     }
 
     private void copyPackageFields(JsonNode source, ObjectNode target) {
-        for (String field : List.of("equipmentLevel", "equipmentQuality", "equipmentTier", "equipmentTemplatePrefix")) {
+        for (String field : List.of(
+            "equipmentLevel",
+            "equipmentQuality",
+            "equipmentTier",
+            "equipmentTemplatePrefix",
+            "enhancementLevel",
+            "ascensionLevel",
+            "refineLevel",
+            "refineFocus",
+            "socketGemRank",
+            "perfectAffixes",
+            "affixTier"
+        )) {
             if (source.has(field)) {
                 target.set(field, source.get(field));
             }
@@ -527,7 +558,7 @@ public class ItemEffectEngine {
         return new ChestLoot(fallback.rewardTemplateId(), Math.max(1, fallback.minQuantity()));
     }
 
-    private String synthesisChestGear(String chestTemplateId, int playerLevel, Random random) {
+    private SynthesizedGear synthesisChestGear(String chestTemplateId, int playerLevel, Random random) {
         String quality;
         if ("chest_legendary_cache".equals(chestTemplateId)) {
             quality = "legendary";
@@ -538,7 +569,8 @@ public class ItemEffectEngine {
         }
         int tier = Math.max(60, Math.min(90, (playerLevel / 10) * 10));
         String slot = SYNTHESIS_CHEST_SLOTS[random.nextInt(SYNTHESIS_CHEST_SLOTS.length)];
-        return "eq_bloodmoon_l" + tier + "_" + slot + "_" + quality;
+        String templateSlot = slot.startsWith("ring") ? "ring" : slot;
+        return new SynthesizedGear("eq_bloodmoon_l" + tier + "_" + templateSlot + "_" + quality, slot);
     }
 
     private String useMessage(ItemRecord item, ItemEffectMetadata metadata, EffectContext context) {
@@ -679,5 +711,8 @@ public class ItemEffectEngine {
     }
 
     private record ChestLoot(String rewardTemplateId, int quantity) {
+    }
+
+    private record SynthesizedGear(String templateId, String slot) {
     }
 }

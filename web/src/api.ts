@@ -158,6 +158,7 @@ export type UseItemResult = {
   stamina?: StaminaSnapshot;
   inventory: InventorySnapshot;
   events?: ItemEffectEvent[];
+  quantity?: number;
 };
 
 export type ItemEffectEvent = {
@@ -171,6 +172,7 @@ export type CraftResult = {
   recipeName: string;
   rewards: Item[];
   inventory: InventorySnapshot;
+  quantity?: number;
 };
 
 export type BulkSellResult = {
@@ -845,6 +847,8 @@ export type Dungeon = {
     label: string;
   };
   stamina?: StaminaSnapshot;
+  normalSweepTickets: number;
+  specialSweepTickets: number;
 };
 
 export type DropPreview = {
@@ -1048,6 +1052,47 @@ export type WorldEvent = {
 export type RobotActivitySnapshot = {
   robots: RobotActivityView[];
   events: RobotActivityEvent[];
+};
+
+export type RobotTickStats = {
+  kind: string;
+  running: boolean;
+  multiplier: number;
+  lastActionCount: number;
+  lastDurationMs: number;
+  skippedCount: number;
+  lastStartedAt?: string | null;
+  lastFinishedAt?: string | null;
+  lastSkippedAt?: string | null;
+  lastSource: string;
+};
+
+export type RobotSpeedView = {
+  multiplier: number;
+  robotTick: RobotTickStats;
+  marketPulse: RobotTickStats;
+  simulation?: RobotSimulationStats | null;
+};
+
+export type RobotSimulationStats = {
+  id: number;
+  source: string;
+  multiplier: number;
+  robotCount: number;
+  plannedCount: number;
+  executedCount: number;
+  deferredCount: number;
+  failedCount: number;
+  decisionMs: number;
+  executionMs: number;
+  totalMs: number;
+  skipped: boolean;
+  backpressureActive: boolean;
+  budgetFactor: number;
+  executionParallelism: number;
+  actionSummary?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
 };
 
 export type RobotActivityDetail = {
@@ -1314,10 +1359,10 @@ export const gameApi = {
       { method: 'POST', body: JSON.stringify({ stoneItemIds }) },
       token,
     ),
-  useItem: (token: string, itemId: number) =>
-    api<UseItemResult>(`/api/inventory/${itemId}/use`, { method: 'POST' }, token),
-  craftRecipe: (token: string, recipeId: string) =>
-    api<CraftResult>(`/api/inventory/recipes/${recipeId}/craft`, { method: 'POST' }, token),
+  useItem: (token: string, itemId: number, quantity = 1) =>
+    api<UseItemResult>(`/api/inventory/${itemId}/use`, { method: 'POST', body: JSON.stringify({ quantity }) }, token),
+  craftRecipe: (token: string, recipeId: string, quantity = 1) =>
+    api<CraftResult>(`/api/inventory/recipes/${recipeId}/craft`, { method: 'POST', body: JSON.stringify({ quantity }) }, token),
   transferEnhancement: (token: string, sourceItemId: number, targetItemId: number) =>
     api<EnhancementTransferResult>('/api/inventory/transfer-enhancement', { method: 'POST', body: JSON.stringify({ sourceItemId, targetItemId }) }, token),
   refine: (token: string, itemId: number, focus: string) =>
@@ -1405,6 +1450,9 @@ export const gameApi = {
   leaderboard: (token: string) => api<LeaderboardEntry[]>('/api/leaderboard/power', {}, token),
   robotActivity: (token: string) => api<RobotActivitySnapshot>('/api/robots/activity', {}, token),
   robotActivityDetail: (token: string, robotId: number) => api<RobotActivityDetail>(`/api/robots/${robotId}/activity`, {}, token),
+  robotSpeed: (token: string) => api<RobotSpeedView>('/api/admin/robot-speed', {}, token),
+  updateRobotSpeed: (token: string, multiplier: number) =>
+    api<RobotSpeedView>('/api/admin/robot-speed', { method: 'PUT', body: JSON.stringify({ multiplier }) }, token),
   rechargeDashboard: (token: string) => api<RechargeDashboard>('/api/recharge/dashboard', {}, token),
   recharge: (token: string, rmbAmount: number) =>
     api<RechargeResult>('/api/recharge', { method: 'POST', body: JSON.stringify({ rmbAmount }) }, token),

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Item } from '../api';
+import type { Item, ItemCatalogItem } from '../api';
 import {
   bestEnhancementStoneIds,
+  catalogItemToDetail,
+  catalogSourceHint,
   enhanceBaseChance,
   enhanceChance,
   enhanceCost,
@@ -17,6 +19,7 @@ import {
   professionName,
   qualityName,
   qualityRank,
+  typeName,
 } from './helpers';
 
 // Minimal Item fixture — enhanceCost/enhanceChance only read a few fields.
@@ -30,6 +33,30 @@ const gem = (id: number, templateId: string, rank: number): Item =>
     effectType: 'gem',
     effectValueJson: JSON.stringify({ kind: 'ruby', rank, stat: 'attack' }),
   });
+
+const catalogItem = (over: Partial<ItemCatalogItem>): ItemCatalogItem => ({
+  templateId: 'shop_level_boost',
+  name: '历练追赶礼盒',
+  itemType: 'boost',
+  itemCategory: 'consumable',
+  quality: 'legendary',
+  requiredLevel: 1,
+  attackBonus: 0,
+  defenseBonus: 0,
+  resistanceBonus: 0,
+  hpBonus: 0,
+  mpBonus: 0,
+  critBonus: 0,
+  randomRange: 0,
+  description: '追赶道具',
+  sellPrice: 1,
+  stackable: true,
+  maxStack: 1,
+  enhanceBonusRate: 0,
+  minEnhanceLevel: 1,
+  maxEnhanceLevel: 15,
+  ...over,
+});
 
 describe('enhanceCost (money path)', () => {
   it('follows requiredLevel^2 * nextLevel * 10', () => {
@@ -134,6 +161,10 @@ describe('name maps fall back gracefully', () => {
     expect(qualityName('immortal')).not.toBe('');
     expect(qualityName('totally-unknown')).toBeTypeOf('string');
   });
+
+  it('shows unequipped ring items as neutral rings instead of the first ring slot', () => {
+    expect(typeName('ring')).toBe('戒指');
+  });
 });
 
 describe('gemUpgradeBlockReason', () => {
@@ -202,5 +233,21 @@ describe('itemEffectText', () => {
       effectType: 'equipmentSetChest',
       effectValueJson: JSON.stringify({ dropPolicy: 'shopOnly' }),
     }))).toBe(false);
+  });
+});
+
+describe('catalog detail helpers', () => {
+  it('builds catalog item details without recursively resolving origin', () => {
+    const target = catalogItem({
+      effectType: 'levelBoost',
+      effectValueJson: JSON.stringify({ targetLevel: 60, shopPurchaseLimit: 1 }),
+      shopPurchaseLimit: 1,
+    });
+
+    expect(catalogSourceHint(target)).toBe('冒险者商店限购');
+    expect(catalogItemToDetail(target)).toMatchObject({
+      templateId: 'shop_level_boost',
+      origin: '冒险者商店限购',
+    });
   });
 });

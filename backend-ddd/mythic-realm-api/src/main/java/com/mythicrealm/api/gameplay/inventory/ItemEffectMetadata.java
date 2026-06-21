@@ -288,6 +288,7 @@ public record ItemEffectMetadata(
             case "equipmentSetChest" -> "套装宝箱";
             case "equipmentProgressBoost" -> "成长券";
             case "enhancementStone" -> "强化石";
+            case "sweepTicket" -> "扫荡符";
             case "fragment" -> "碎片";
             case "gem" -> "宝石";
             case "chest" -> "宝箱";
@@ -322,6 +323,7 @@ public record ItemEffectMetadata(
                 ? "全部装备升阶至 " + root.path("targetLevel").asInt(5) + " 阶"
                 : "全部装备强化至 +" + root.path("targetLevel").asInt(15);
             case "enhancementStone" -> description == null || description.isBlank() ? "强化时提升成功率" : description;
+            case "sweepTicket" -> description == null || description.isBlank() ? "副本扫荡时消耗" : description;
             case "chest" -> "开启后随机获得奖励";
             default -> description == null ? "" : description;
         };
@@ -359,6 +361,7 @@ public record ItemEffectMetadata(
             case "equipmentSetChest" -> "开启后一次性获得对应等级九件装备。";
             case "equipmentProgressBoost" -> "使用后直接提升背包和已穿戴装备加工进度。";
             case "enhancementStone" -> "装备强化时作为材料使用。";
+            case "sweepTicket" -> "在副本大厅扫荡时自动消耗，不能直接使用。";
             case "chest" -> "开启后按权重产出奖励。";
             default -> "chest".equals(itemCategory) ? "开启后获得奖励。" : "";
         };

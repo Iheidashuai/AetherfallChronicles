@@ -34,4 +34,22 @@ class AiChatSchemaTest {
         assertTrue(schema.contains("UNIQUE KEY uk_ai_relationship (robot_id, player_id)"));
         assertTrue(schema.contains("CREATE TABLE ai_public_memory"));
     }
+
+    @Test
+    void aiRepliesAreInsertedInDelayOrderForSseIdCursors() throws IOException {
+        String source = Files.readString(Path.of("src/main/java/com/mythicrealm/api/gameplay/ai/AiChatInteractionService.java"));
+
+        assertTrue(source.contains("orderedReplies = validation.replies().stream()"));
+        assertTrue(source.contains(".sorted(Comparator.comparingInt(ValidatedReply::delayMs))"));
+        assertTrue(source.contains("for (ValidatedReply reply : orderedReplies)"));
+    }
+
+    @Test
+    void mentionedRobotIsForcedIntoCandidatePool() throws IOException {
+        String source = Files.readString(Path.of("src/main/java/com/mythicrealm/api/gameplay/ai/AiChatInteractionService.java"));
+
+        assertTrue(source.contains("mentionedRobotFromDatabase(interaction)"));
+        assertTrue(source.contains("? LIKE CONCAT('%@', p.name, '%')"));
+        assertTrue(source.contains("pool.add(databaseMentioned)"));
+    }
 }

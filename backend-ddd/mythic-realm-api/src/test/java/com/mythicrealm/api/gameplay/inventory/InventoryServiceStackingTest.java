@@ -39,16 +39,29 @@ class InventoryServiceStackingTest {
     }
 
     @Test
-    void enhancementTransferRequiresSameEquipmentSlot() {
-        assertThat(InventoryService.canTransferEnhancementBetween(
+    void equipmentTransferRequiresSameEquipmentSlot() {
+        assertThat(InventoryService.canTransferEquipmentProgressBetween(
             equipment(1, "legs", 15),
             equipment(2, "legs", 0)
         )).isTrue();
 
-        assertThat(InventoryService.canTransferEnhancementBetween(
+        assertThat(InventoryService.canTransferEquipmentProgressBetween(
             equipment(1, "legs", 15),
             equipment(2, "weapon", 0)
         )).isFalse();
+    }
+
+    @Test
+    void equipmentTransferSourceRequiresAnyProgress() {
+        assertThat(InventoryService.hasTransferableEquipmentProgress(equipment(1, "legs", 0))).isFalse();
+        assertThat(InventoryService.hasTransferableEquipmentProgress(equipment(2, "legs", 1))).isTrue();
+    }
+
+    @Test
+    void synthesizedChestGearNamesDistinguishRingSides() {
+        assertThat(InventoryService.synthesizedChestGearName("永夜·永恒指轮", "ring1")).isEqualTo("永夜·永恒指轮·左戒");
+        assertThat(InventoryService.synthesizedChestGearName("永夜·永恒指轮", "ring2")).isEqualTo("永夜·永恒指轮·右戒");
+        assertThat(InventoryService.synthesizedChestGearName("永夜·弑神之刃", "weapon")).isEqualTo("永夜·弑神之刃");
     }
 
     private static ItemRecord equipment(long id, String itemType, int enhancementLevel) {

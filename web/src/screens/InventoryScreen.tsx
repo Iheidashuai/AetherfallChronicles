@@ -160,12 +160,20 @@ import {
   invalidateGameQueries,
 } from '../components/ui';
 
+function isBulkOpenableItem(item: Item) {
+  const effectType = item.effectType ?? 'chest';
+  return item.stackable
+    && item.itemCategory === 'chest'
+    && ['chest', 'equipmentSetChest'].includes(effectType);
+}
+
 export function InventoryScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('quality');
+  const [craftQuantities, setCraftQuantities] = useState<Record<string, number>>({});
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [equipCandidate, setEquipCandidate] = useState<Item | null>(null);
   const [enhanceItem, setEnhanceItem] = useState<Item | null>(null);
@@ -339,7 +347,7 @@ export function InventoryScreen({ token }: { token: string }) {
   }
 
   const useItemMutation = useMutation({
-    mutationFn: (item: Item) => gameApi.useItem(token, item.id),
+    mutationFn: ({ item, quantity }: { item: Item; quantity: number }) => gameApi.useItem(token, item.id, quantity),
     onMutate: () => {
       setNotice(null);
     },
@@ -365,13 +373,13 @@ export function InventoryScreen({ token }: { token: string }) {
     },
   });
   const craftMutation = useMutation({
-    mutationFn: (recipeId: string) => gameApi.craftRecipe(token, recipeId),
+    mutationFn: ({ recipeId, quantity }: { recipeId: string; quantity: number }) => gameApi.craftRecipe(token, recipeId, quantity),
     onMutate: () => {
       setNotice(null);
     },
     onSuccess: async (result) => {
       queryClient.setQueryData(['inventory', token], result.inventory);
-      setNotice(`已合成 ${result.recipeName}`);
+      setNotice(`已合成 ${result.recipeName}${(result.quantity ?? 1) > 1 ? ` x${result.quantity}` : ''}`);
       await invalidateGameQueries(queryClient, token);
     },
   });
@@ -409,6 +417,10 @@ export function InventoryScreen({ token }: { token: string }) {
   const activeTypes = itemTypesForCategory(category === 'all' ? 'equipment' : category);
   const legendaryFragments = inventoryTemplateQuantity(data.inventory, 'mat_fragment_legendary');
   const immortalFragments = inventoryTemplateQuantity(data.inventory, 'mat_fragment_immortal');
+  const craftRecipes = [
+    { id: 'recipe_legendary_cache', name: '传说装备宝箱', fragments: legendaryFragments, cost: 20, fragmentName: '传说碎片' },
+    { id: 'recipe_immortal_cache', name: '不朽装备宝箱', fragments: immortalFragments, cost: 30, fragmentName: '不朽碎片' },
+  ];
   const busy = equipMutation.isPending || equipBestMutation.isPending || unequipMutation.isPending || sellMutation.isPending || enhanceMutation.isPending || autoEnhanceRunning || useItemMutation.isPending || craftMutation.isPending || bulkSellMutation.isPending || organizeMutation.isPending;
   const inventoryActionError =
     equipMutation.error?.message ??
@@ -436,6 +448,23 @@ export function InventoryScreen({ token }: { token: string }) {
     craftMutation.reset();
     bulkSellMutation.reset();
     organizeMutation.reset();
+  }
+
+  function craftableCount(recipe: { fragments: number; cost: number }) {
+    return Math.floor(recipe.fragments / recipe.cost);
+  }
+
+  function craftQuantity(recipeId: string, maxQuantity: number) {
+    if (maxQuantity <= 0) {
+      return 0;
+    }
+    const current = craftQuantities[recipeId] ?? 1;
+    return Math.min(Math.max(1, current), maxQuantity);
+  }
+
+  function updateCraftQuantity(recipeId: string, value: number, maxQuantity: number) {
+    const nextQuantity = maxQuantity <= 0 ? 0 : Math.min(Math.max(1, value || 1), maxQuantity);
+    setCraftQuantities((current) => ({ ...current, [recipeId]: nextQuantity }));
   }
 
   return (
@@ -547,16 +576,30 @@ export function InventoryScreen({ token }: { token: string }) {
                     }}>强化</button>
                   </>
                 ) : (
-                  <button
-                    className="mini-action"
-                    disabled={busy || !(item.usable ?? Boolean(item.effectType || item.itemCategory === 'chest'))}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      useItemMutation.mutate(item);
-                    }}
-                  >
-                    {item.actionLabel ?? (['chest', 'equipmentSetChest'].includes(item.effectType ?? '') ? '开启' : '使用')}
-                  </button>
+                  <>
+                    <button
+                      className="mini-action"
+                      disabled={busy || !(item.usable ?? Boolean(item.effectType || item.itemCategory === 'chest'))}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        useItemMutation.mutate({ item, quantity: 1 });
+                      }}
+                    >
+                      {item.actionLabel ?? (['chest', 'equipmentSetChest'].includes(item.effectType ?? '') ? '开启' : '使用')}
+                    </button>
+                    {isBulkOpenableItem(item) && item.quantity > 1 && (
+                      <button
+                        className="mini-action subtle"
+                        disabled={busy || !(item.usable ?? Boolean(item.effectType || item.itemCategory === 'chest'))}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          useItemMutation.mutate({ item, quantity: item.quantity });
+                        }}
+                      >
+                        开启全部
+                      </button>
+                    )}
+                  </>
                 )}
                 <button className="mini-action danger" disabled={busy} onClick={(event) => {
                   event.stopPropagation();
@@ -605,14 +648,45 @@ export function InventoryScreen({ token }: { token: string }) {
           </div>
           <SectionTitle icon={<Package size={18} />} title="碎片合成" />
           <div className="craft-recipe-list">
-            <button className="recipe-button" disabled={busy || legendaryFragments < 20} onClick={() => craftMutation.mutate('recipe_legendary_cache')}>
-              <strong>传说装备宝箱</strong>
-              <span>{legendaryFragments}/20 传说碎片</span>
-            </button>
-            <button className="recipe-button" disabled={busy || immortalFragments < 30} onClick={() => craftMutation.mutate('recipe_immortal_cache')}>
-              <strong>不朽装备宝箱</strong>
-              <span>{immortalFragments}/30 不朽碎片</span>
-            </button>
+            {craftRecipes.map((recipe) => {
+              const maxQuantity = craftableCount(recipe);
+              const quantity = craftQuantity(recipe.id, maxQuantity);
+              const disabled = busy || maxQuantity <= 0;
+              return (
+                <div key={recipe.id} className={`recipe-card ${disabled ? 'disabled' : ''}`}>
+                  <div className="recipe-card-main">
+                    <strong>{recipe.name}</strong>
+                    <span>{recipe.fragments}/{recipe.cost} {recipe.fragmentName} · 可合成 {maxQuantity}</span>
+                  </div>
+                  <div className="recipe-card-controls">
+                    <input
+                      aria-label={`${recipe.name}合成数量`}
+                      className="recipe-quantity-input"
+                      type="number"
+                      min={1}
+                      max={Math.max(1, maxQuantity)}
+                      value={quantity}
+                      disabled={disabled}
+                      onChange={(event) => updateCraftQuantity(recipe.id, Number(event.target.value), maxQuantity)}
+                    />
+                    <button
+                      className="mini-action"
+                      disabled={disabled}
+                      onClick={() => craftMutation.mutate({ recipeId: recipe.id, quantity })}
+                    >
+                      合成
+                    </button>
+                    <button
+                      className="mini-action subtle"
+                      disabled={disabled}
+                      onClick={() => craftMutation.mutate({ recipeId: recipe.id, quantity: maxQuantity })}
+                    >
+                      全部
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <SectionTitle icon={<Coins size={18} />} title="按品质卖出" />
           <div className="quality-sell-grid">

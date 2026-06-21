@@ -318,6 +318,7 @@ function GuildChat({ token }: { token: string }) {
   const [streamConnected, setStreamConnected] = useState(false);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const lastMessageIdRef = useRef(0);
+  const streamConnectedRef = useRef(false);
   const chatQuery = useQuery({
     queryKey: ['guild', 'chat', token],
     queryFn: () => gameApi.chatMessages(token, 'guild'),
@@ -343,11 +344,24 @@ function GuildChat({ token }: { token: string }) {
     if (!message || !Number.isFinite(message.id)) {
       return;
     }
+    appendIncomingMessages([message]);
+  }
+
+  function appendIncomingMessages(incoming: ChatMessage[]) {
+    if (incoming.length === 0) {
+      return;
+    }
     setMessages((previous) => {
-      if (previous.some((item) => item.id === message.id)) {
-        return previous;
+      const byId = new Map<number, ChatMessage>();
+      for (const item of previous) {
+        byId.set(item.id, item);
       }
-      const next = [...previous, message].sort((left, right) => left.id - right.id).slice(-120);
+      for (const item of incoming) {
+        if (item && Number.isFinite(item.id)) {
+          byId.set(item.id, item);
+        }
+      }
+      const next = [...byId.values()].sort((left, right) => left.id - right.id).slice(-120);
       lastMessageIdRef.current = next.at(-1)?.id ?? lastMessageIdRef.current;
       return next;
     });
@@ -376,6 +390,7 @@ function GuildChat({ token }: { token: string }) {
     source.onerror = () => {
       if (!closed) {
         setStreamConnected(false);
+        gameApi.chatMessages(token, 'guild').then(appendIncomingMessages).catch(() => undefined);
       }
     };
     source.addEventListener('message', (event: MessageEvent) => {
@@ -390,6 +405,22 @@ function GuildChat({ token }: { token: string }) {
       source.close();
       setStreamConnected(false);
     };
+  }, [token, Boolean(chatQuery.data)]);
+
+  useEffect(() => {
+    streamConnectedRef.current = streamConnected;
+  }, [streamConnected]);
+
+  useEffect(() => {
+    if (!chatQuery.data) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      if (!streamConnectedRef.current) {
+        gameApi.chatMessages(token, 'guild').then(appendIncomingMessages).catch(() => undefined);
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, [token, Boolean(chatQuery.data)]);
 
   useEffect(() => {
@@ -422,7 +453,7 @@ function GuildChat({ token }: { token: string }) {
         <input
           value={text}
           maxLength={120}
-          placeholder="对公会说点什么…"
+          placeholder="@名字 对公会说点什么..."
           onChange={(event) => setText(event.target.value)}
         />
         <button type="submit" disabled={sendMutation.isPending || !text.trim()}>

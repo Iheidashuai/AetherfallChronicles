@@ -71,6 +71,7 @@ import type {
   RobotActivityDetail,
   RobotActivityEvent,
   RobotActivityView,
+  RobotSpeedView,
   RiftRunResult,
   RiftSimulationResult,
   RiftSnapshot,
@@ -165,6 +166,7 @@ export function RobotActivityScreen({ token }: { token: string }) {
   const admin = useAppStore((state) => state.admin);
   const pendingWorldEventAction = useAppStore((state) => state.pendingWorldEventAction);
   const clearPendingWorldEventAction = useAppStore((state) => state.clearPendingWorldEventAction);
+  const queryClient = useQueryClient();
   const [selectedRobot, setSelectedRobot] = useState<RobotActivityView | null>(null);
   const [highlightRobotId, setHighlightRobotId] = useState<number | null>(null);
   const [filters, setFilters] = useState<RobotFilters>({
@@ -180,6 +182,19 @@ export function RobotActivityScreen({ token }: { token: string }) {
     queryKey: ['robot-activity', token],
     queryFn: () => gameApi.robotActivity(token),
     refetchInterval: 5_000,
+  });
+  const speedQuery = useQuery({
+    queryKey: ['robot-speed', token],
+    queryFn: () => gameApi.robotSpeed(token),
+    enabled: admin,
+    refetchInterval: 5_000,
+  });
+  const speedMutation = useMutation({
+    mutationFn: (multiplier: number) => gameApi.updateRobotSpeed(token, multiplier),
+    onSuccess: (speed) => {
+      queryClient.setQueryData(['robot-speed', token], speed);
+      queryClient.invalidateQueries({ queryKey: ['robot-activity', token] });
+    },
   });
   const robots = data?.robots ?? [];
   const filteredRobots = useMemo(() => filterRobots(robots, filters), [robots, filters]);
@@ -239,6 +254,15 @@ export function RobotActivityScreen({ token }: { token: string }) {
         <Metric label="累计充值" value={`${formatNumber(totalRecharge)} 元`} />
         <Metric label="最高战力" value={formatNumber(peakPower)} />
       </div>
+      {admin && (
+        <RobotSpeedAdminPanel
+          speed={speedQuery.data}
+          loading={speedQuery.isLoading}
+          busy={speedMutation.isPending}
+          error={(speedQuery.error as Error | null)?.message ?? (speedMutation.error as Error | null)?.message}
+          onSetSpeed={(multiplier) => speedMutation.mutate(multiplier)}
+        />
+      )}
       <div className="robot-workbench desktop-workbench">
         <section className="robot-roster main-panel">
           <div className="robot-list-head">
@@ -295,4 +319,78 @@ export function RobotActivityScreen({ token }: { token: string }) {
       {selectedRobot && <RobotActivityDetailModal token={token} robot={selectedRobot} onClose={closeRobotDetail} />}
     </section>
   );
+}
+
+function RobotSpeedAdminPanel({
+  speed,
+  loading,
+  busy,
+  error,
+  onSetSpeed,
+}: {
+  speed?: RobotSpeedView;
+  loading: boolean;
+  busy: boolean;
+  error?: string;
+  onSetSpeed: (multiplier: number) => void;
+}) {
+  const current = speed?.multiplier ?? 1;
+  const simulation = speed?.simulation;
+  const options = [1, 5, 10];
+  return (
+    <section className="robot-speed-admin">
+      <div className="robot-speed-head">
+        <SectionTitle icon={<FastForward size={18} />} title="机器人加速" />
+        <div className="robot-speed-actions">
+          <div className="robot-speed-segment" aria-label="机器人加速倍率">
+            {options.map((multiplier) => (
+              <button
+                key={multiplier}
+                className={current === multiplier ? 'active' : ''}
+                disabled={busy || loading}
+                onClick={() => onSetSpeed(multiplier)}
+              >
+                {multiplier}x
+              </button>
+            ))}
+          </div>
+          {current !== 1 && (
+            <button className="mini-action subtle" disabled={busy || loading} onClick={() => onSetSpeed(1)}>
+              恢复 1x
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="robot-speed-status">
+        <Metric label="当前" value={`${current}x · 全员调度`} />
+        <Metric label="主 tick" value={tickText(speed?.robotTick)} />
+        <Metric label="市场 pulse" value={tickText(speed?.marketPulse)} />
+        <Metric label="跳过" value={`${(speed?.robotTick.skippedCount ?? 0) + (speed?.marketPulse.skippedCount ?? 0)} 次`} />
+        <Metric label="规划 / 执行" value={simulation ? `${formatNumber(simulation.plannedCount)} / ${formatNumber(simulation.executedCount)}` : '等待'} />
+        <Metric label="延迟 / 失败" value={simulation ? `${formatNumber(simulation.deferredCount)} / ${formatNumber(simulation.failedCount)}` : '等待'} />
+        <Metric label="最近耗时" value={simulation ? `${formatNumber(simulation.totalMs)} ms` : '等待'} />
+        <Metric label="DB 并发" value={simulation ? `${formatNumber(simulation.executionParallelism)}` : '等待'} />
+        <Metric label="降载" value={simulation?.backpressureActive ? `${Math.round(simulation.budgetFactor * 100)}%` : '未触发'} />
+      </div>
+      <div className="robot-speed-notes">
+        <span>模式：每 5 秒最多 400 名机器人参与规划，按预算限流执行</span>
+        <span>影响：机器人行为、被动成长、市场周转、机器人挂单生命周期</span>
+        <span>不影响：AI 聊天、玩家恢复、充值收入、系统时间</span>
+      </div>
+      {error && <p className="gate-hint">{error}</p>}
+    </section>
+  );
+}
+
+function tickText(tick?: RobotSpeedView['robotTick']) {
+  if (!tick) {
+    return '等待';
+  }
+  if (tick.running) {
+    return '运行中';
+  }
+  if (!tick.lastFinishedAt && tick.skippedCount === 0) {
+    return '等待';
+  }
+  return `${formatNumber(tick.lastActionCount)} 次 / ${formatNumber(tick.lastDurationMs)} ms`;
 }

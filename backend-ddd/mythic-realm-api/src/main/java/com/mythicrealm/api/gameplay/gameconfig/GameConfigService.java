@@ -1,6 +1,7 @@
 package com.mythicrealm.api.gameplay.gameconfig;
 
 import com.mythicrealm.api.gameplay.common.ApiException;
+import com.mythicrealm.api.gameplay.dungeon.SweepTicketPolicy;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.ItemTemplate;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.MonsterConfig;
@@ -323,6 +324,11 @@ public class GameConfigService {
                 }
             }
         }
+        dropMissChanceByItem.merge(
+            SweepTicketPolicy.ticketTemplateId(dungeon.id()),
+            1 - SweepTicketPolicy.ticketDropRate(dungeon.id()),
+            (oldValue, nextValue) -> oldValue * nextValue
+        );
 
         List<DropPreview> drops = dropMissChanceByItem.entrySet().stream()
             .map(entry -> {

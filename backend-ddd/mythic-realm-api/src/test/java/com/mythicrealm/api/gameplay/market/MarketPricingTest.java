@@ -48,6 +48,20 @@ class MarketPricingTest {
     }
 
     @Test
+    void robotExpiredListingsReclaimThirtyPercent() {
+        assertEquals(300, MarketService.robotListingReclaimGold(1000));
+        assertEquals(1, MarketService.robotListingReclaimGold(1));
+        assertEquals(1, MarketService.robotListingReclaimGold(0));
+    }
+
+    @Test
+    void robotListingTtlScalesWithSpeedMultiplier() {
+        assertEquals(24 * 60, MarketService.robotListingTtlMinutes(1));
+        assertEquals(288, MarketService.robotListingTtlMinutes(5));
+        assertEquals(144, MarketService.robotListingTtlMinutes(10));
+    }
+
+    @Test
     void marketItemForeignKeyAllowsConsumedSoldItems() throws IOException {
         String schema = Files.readString(Path.of("../mythic-realm-starter/src/main/resources/db/latest_schema.sql"));
 

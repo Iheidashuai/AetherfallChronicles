@@ -306,14 +306,16 @@ export function SkillCard({ skill, busy, onTrain }: { skill: SkillView; busy: bo
   );
 }
 
-export function SpecialDungeonPanel({ dungeons, selectedDungeon, combatPower, playerLevel, loading, onSelect, onRun }: {
+export function SpecialDungeonPanel({ dungeons, selectedDungeon, combatPower, playerLevel, loading, sweepLoading, onSelect, onRun, onSweep }: {
   dungeons: Dungeon[];
   selectedDungeon: Dungeon | null;
   combatPower: number;
   playerLevel: number;
   loading: boolean;
+  sweepLoading: boolean;
   onSelect: (dungeonId: string) => void;
   onRun: (dungeonId: string) => void;
+  onSweep: (dungeon: Dungeon, times: number) => void;
 }) {
   if (dungeons.length === 0 || !selectedDungeon) {
     return <EmptyState text="特殊副本尚未开放。" />;
@@ -330,7 +332,7 @@ export function SpecialDungeonPanel({ dungeons, selectedDungeon, combatPower, pl
         <div>
           <span className="eyebrow">特殊副本 · 血月裂隙</span>
           <h2>传说与不朽装备唯一来源</h2>
-          <p>不开放扫荡，成功通关后进入高阶掉落结算。传说 15 次未出保底，不朽 60 次后软保底。</p>
+          <p>手动通关会记录评分，后续扫荡按历史最佳评分结算。传说 15 次未出保底，不朽 60 次后软保底。</p>
         </div>
         <strong className={`risk-pill ${risk.level}`}>{risk.label}</strong>
       </div>
@@ -357,10 +359,10 @@ export function SpecialDungeonPanel({ dungeons, selectedDungeon, combatPower, pl
         combatPower={combatPower}
         playerLevel={playerLevel}
         loading={loading}
-        sweepLoading={false}
+        sweepLoading={sweepLoading}
         special
         onRun={() => onRun(selectedDungeon.id)}
-        onSweep={() => undefined}
+        onSweep={(times) => onSweep(selectedDungeon, times)}
       />
     </div>
   );
@@ -1159,7 +1161,7 @@ export function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sw
   sweepLoading: boolean;
   special?: boolean;
   onRun: () => void;
-  onSweep: () => void;
+  onSweep: (times: number) => void;
 }) {
   const risk = dungeonRisk(combatPower, dungeon.minimumPower, playerLevel, dungeon.minimumLevel, dungeon.gate);
   const drops = dungeon.drops ?? [];
@@ -1170,12 +1172,39 @@ export function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sw
   const eligible = dungeon.gate?.eligible ?? true;
   const stamina = dungeon.stamina;
   const canRunWithStamina = !stamina || stamina.current >= 1;
-  const canSweepWithStamina = !stamina || stamina.current >= 10;
+  const ticketName = specialDungeon ? '特殊扫荡符' : '普通扫荡符';
+  const ticketCount = specialDungeon ? dungeon.specialSweepTickets : dungeon.normalSweepTickets;
   const previewDrops = drops.slice(0, specialDungeon ? 5 : 3);
   const hiddenDropCount = Math.max(0, drops.length - previewDrops.length);
   const normalDropLabel = drops.length > 0 ? `${drops.length} 件可掉落` : '暂无掉落';
   const [showDrops, setShowDrops] = useState(false);
   const [detailDrop, setDetailDrop] = useState<DropPreview | null>(null);
+  const canSweep = (times: number) => (
+    !loading
+    && !sweepLoading
+    && dungeon.cleared
+    && eligible
+    && (!stamina || stamina.current >= times)
+    && ticketCount >= times
+  );
+  const sweepLabel = (times: number) => {
+    if (sweepLoading) {
+      return '扫荡中';
+    }
+    if (!dungeon.cleared) {
+      return '需先通关';
+    }
+    if (!eligible) {
+      return '未达标';
+    }
+    if (stamina && stamina.current < times) {
+      return `缺疲劳 ${times - stamina.current}`;
+    }
+    if (ticketCount < times) {
+      return `缺${ticketName} ${times - ticketCount}`;
+    }
+    return `扫荡 ${times} 次`;
+  };
   return (
     <article className={`dungeon-card ${risk.level} ${specialDungeon ? 'special' : ''} ${eligible ? '' : 'locked'}`}>
       <div className="dungeon-card-head">
@@ -1197,6 +1226,7 @@ export function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sw
       </div>
       {specialDungeon && !eligible && <p className="gate-warning">{dungeon.gate.label}</p>}
       {stamina && stamina.current <= 0 && <p className="gate-warning">疲劳不足，可在背包使用疲劳药水。</p>}
+      <p className="gate-hint">持有 {ticketName} {formatNumber(ticketCount)} 个 · 扫荡消耗同等疲劳与扫荡符</p>
       {specialDungeon ? (
         <div className="drop-preview-section">
           <span>当前副本可掉落</span>
@@ -1229,13 +1259,17 @@ export function DungeonCard({ dungeon, combatPower, playerLevel = 0, loading, sw
         <button className="compact-action" disabled={loading || !eligible || !canRunWithStamina} onClick={onRun}>
           {loading ? '战斗中' : !canRunWithStamina ? '疲劳不足' : eligible ? specialDungeon ? '挑战裂隙' : '进入' : '未达标'}
         </button>
-        {specialDungeon ? (
-          <button className="compact-action sweep-compact locked" disabled>不可扫荡</button>
-        ) : (
-          <button className="compact-action sweep-compact" disabled={loading || sweepLoading || !dungeon.cleared || !eligible || !canSweepWithStamina} onClick={onSweep}>
-            {sweepLoading ? '扫荡中' : !canSweepWithStamina ? '疲劳不足' : '扫荡 10 次'}
+        {[10, 50].map((times) => (
+          <button
+            key={times}
+            className="compact-action sweep-compact"
+            disabled={!canSweep(times)}
+            onClick={() => onSweep(times)}
+            title={`${ticketName} ${formatNumber(ticketCount)} 个`}
+          >
+            {sweepLabel(times)}
           </button>
-        )}
+        ))}
       </div>
       {showDrops && createPortal(
         <DungeonDropsModal dungeon={dungeon} special={specialDungeon} onClose={() => setShowDrops(false)} />,

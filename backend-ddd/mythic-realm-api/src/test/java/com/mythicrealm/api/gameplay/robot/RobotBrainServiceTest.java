@@ -114,10 +114,29 @@ class RobotBrainServiceTest {
         assertThat(memory.recentlySaid(7, "没说过的话")).isFalse();
     }
 
+    @Test
+    void routineRobotLedgerLinesDoNotPublishToWorldChat() {
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("刚花 790 金学会技能【陨星术】到 1 阶，下次刷本试试自动循环。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("领取任务《公会第一枚印章》奖励：80 金 / 60 经验 / 2 件物品。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("使用《小体力药水》，获得 60 体力。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("合成《传说装备匣》，背包获得 炎纹护肩。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("这轮副本击败 9 只魔物，战力评估更新到 95606。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("换了 44 元，补进 44000 金，先留作强化、技能和商会预算。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("刚把【蛛影符纹护符 +2】强化到 +2，Nerys Dawnmere 你别再劝我收手了。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("先花 4 元换了 4000 金，刚把【腐沼符纹胸甲 +3】强化到 +3，Aelric Ashenford 你别再劝我收手了。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("强化【幽根精钢甲】失败了，现在 +0，先缓一口气。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("先花 4 元换了 4000 金，强化【幽根精钢甲】失败了，现在 +0，先缓一口气。")).isFalse();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("切换到构筑【铁壁续航】，装备 9 件，技能轮转 4 个，战力 9768 -> 9768。")).isFalse();
+
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("你现在主刷哪个副本？想找个稳定节奏。")).isTrue();
+        assertThat(RobotActionSupport.shouldPublishToWorldChat("刚推完【蛛影林地·通道】，你那边掉率怎么样？")).isTrue();
+    }
+
     private RobotBrainService brainWith(List<DungeonConfig> dungeons, RobotDecisionAction... actions) {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), anyLong())).thenReturn(0);
         when(jdbcTemplate.queryForObject(any(String.class), eq(Integer.class), anyLong(), anyLong())).thenReturn(0);
+        when(jdbcTemplate.queryForList(any(String.class), eq(String.class), anyLong())).thenReturn(List.of());
 
         GameConfigService gameConfigService = mock(GameConfigService.class);
         when(gameConfigService.dungeons()).thenReturn(dungeons);

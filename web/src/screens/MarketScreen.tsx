@@ -369,6 +369,7 @@ export function MarketScreen({ token }: { token: string }) {
                 ['material', '材料'],
                 ['consumable', '消耗品'],
                 ['chest', '宝箱'],
+                ['sweepTicket', '扫荡符'],
               ].map(([value, label]) => (
                 <button key={value} className={marketFilters.category === value ? 'active' : ''} onClick={() => setMarketFilters((current) => ({ ...current, category: value as MarketCategoryFilter, itemType: value === 'equipment' ? current.itemType : 'all' }))}>{label}</button>
               ))}

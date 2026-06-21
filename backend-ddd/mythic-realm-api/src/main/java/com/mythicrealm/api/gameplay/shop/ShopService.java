@@ -43,7 +43,7 @@ public class ShopService {
         return new ShopSnapshot(
             rechargeService.wallet(player),
             offers(player),
-            List.of("all", "gold", "stamina", "enhancement", "gem", "chest", "growth")
+            List.of("all", "sweep", "gold", "stamina", "enhancement", "gem", "chest", "growth")
         );
     }
 

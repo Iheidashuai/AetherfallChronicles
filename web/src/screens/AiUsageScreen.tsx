@@ -6,6 +6,9 @@ import type { AiModelCallDetail } from '../api';
 import { useAppStore } from '../store';
 import { EmptyState, ErrorScreen, LoadingScreen, Metric, SectionTitle, TopBar } from '../components/ui';
 
+const INPUT_TOKEN_PRICE_PER_1K = 0.00075;
+const OUTPUT_TOKEN_PRICE_PER_1K = 0.003;
+
 export function AiUsageScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const [selectedCallId, setSelectedCallId] = useState<number | null>(null);
@@ -40,8 +43,14 @@ export function AiUsageScreen({ token }: { token: string }) {
     <section className="screen ai-usage-screen">
       <TopBar title="AI 用量" onBack={() => setScreen('robots')} />
       <div className="stat-grid ai-usage-stats status-strip">
-        <Metric label="今日 Token" value={formatNumber(summary.todayTotalTokens)} />
-        <Metric label="历史 Token" value={formatNumber(summary.allTotalTokens)} />
+        <Metric label="今日输入" value={formatNumber(summary.todayPromptTokens)} />
+        <Metric label="今日输出" value={formatNumber(summary.todayCompletionTokens)} />
+        <Metric label="今日总计" value={formatNumber(summary.todayTotalTokens)} />
+        <Metric label="历史输入" value={formatNumber(summary.allPromptTokens)} />
+        <Metric label="历史输出" value={formatNumber(summary.allCompletionTokens)} />
+        <Metric label="历史总计" value={formatNumber(summary.allTotalTokens)} />
+        <Metric label="今日费用" value={formatYuan(tokenCost(summary.todayPromptTokens, summary.todayCompletionTokens))} />
+        <Metric label="历史费用" value={formatYuan(tokenCost(summary.allPromptTokens, summary.allCompletionTokens))} />
         <Metric label="平均延迟" value={`${formatNumber(summary.avgLatencyMs)} ms`} />
         <Metric label="失败率" value={formatPercent(summary.failureRate)} />
         <Metric label="兜底" value={formatNumber(summary.fallbackCount)} />
@@ -57,6 +66,10 @@ export function AiUsageScreen({ token }: { token: string }) {
               <span>{summary.provider || '未调用'}</span>
               <strong>{summary.model || '未配置模型'}</strong>
             </div>
+            <div className="ai-price-chip">
+              <span>输入 {formatPrice(INPUT_TOKEN_PRICE_PER_1K)} 元/1K</span>
+              <span>输出 {formatPrice(OUTPUT_TOKEN_PRICE_PER_1K)} 元/1K</span>
+            </div>
           </div>
           <div className="ai-usage-table-wrap">
             {calls.length === 0 ? (
@@ -68,7 +81,10 @@ export function AiUsageScreen({ token }: { token: string }) {
                     <th>ID</th>
                     <th>模式</th>
                     <th>模型</th>
-                    <th>Token</th>
+                    <th>输入</th>
+                    <th>输出</th>
+                    <th>总计</th>
+                    <th>费用</th>
                     <th>延迟</th>
                     <th>状态</th>
                     <th>时间</th>
@@ -84,7 +100,10 @@ export function AiUsageScreen({ token }: { token: string }) {
                       <td>#{call.id}</td>
                       <td>{call.mode}</td>
                       <td>{call.model || call.provider}</td>
+                      <td>{formatNumber(call.promptTokens ?? 0)}</td>
+                      <td>{formatNumber(call.completionTokens ?? 0)}</td>
                       <td>{formatNumber(call.totalTokens ?? 0)}</td>
+                      <td>{formatYuan(tokenCost(call.promptTokens ?? 0, call.completionTokens ?? 0))}</td>
                       <td>{formatNumber(call.latencyMs)} ms</td>
                       <td>
                         <span className={`ai-call-status ${call.success ? 'ok' : 'fail'}`}>
@@ -123,8 +142,12 @@ function CallDetail({ detail }: { detail: AiModelCallDetail }) {
       <div className="ai-call-detail-grid">
         <Metric label="Provider" value={detail.provider || '-'} />
         <Metric label="Model" value={detail.model || '-'} />
-        <Metric label="Prompt" value={formatNumber(detail.promptTokens ?? 0)} />
-        <Metric label="Completion" value={formatNumber(detail.completionTokens ?? 0)} />
+        <Metric label="输入 Token" value={formatNumber(detail.promptTokens ?? 0)} />
+        <Metric label="输出 Token" value={formatNumber(detail.completionTokens ?? 0)} />
+        <Metric label="总 Token" value={formatNumber(detail.totalTokens ?? 0)} />
+        <Metric label="输入费用" value={formatYuan(inputTokenCost(detail.promptTokens ?? 0))} />
+        <Metric label="输出费用" value={formatYuan(outputTokenCost(detail.completionTokens ?? 0))} />
+        <Metric label="合计费用" value={formatYuan(tokenCost(detail.promptTokens ?? 0, detail.completionTokens ?? 0))} />
         <Metric label="Token 来源" value={detail.tokenSource || '-'} />
         <Metric label="Latency" value={`${formatNumber(detail.latencyMs)} ms`} />
       </div>
@@ -167,6 +190,34 @@ function pretty(value: string) {
 
 function formatNumber(value: number) {
   return Number.isFinite(value) ? Math.round(value).toLocaleString() : '0';
+}
+
+function inputTokenCost(tokens: number) {
+  return (safeNumber(tokens) / 1000) * INPUT_TOKEN_PRICE_PER_1K;
+}
+
+function outputTokenCost(tokens: number) {
+  return (safeNumber(tokens) / 1000) * OUTPUT_TOKEN_PRICE_PER_1K;
+}
+
+function tokenCost(inputTokens: number, outputTokens: number) {
+  return inputTokenCost(inputTokens) + outputTokenCost(outputTokens);
+}
+
+function safeNumber(value: number) {
+  return Number.isFinite(value) ? value : 0;
+}
+
+function formatYuan(value: number) {
+  const amount = safeNumber(value);
+  return `${amount >= 1 ? amount.toFixed(2) : amount.toFixed(6)} 元`;
+}
+
+function formatPrice(value: number) {
+  return value.toLocaleString('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  });
 }
 
 function formatPercent(value: number) {

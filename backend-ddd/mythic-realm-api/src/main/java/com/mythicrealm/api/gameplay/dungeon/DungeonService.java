@@ -25,6 +25,7 @@ import com.mythicrealm.api.gameplay.stamina.StaminaService.StaminaSnapshot;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -88,6 +89,8 @@ public class DungeonService {
         PlayerRecord player = playerService.requireById(playerId);
         int combatPower = inventoryService.combatPower(player);
         StaminaSnapshot stamina = staminaService.snapshot(playerId);
+        int normalSweepTickets = inventoryService.templateQuantity(playerId, SweepTicketPolicy.NORMAL_TICKET_TEMPLATE_ID);
+        int specialSweepTickets = inventoryService.templateQuantity(playerId, SweepTicketPolicy.SPECIAL_TICKET_TEMPLATE_ID);
         Set<String> cleared = jdbcTemplate.queryForList(
                 "SELECT DISTINCT dungeon_id FROM dungeon_run WHERE player_id = ? AND success = TRUE",
                 String.class,
@@ -100,7 +103,9 @@ public class DungeonService {
                 preview,
                 cleared.contains(preview.id()),
                 encounterGate.evaluate(player, combatPower, gameConfigService.requireDungeon(preview.id())),
-                stamina
+                stamina,
+                normalSweepTickets,
+                specialSweepTickets
             ))
             .toList();
     }
@@ -163,7 +168,7 @@ public class DungeonService {
             appendFrame(
                 logs,
                 frames,
-                "特殊副本规则：不开放扫荡，通关后只结算传说与不朽装备。",
+                "特殊副本规则：手动通关会记录评分，后续扫荡按历史最佳评分结算。",
                 "danger",
                 "准备",
                 null,
@@ -265,6 +270,9 @@ public class DungeonService {
         } else if (success) {
             rareOrBetterLoot += awardNormalRatingBonus(player.id(), dungeon, rating, random, loot, logs, frames, playerHp, playerMaxHp);
         }
+        if (success) {
+            awardSweepTicket(player.id(), dungeon, random, loot, logs, frames, playerHp, playerMaxHp);
+        }
 
         PlayerRecord updatedPlayer = playerService.applyRewards(player.id(), expGained, goldGained);
         DungeonRunResult result = new DungeonRunResult(
@@ -304,15 +312,28 @@ public class DungeonService {
     @Transactional
     public DungeonSweepResult sweepDungeon(AuthenticatedAccount account, String dungeonId, int times, String requestId) {
         PlayerRecord player = playerService.requireByAccount(account);
+        return sweepDungeonForPlayer(player, dungeonId, times, requestId);
+    }
+
+    @Transactional
+    public DungeonSweepResult sweepDungeonForPlayer(PlayerRecord player, String dungeonId, int times, String requestId) {
         DungeonConfig dungeon = gameConfigService.requireDungeon(dungeonId);
-        if (isSpecialDungeon(dungeon.id())) {
-            throw ApiException.badRequest("特殊副本不支持扫荡，请手动挑战");
-        }
         if (!hasCleared(player.id(), dungeon.id())) {
             throw ApiException.badRequest("通关后才能扫荡该副本");
         }
 
-        int sweepTimes = Math.max(1, Math.min(10, times));
+        int sweepTimes = requireSweepTimes(times);
+        String ticketTemplateId = SweepTicketPolicy.ticketTemplateId(dungeon.id());
+        String ticketName = SweepTicketPolicy.ticketName(dungeon.id());
+        int ticketCount = inventoryService.templateQuantity(player.id(), ticketTemplateId);
+        if (ticketCount < sweepTimes) {
+            throw ApiException.badRequest(ticketName + "不足，还需要 " + (sweepTimes - ticketCount) + " 个");
+        }
+        StaminaSnapshot currentStamina = staminaService.snapshot(player.id());
+        if (currentStamina.current() < sweepTimes) {
+            throw ApiException.badRequest("疲劳不足，需要 " + sweepTimes + "，当前 " + currentStamina.current());
+        }
+        inventoryService.consumeTemplateQuantity(player.id(), ticketTemplateId, sweepTimes);
         StaminaSnapshot stamina = staminaService.consume(player.id(), sweepTimes);
         Random random = new Random(Objects.hash(player.id(), dungeonId, normalizeRequestId(requestId), System.nanoTime()));
         var logs = new ArrayList<String>();
@@ -321,40 +342,74 @@ public class DungeonService {
         int goldGained = 0;
         int monstersKilled = 0;
         int rareOrBetterLoot = 0;
+        boolean specialDungeon = isSpecialDungeon(dungeon.id());
+        String sweepRating = specialDungeon ? bestManualRating(player.id(), dungeon.id()) : "SWEEP";
 
         for (int sweepIndex = 1; sweepIndex <= sweepTimes; sweepIndex++) {
             int runExp = 0;
             int runGold = 0;
             int runLoot = 0;
             int runKills = 0;
-            for (var room : dungeon.rooms()) {
-                for (var roomMonster : room.monsters()) {
-                    MonsterConfig monster = gameConfigService.requireMonster(roomMonster.monsterId());
-                    for (int i = 0; i < roomMonster.count(); i++) {
-                        monstersKilled++;
-                        runKills++;
-                        expGained += monster.expReward();
-                        goldGained += monster.goldReward();
-                        runExp += monster.expReward();
-                        runGold += monster.goldReward();
-                        if (monster.lootTable() == null) {
-                            continue;
-                        }
-                        for (var lootEntry : monster.lootTable()) {
-                            if (random.nextDouble() <= lootEntry.dropRate()) {
-                                ItemTemplate template = gameConfigService.requireItem(lootEntry.itemId());
-                                ItemRecord item = inventoryService.addLootToInventory(player.id(), template, random);
-                                loot.add(item);
-                                runLoot++;
-                                if (isRareOrBetter(template.quality())) {
-                                    rareOrBetterLoot++;
+            int lootStart = loot.size();
+            List<ItemRecord> runLootItems;
+            if (specialDungeon) {
+                var passLogs = new ArrayList<String>();
+                var passFrames = new ArrayList<BattleFrame>();
+                var passLoot = new ArrayList<ItemRecord>();
+                rareOrBetterLoot += awardSpecialLoot(player.id(), dungeon, sweepRating, random, passLoot, passLogs, passFrames, 1, 1);
+                awardSweepTicket(player.id(), dungeon, random, passLoot, passLogs, passFrames, 1, 1);
+                runLootItems = List.copyOf(passLoot);
+                runLoot = runLootItems.size();
+                loot.addAll(runLootItems);
+            } else {
+                for (var room : dungeon.rooms()) {
+                    for (var roomMonster : room.monsters()) {
+                        MonsterConfig monster = gameConfigService.requireMonster(roomMonster.monsterId());
+                        for (int i = 0; i < roomMonster.count(); i++) {
+                            monstersKilled++;
+                            runKills++;
+                            expGained += monster.expReward();
+                            goldGained += monster.goldReward();
+                            runExp += monster.expReward();
+                            runGold += monster.goldReward();
+                            if (monster.lootTable() == null) {
+                                continue;
+                            }
+                            for (var lootEntry : monster.lootTable()) {
+                                if (random.nextDouble() <= lootEntry.dropRate()) {
+                                    ItemTemplate template = gameConfigService.requireItem(lootEntry.itemId());
+                                    ItemRecord item = inventoryService.addLootToInventory(player.id(), template, random);
+                                    loot.add(item);
+                                    runLoot++;
+                                    if (isRareOrBetter(template.quality())) {
+                                        rareOrBetterLoot++;
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                var passLogs = new ArrayList<String>();
+                var passFrames = new ArrayList<BattleFrame>();
+                if (awardSweepTicket(player.id(), dungeon, random, loot, passLogs, passFrames, 1, 1)) {
+                    runLoot++;
+                }
+                runLootItems = List.copyOf(loot.subList(lootStart, loot.size()));
             }
-            logs.add("第 " + sweepIndex + " 次扫荡：击败 " + runKills + " 只魔物，获得 " + runExp + " 经验 / " + runGold + " 金，掉落 " + runLoot + " 件装备。");
+            persistSweepRun(
+                player.id(),
+                dungeon.id(),
+                sweepRunRequestId(normalizeRequestId(requestId), sweepIndex),
+                sweepRating,
+                runKills,
+                runExp,
+                runGold,
+                inventoryService.combatPower(player),
+                dungeon.recommendedPower(),
+                runLootItems,
+                List.of(sweepLogLine(sweepIndex, specialDungeon, sweepRating, runKills, runExp, runGold, runLootItems))
+            );
+            logs.add(sweepLogLine(sweepIndex, specialDungeon, sweepRating, runKills, runExp, runGold, runLootItems));
         }
 
         PlayerRecord updatedPlayer = playerService.applyRewards(player.id(), expGained, goldGained);
@@ -372,7 +427,7 @@ public class DungeonService {
             stamina
         );
         persistSweep(player.id(), dungeon.id(), normalizeRequestId(requestId), result);
-        publishLegendaryLoot(player.name(), dungeon.name(), loot);
+        publishLegendaryLoot(player.name(), dungeon.name(), loot, SweepTicketPolicy.MAX_SWEEP_LOOT_ANNOUNCEMENTS);
         questService.recordEvent(player.id(), new QuestEvent("dungeonCompleted", dungeon.id(), sweepTimes));
         questService.recordEvent(player.id(), new QuestEvent("staminaSpent", null, sweepTimes));
         if (monstersKilled > 0) {
@@ -395,8 +450,88 @@ public class DungeonService {
         return clears != null && clears > 0;
     }
 
+    static int requireSweepTimes(int times) {
+        if (!SweepTicketPolicy.isSupportedSweepTimes(times)) {
+            throw ApiException.badRequest("只支持扫荡 10 次或 50 次");
+        }
+        return times;
+    }
+
+    private String bestManualRating(long playerId, String dungeonId) {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT rating
+                FROM dungeon_run
+                WHERE player_id = ? AND dungeon_id = ? AND success = TRUE AND run_type = 'manual'
+                """,
+                String.class,
+                playerId,
+                dungeonId
+            )
+            .stream()
+            .max(Comparator.comparingInt(SweepTicketPolicy::ratingRank))
+            .orElse("B");
+    }
+
+    private String sweepRunRequestId(String requestId, int sweepIndex) {
+        return requestId == null ? null : requestId + ":sweep:" + sweepIndex;
+    }
+
+    private String sweepLogLine(
+        int sweepIndex,
+        boolean specialDungeon,
+        String rating,
+        int runKills,
+        int runExp,
+        int runGold,
+        List<ItemRecord> loot
+    ) {
+        long ticketDrops = loot.stream()
+            .filter(item -> SweepTicketPolicy.NORMAL_TICKET_TEMPLATE_ID.equals(item.templateId())
+                || SweepTicketPolicy.SPECIAL_TICKET_TEMPLATE_ID.equals(item.templateId()))
+            .count();
+        String ticketText = ticketDrops > 0 ? "，含扫荡符 " + ticketDrops + " 个" : "";
+        if (specialDungeon) {
+            return "第 " + sweepIndex + " 次扫荡：按历史最佳 " + rating + " 评分结算，掉落 " + loot.size() + " 件物品" + ticketText + "。";
+        }
+        return "第 " + sweepIndex + " 次扫荡：击败 " + runKills + " 只魔物，获得 " + runExp + " 经验 / " + runGold + " 金，掉落 " + loot.size() + " 件物品" + ticketText + "。";
+    }
+
+    private boolean awardSweepTicket(
+        long playerId,
+        DungeonConfig dungeon,
+        Random random,
+        List<ItemRecord> loot,
+        List<String> logs,
+        List<BattleFrame> frames,
+        int playerHp,
+        int playerMaxHp
+    ) {
+        if (random.nextDouble() > SweepTicketPolicy.ticketDropRate(dungeon.id())) {
+            return false;
+        }
+        ItemRecord ticket = inventoryService.grantItem(
+            playerId,
+            SweepTicketPolicy.ticketTemplateId(dungeon.id()),
+            1,
+            random
+        ).getFirst();
+        loot.add(ticket);
+        appendFrame(logs, frames, "结算掉落：" + ticket.name(), "loot", "结算", null, playerHp, playerMaxHp, 0, 0);
+        return true;
+    }
+
     private void publishLegendaryLoot(String playerName, String dungeonName, List<ItemRecord> loot) {
-        for (ItemRecord item : loot) {
+        publishLegendaryLoot(playerName, dungeonName, loot, Integer.MAX_VALUE);
+    }
+
+    private void publishLegendaryLoot(String playerName, String dungeonName, List<ItemRecord> loot, int maxAnnouncements) {
+        List<ItemRecord> featuredLoot = loot.stream()
+            .filter(item -> "immortal".equals(item.quality()) || "legendary".equals(item.quality()))
+            .sorted(Comparator.comparingInt((ItemRecord item) -> "immortal".equals(item.quality()) ? 2 : 1).reversed())
+            .limit(Math.max(0, maxAnnouncements))
+            .toList();
+        for (ItemRecord item : featuredLoot) {
             if ("immortal".equals(item.quality())) {
                 announcementService.publishImmortalLoot(playerName, dungeonName, item.displayName());
             } else if ("legendary".equals(item.quality())) {
@@ -897,9 +1032,9 @@ public class DungeonService {
             PreparedStatement ps = connection.prepareStatement(
                 """
                 INSERT INTO dungeon_run
-                (player_id, dungeon_id, config_version, request_id, success, rating, monsters_killed,
+                (player_id, dungeon_id, config_version, request_id, run_type, success, rating, monsters_killed,
                  exp_gained, gold_gained, combat_power, recommended_power, player_max_hp, player_final_hp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 Statement.RETURN_GENERATED_KEYS
             );
@@ -940,6 +1075,47 @@ public class DungeonService {
             result.loot().size(),
             result.combatPower()
         );
+    }
+
+    private void persistSweepRun(
+        long playerId,
+        String dungeonId,
+        String requestId,
+        String rating,
+        int monstersKilled,
+        int expGained,
+        int goldGained,
+        int combatPower,
+        int recommendedPower,
+        List<ItemRecord> loot,
+        List<String> logs
+    ) {
+        var keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(
+                """
+                INSERT INTO dungeon_run
+                (player_id, dungeon_id, config_version, request_id, run_type, success, rating, monsters_killed,
+                 exp_gained, gold_gained, combat_power, recommended_power, player_max_hp, player_final_hp)
+                VALUES (?, ?, ?, ?, 'sweep', TRUE, ?, ?, ?, ?, ?, ?, 0, 0)
+                """,
+                Statement.RETURN_GENERATED_KEYS
+            );
+            ps.setLong(1, playerId);
+            ps.setString(2, dungeonId);
+            ps.setString(3, configVersion);
+            ps.setString(4, requestId);
+            ps.setString(5, rating);
+            ps.setInt(6, monstersKilled);
+            ps.setInt(7, expGained);
+            ps.setInt(8, goldGained);
+            ps.setInt(9, combatPower);
+            ps.setInt(10, recommendedPower);
+            return ps;
+        }, keyHolder);
+        long runId = keyHolder.getKey().longValue();
+        persistRunLoot(runId, loot);
+        persistRunLogs(runId, logs);
     }
 
     private void persistSweep(long playerId, String dungeonId, String requestId, DungeonSweepResult result) {
@@ -1216,22 +1392,33 @@ public class DungeonService {
         List<GameConfigService.DropPreview> drops,
         boolean cleared,
         EncounterGate.GateStatus gate,
-        StaminaSnapshot stamina
+        StaminaSnapshot stamina,
+        int normalSweepTickets,
+        int specialSweepTickets
     ) {
         static DungeonProgressPreview from(DungeonPreview preview, boolean cleared) {
             return from(
                 preview,
                 cleared,
                 new EncounterGate.GateStatus(false, preview.minimumLevel(), preview.minimumPower(), "登录后查看"),
-                null
+                null,
+                0,
+                0
             );
         }
 
         static DungeonProgressPreview from(DungeonPreview preview, boolean cleared, EncounterGate.GateStatus gate) {
-            return from(preview, cleared, gate, null);
+            return from(preview, cleared, gate, null, 0, 0);
         }
 
-        static DungeonProgressPreview from(DungeonPreview preview, boolean cleared, EncounterGate.GateStatus gate, StaminaSnapshot stamina) {
+        static DungeonProgressPreview from(
+            DungeonPreview preview,
+            boolean cleared,
+            EncounterGate.GateStatus gate,
+            StaminaSnapshot stamina,
+            int normalSweepTickets,
+            int specialSweepTickets
+        ) {
             return new DungeonProgressPreview(
                 preview.id(),
                 preview.name(),
@@ -1246,7 +1433,9 @@ public class DungeonService {
                 preview.drops(),
                 cleared,
                 gate,
-                stamina
+                stamina,
+                normalSweepTickets,
+                specialSweepTickets
             );
         }
     }

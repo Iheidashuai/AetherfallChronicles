@@ -26,20 +26,23 @@ public class RobotProgressionService {
     private final JdbcTemplate jdbcTemplate;
     private final PlayerService playerService;
     private final RobotSimulationProperties properties;
+    private final RobotSpeedService robotSpeedService;
 
     public RobotProgressionService(
         JdbcTemplate jdbcTemplate,
         PlayerService playerService,
-        RobotSimulationProperties properties
+        RobotSimulationProperties properties,
+        RobotSpeedService robotSpeedService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.playerService = playerService;
         this.properties = properties;
+        this.robotSpeedService = robotSpeedService;
     }
 
     @Scheduled(fixedDelayString = "${mythicrealm.robot.passive-growth-interval-ms:180000}", initialDelay = 20_000)
     public void grantPassiveGrowth() {
-        double levelsPerHour = properties.getPassiveLevelsPerHour();
+        double levelsPerHour = properties.getPassiveLevelsPerHour() * robotSpeedService.multiplier();
         if (levelsPerHour <= 0) {
             return;
         }

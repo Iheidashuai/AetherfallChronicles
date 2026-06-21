@@ -40,6 +40,8 @@ class EndgameRiftSchemaTest {
 
         assertTrue(schema.contains("('processing_abyss_essence_pack', '深渊精华匣'"));
         assertTrue(schema.contains("('processing_tempering_shard_pack', '淬炼碎片匣'"));
+        assertTrue(schema.contains("('processing_reforge_orb_pack', '重铸宝珠补给包'"));
+        assertTrue(schema.contains("'enhancement', 88, 'mat_reforge_orb', 3, 0, 60, 258, TRUE"));
         assertTrue(schema.contains("('processing_guard_pack', '护阶符'"));
         assertTrue(schema.contains("('gem_ruby_starter', '裂纹红宝石 I'"));
         assertTrue(schema.contains("('gem_topaz_starter', '裂纹黄玉 I'"));

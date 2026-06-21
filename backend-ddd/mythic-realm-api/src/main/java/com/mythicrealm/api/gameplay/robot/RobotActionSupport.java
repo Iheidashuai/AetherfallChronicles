@@ -3,6 +3,7 @@ package com.mythicrealm.api.gameplay.robot;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.build.BuildService;
 import com.mythicrealm.api.gameplay.dungeon.DungeonService;
+import com.mythicrealm.api.gameplay.dungeon.SweepTicketPolicy;
 import com.mythicrealm.api.gameplay.guild.GuildBossService;
 import com.mythicrealm.api.gameplay.guild.GuildService;
 import com.mythicrealm.api.gameplay.endgame.EndgameRiftService;
@@ -17,6 +18,7 @@ import com.mythicrealm.api.gameplay.quest.QuestService;
 import com.mythicrealm.api.gameplay.quest.QuestService.QuestEvent;
 import com.mythicrealm.api.gameplay.recharge.RechargeService;
 import com.mythicrealm.api.gameplay.skill.SkillService;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -145,6 +147,42 @@ public class RobotActionSupport {
         record(context.actor(), "dungeon", text, score.reason());
         processLoot(context.actor(), result, context.random());
         return RobotActionResult.success("dungeon", text);
+    }
+
+    public RobotActionResult sweepDungeon(RobotDecisionContext context, RobotActionScore score) {
+        DungeonConfig dungeon = context.sweepDungeon();
+        if (dungeon == null || context.sweepTimes() <= 0) {
+            return rest(context.actor(), "扫荡符和疲劳还没准备好，先调整路线。", score.reason());
+        }
+
+        DungeonService.DungeonSweepResult result;
+        try {
+            result = dungeonService.sweepDungeonForPlayer(context.player(), dungeon.id(), context.sweepTimes(), null);
+        } catch (ApiException error) {
+            String text = "准备扫荡时发现扫荡符、疲劳或通关记录不满足。";
+            record(context.actor(), "rest", text, score.reason());
+            return RobotActionResult.failure("rest", text);
+        }
+
+        jdbcTemplate.update(
+            """
+            UPDATE player
+            SET dungeon_clears = dungeon_clears + ?, last_activity_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            result.times(),
+            context.actor().id()
+        );
+
+        long ticketDrops = result.loot().stream()
+            .filter(item -> SweepTicketPolicy.NORMAL_TICKET_TEMPLATE_ID.equals(item.templateId())
+                || SweepTicketPolicy.SPECIAL_TICKET_TEMPLATE_ID.equals(item.templateId()))
+            .count();
+        String text = "扫荡 " + result.times() + " 次【" + result.dungeonName() + "】，获得 "
+            + result.loot().size() + " 件物品 / " + ticketDrops + " 个扫荡符，战力更新到 " + result.combatPower() + "。";
+        record(context.actor(), "dungeon_sweep", text, score.reason());
+        processLoot(context.actor(), result, context.random());
+        return RobotActionResult.success("dungeon_sweep", text);
     }
 
     public RobotActionResult enhanceEquipment(RobotDecisionContext context, RobotActionScore score) {
@@ -656,8 +694,15 @@ public class RobotActionSupport {
     }
 
     private void processLoot(RobotAgent actor, DungeonService.DungeonRunResult result, Random random) {
-        PlayerRecord updatedPlayer = result.player();
-        for (ItemRecord item : result.loot()) {
+        processLoot(actor, result.player(), result.dungeonName(), result.loot(), random);
+    }
+
+    private void processLoot(RobotAgent actor, DungeonService.DungeonSweepResult result, Random random) {
+        processLoot(actor, result.player(), result.dungeonName(), result.loot(), random);
+    }
+
+    private void processLoot(RobotAgent actor, PlayerRecord updatedPlayer, String dungeonName, List<ItemRecord> loot, Random random) {
+        for (ItemRecord item : loot) {
             if (!item.equipment()) {
                 boolean legendary = "legendary".equals(item.quality()) || "immortal".equals(item.quality());
                 if (legendary) {
@@ -677,10 +722,10 @@ public class RobotActionSupport {
                 );
             }
             if (drop.equipped()) {
-                String text = "在【" + result.dungeonName() + "】打到【" + drop.change().itemName() + "】，换到" + drop.change().slotName() + "上，战力提升 " + drop.change().powerGain() + "。";
+                String text = "在【" + dungeonName + "】打到【" + drop.change().itemName() + "】，换到" + drop.change().slotName() + "上，战力提升 " + drop.change().powerGain() + "。";
                 robotActivityLogService.record(updatedPlayer.id(), "equip", text);
             } else {
-                marketService.listRobotOwnedItem(updatedPlayer, actor.title(), item, "机器人副本掉落 · " + result.dungeonName(), random, true);
+                marketService.listRobotOwnedItem(updatedPlayer, actor.title(), item, "机器人副本掉落 · " + dungeonName, random, true);
             }
         }
     }
@@ -767,6 +812,12 @@ public class RobotActionSupport {
     }
 
     private void chat(RobotAgent actor, String text) {
+        if (!shouldPublishToWorldChat(text)) {
+            return;
+        }
+        if (worldChatCoolingDown()) {
+            return;
+        }
         jdbcTemplate.update(
             "INSERT INTO chat_message (player_id, sender_name, kind, text) VALUES (?, ?, 'robot', ?)",
             actor.id(),
@@ -776,6 +827,56 @@ public class RobotActionSupport {
         if (memoryService != null) {
             memoryService.recordChat(actor.id(), text);
         }
+    }
+
+    private boolean worldChatCoolingDown() {
+        int cooldownSeconds = properties == null ? 0 : Math.max(0, properties.getWorldChatCooldownSeconds());
+        if (cooldownSeconds == 0) {
+            return false;
+        }
+        Integer recentRobotMessages = jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM chat_message
+            WHERE channel = 'world'
+              AND kind = 'robot'
+              AND created_at >= ?
+            """,
+            Integer.class,
+            Timestamp.from(java.time.Instant.now().minusSeconds(cooldownSeconds))
+        );
+        return recentRobotMessages != null && recentRobotMessages > 0;
+    }
+
+    static boolean shouldPublishToWorldChat(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String normalized = text.trim();
+        if ((normalized.startsWith("刚花 ") || normalized.startsWith("先换 ")) && normalized.contains("技能【")) {
+            return false;
+        }
+        if (normalized.startsWith("领取任务《")
+            || normalized.startsWith("使用《")
+            || normalized.startsWith("合成《")) {
+            return false;
+        }
+        if (normalized.startsWith("这轮副本击败 ") && normalized.contains("战力评估更新到 ")) {
+            return false;
+        }
+        if (normalized.startsWith("换了 ") && normalized.contains("元，补进 ") && normalized.contains(" 金")) {
+            return false;
+        }
+        if (normalized.contains("刚把【") && normalized.contains("】强化到 +")) {
+            return false;
+        }
+        if (normalized.contains("强化【") && normalized.contains("】失败了")) {
+            return false;
+        }
+        if (normalized.startsWith("切换到构筑【")) {
+            return false;
+        }
+        return true;
     }
 
     /**

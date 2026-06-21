@@ -246,8 +246,8 @@ describe('BlacksmithScreen enhance list', () => {
   });
 });
 
-describe('BlacksmithScreen enhancement transfer', () => {
-  it('only shows same-slot lower-enhancement targets after selecting a source item', async () => {
+describe('BlacksmithScreen equipment transfer', () => {
+  it('shows same-slot targets regardless of their current enhancement after selecting a source item', async () => {
     const source = equipment({
       id: 201,
       templateId: 'source_legs',
@@ -265,7 +265,7 @@ describe('BlacksmithScreen enhancement transfer', () => {
     const highTarget = equipment({
       id: 203,
       templateId: 'target_legs_high',
-      name: '不可选高强护腿',
+      name: '可选高强护腿',
       itemType: 'legs',
       enhancementLevel: 15,
     });
@@ -300,7 +300,7 @@ describe('BlacksmithScreen enhancement transfer', () => {
     });
 
     const transferNav = Array.from(container!.querySelectorAll<HTMLButtonElement>('button'))
-      .find((button) => button.textContent?.includes('强化转移'));
+      .find((button) => button.textContent?.includes('装备转移'));
     expect(transferNav).toBeTruthy();
 
     await act(async () => {
@@ -321,7 +321,7 @@ describe('BlacksmithScreen enhancement transfer', () => {
 
     const targetColumn = container!.querySelectorAll<HTMLElement>('.transfer-column')[1];
     expect(targetColumn.textContent).toContain('可选低强护腿');
-    expect(targetColumn.textContent).not.toContain('不可选高强护腿');
+    expect(targetColumn.textContent).toContain('可选高强护腿');
     expect(targetColumn.textContent).not.toContain('不可选低强武器');
     expect(targetColumn.textContent).not.toContain('来源高强护腿');
   });

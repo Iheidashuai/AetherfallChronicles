@@ -108,7 +108,9 @@ public class ChatService {
     private void runStream(SseEmitter emitter, AtomicBoolean open, long afterId, String channel) {
         long lastId = afterId;
         long nextAmbientAt = System.currentTimeMillis() + nextAmbientDelayMillis();
+        long nextHeartbeatAt = System.currentTimeMillis() + 15_000;
         try {
+            emitter.send(SseEmitter.event().name("ready").data(channel));
             while (open.get()) {
                 List<ChatMessageView> pending = messagesAfter(lastId, channel);
                 if ("world".equals(channel) && pending.isEmpty() && System.currentTimeMillis() >= nextAmbientAt) {
@@ -117,6 +119,10 @@ public class ChatService {
                     pending = messagesAfter(lastId, channel);
                 }
                 if (pending.isEmpty()) {
+                    if (System.currentTimeMillis() >= nextHeartbeatAt) {
+                        emitter.send(SseEmitter.event().name("ping").data(Long.toString(System.currentTimeMillis())));
+                        nextHeartbeatAt = System.currentTimeMillis() + 15_000;
+                    }
                     sleep(open, 900);
                     continue;
                 }
@@ -129,13 +135,12 @@ public class ChatService {
                         .id(Long.toString(message.id()))
                         .data(message));
                     lastId = Math.max(lastId, message.id());
+                    nextHeartbeatAt = System.currentTimeMillis() + 15_000;
                     sleep(open, 650);
                 }
             }
         } catch (IOException | IllegalStateException error) {
-            if (open.get()) {
-                emitter.completeWithError(error);
-            }
+            open.set(false);
         } finally {
             open.set(false);
         }
@@ -262,9 +267,23 @@ public class ChatService {
     private List<ChatMessageView> recentMessages(String channel) {
         List<RawMessage> raw = jdbcTemplate.query(
             """
-            SELECT id, player_id, sender_name, kind, text, created_at
+            SELECT id, player_id, sender_name, kind, text, deliver_at AS created_at
             FROM chat_message
-            WHERE channel = ? AND deliver_at <= CURRENT_TIMESTAMP
+            WHERE channel = ?
+              AND deliver_at <= CURRENT_TIMESTAMP
+              AND NOT (
+                kind = 'robot' AND (
+                  text LIKE '刚花 %技能%' OR
+                  text LIKE '领取任务《%' OR
+                  text LIKE '使用《%' OR
+                  text LIKE '合成《%' OR
+                  text LIKE '这轮副本击败 %战力评估更新到 %' OR
+                  text LIKE '换了 %元，补进 %金%' OR
+                  text LIKE '%刚把【%】强化到 +%' OR
+                  text LIKE '%强化【%】失败了%' OR
+                  text LIKE '切换到构筑【%'
+                )
+              )
             ORDER BY id DESC
             LIMIT 80
             """,
@@ -277,11 +296,24 @@ public class ChatService {
     private List<ChatMessageView> messagesAfter(long afterId, String channel) {
         return toViews(jdbcTemplate.query(
             """
-            SELECT cm.id, cm.player_id, cm.sender_name, cm.kind, cm.text, cm.created_at
+            SELECT cm.id, cm.player_id, cm.sender_name, cm.kind, cm.text, cm.deliver_at AS created_at
             FROM chat_message cm
             WHERE cm.channel = ?
               AND cm.id > ?
               AND cm.deliver_at <= CURRENT_TIMESTAMP
+              AND NOT (
+                cm.kind = 'robot' AND (
+                  cm.text LIKE '刚花 %技能%' OR
+                  cm.text LIKE '领取任务《%' OR
+                  cm.text LIKE '使用《%' OR
+                  cm.text LIKE '合成《%' OR
+                  cm.text LIKE '这轮副本击败 %战力评估更新到 %' OR
+                  cm.text LIKE '换了 %元，补进 %金%' OR
+                  cm.text LIKE '%刚把【%】强化到 +%' OR
+                  cm.text LIKE '%强化【%】失败了%' OR
+                  cm.text LIKE '切换到构筑【%'
+                )
+              )
               AND NOT EXISTS (
                 SELECT 1
                 FROM chat_message hidden
@@ -303,7 +335,7 @@ public class ChatService {
     private ChatMessageView messageById(long messageId) {
         return toViews(jdbcTemplate.query(
             """
-            SELECT id, player_id, sender_name, kind, text, created_at
+            SELECT id, player_id, sender_name, kind, text, deliver_at AS created_at
             FROM chat_message
             WHERE id = ?
             """,

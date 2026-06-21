@@ -208,6 +208,7 @@ export function ShopScreen({ token }: { token: string }) {
   const shopError = purchaseMutation.error?.message ?? null;
   const categoryRows: Array<[ShopCategoryFilter, string]> = [
     ['all', '全部'],
+    ['sweep', '扫荡'],
     ['gold', '金币'],
     ['stamina', '疲劳'],
     ['enhancement', '强化'],

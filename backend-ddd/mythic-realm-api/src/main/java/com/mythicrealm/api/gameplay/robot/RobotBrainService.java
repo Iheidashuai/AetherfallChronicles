@@ -1,6 +1,7 @@
 package com.mythicrealm.api.gameplay.robot;
 
 import com.mythicrealm.api.gameplay.dungeon.DungeonService;
+import com.mythicrealm.api.gameplay.dungeon.SweepTicketPolicy;
 import com.mythicrealm.api.gameplay.endgame.EndgameRiftService;
 import com.mythicrealm.api.gameplay.gameconfig.ConfigModels.DungeonConfig;
 import com.mythicrealm.api.gameplay.gameconfig.GameConfigService;
@@ -66,6 +67,10 @@ public class RobotBrainService {
     }
 
     public RobotActionResult thinkAndAct(RobotAgent actor, RobotAgent target) {
+        return execute(plan(actor, target));
+    }
+
+    public RobotIntent plan(RobotAgent actor, RobotAgent target) {
         Random random = new Random(Objects.hash(actor.id(), actor.power(), actor.dungeonClears(), System.nanoTime()));
         RobotDecisionContext context = createContext(actor, target, random);
         List<ScoredAction> candidates = actions.stream()
@@ -75,13 +80,20 @@ public class RobotBrainService {
             .toList();
 
         if (candidates.isEmpty()) {
-            RobotActionResult fallback = actionSupport.rest(actor, "在公会大厅整理背包和下一步路线。", "没有可执行候选动作");
-            memoryService.recordKind(actor.id(), fallback.kind());
-            return fallback;
+            return RobotIntent.rest(actor, target, "没有可执行候选动作");
         }
         ScoredAction selected = sampleSoftmax(candidates, temperature(actor), random);
-        RobotActionResult result = selected.action().execute(context, selected.score());
-        memoryService.recordKind(actor.id(), result.kind());
+        return RobotIntent.of(actor, target, selected.action(), selected.score(), context);
+    }
+
+    public RobotActionResult execute(RobotIntent intent) {
+        RobotActionResult result;
+        if (intent.action() == null) {
+            result = actionSupport.rest(intent.actor(), "在公会大厅整理背包和下一步路线。", intent.reason());
+        } else {
+            result = intent.action().execute(intent.context(), intent.score());
+        }
+        memoryService.recordKind(intent.actor().id(), result.kind());
         return result;
     }
 
@@ -139,6 +151,10 @@ public class RobotBrainService {
         RobotEquipmentService.EnhancementOpportunity enhancementOpportunity = robotEquipmentService.enhancementOpportunity(actor.player());
         long spendableGold = actor.player().gold() + actor.player().realMoney() * 1_000L;
         long playerId = actor.id();
+        StaminaService.StaminaSnapshot stamina = staminaService.snapshot(playerId);
+        int normalSweepTickets = templateQuantity(playerId, SweepTicketPolicy.NORMAL_TICKET_TEMPLATE_ID);
+        int specialSweepTickets = templateQuantity(playerId, SweepTicketPolicy.SPECIAL_TICKET_TEMPLATE_ID);
+        SweepPlan sweepPlan = chooseSweepPlan(actor, stamina, normalSweepTickets, specialSweepTickets, random);
         boolean riftUnlocked = endgameRiftService != null && endgameRiftService.unlocked(actor.player());
         EndgameRiftService.RiftProgress riftProgress = endgameRiftService == null
             ? new EndgameRiftService.RiftProgress(0, 0, null)
@@ -152,11 +168,13 @@ public class RobotBrainService {
             target,
             runnableDungeon,
             progressionDungeon,
+            sweepPlan == null ? null : sweepPlan.dungeon(),
+            sweepPlan == null ? 0 : sweepPlan.times(),
             enhancementOpportunity,
             inventoryCount(playerId),
             activeListings(playerId),
             marketOpportunities(playerId, spendableGold),
-            staminaService.snapshot(playerId),
+            stamina,
             questService.claimableCount(playerId),
             questService.firstClaimableQuestId(playerId),
             effectQuantity(playerId, "staminaPotion"),
@@ -185,6 +203,62 @@ public class RobotBrainService {
             memoryService.recentKindCounts(playerId),
             inGuild(playerId),
             random
+        );
+    }
+
+    private SweepPlan chooseSweepPlan(
+        RobotAgent actor,
+        StaminaService.StaminaSnapshot stamina,
+        int normalSweepTickets,
+        int specialSweepTickets,
+        Random random
+    ) {
+        if (stamina == null || stamina.current() < SweepTicketPolicy.SHORT_SWEEP_TIMES) {
+            return null;
+        }
+        List<String> clearedDungeonIds = clearedDungeonIds(actor.id());
+        if (clearedDungeonIds.isEmpty()) {
+            return null;
+        }
+        List<DungeonConfig> normalCandidates = sweepCandidates(actor, clearedDungeonIds, false);
+        if (!normalCandidates.isEmpty() && normalSweepTickets >= SweepTicketPolicy.SHORT_SWEEP_TIMES) {
+            int times = normalSweepTickets >= SweepTicketPolicy.LONG_SWEEP_TIMES && stamina.current() >= SweepTicketPolicy.LONG_SWEEP_TIMES
+                ? SweepTicketPolicy.LONG_SWEEP_TIMES
+                : SweepTicketPolicy.SHORT_SWEEP_TIMES;
+            return new SweepPlan(normalCandidates.get(random.nextInt(normalCandidates.size())), times);
+        }
+        if (specialSweepTickets < SweepTicketPolicy.SHORT_SWEEP_TIMES || random.nextInt(100) >= 28) {
+            return null;
+        }
+        List<DungeonConfig> specialCandidates = sweepCandidates(actor, clearedDungeonIds, true);
+        if (specialCandidates.isEmpty()) {
+            return null;
+        }
+        int times = specialSweepTickets >= SweepTicketPolicy.LONG_SWEEP_TIMES && stamina.current() >= SweepTicketPolicy.LONG_SWEEP_TIMES
+            ? SweepTicketPolicy.LONG_SWEEP_TIMES
+            : SweepTicketPolicy.SHORT_SWEEP_TIMES;
+        return new SweepPlan(specialCandidates.get(random.nextInt(specialCandidates.size())), times);
+    }
+
+    private List<DungeonConfig> sweepCandidates(RobotAgent actor, List<String> clearedDungeonIds, boolean special) {
+        return gameConfigService.dungeons().stream()
+            .filter(dungeon -> DungeonService.isSpecialDungeon(dungeon.id()) == special)
+            .filter(dungeon -> clearedDungeonIds.contains(dungeon.id()))
+            .filter(dungeon -> dungeon.minimumLevel() <= Math.max(1, actor.player().level()))
+            .filter(dungeon -> dungeon.minimumPower() <= Math.max(1, actor.power()))
+            .sorted(Comparator
+                .comparingInt((DungeonConfig dungeon) -> Math.abs(dungeon.minimumLevel() - Math.max(1, actor.player().level())))
+                .thenComparingInt(dungeon -> Math.abs(dungeon.minimumPower() - actor.power()))
+                .thenComparing(DungeonConfig::id))
+            .limit(8)
+            .toList();
+    }
+
+    private List<String> clearedDungeonIds(long playerId) {
+        return jdbcTemplate.queryForList(
+            "SELECT DISTINCT dungeon_id FROM dungeon_run WHERE player_id = ? AND success = TRUE",
+            String.class,
+            playerId
         );
     }
 
@@ -256,7 +330,7 @@ public class RobotBrainService {
               AND (ml.seller_player_id IS NULL OR ml.seller_player_id <> ?)
               AND (
                   COALESCE(ii.quality, it.quality) IN ('rare', 'epic', 'legendary', 'immortal')
-                  OR COALESCE(ml.item_category, it.market_category, it.item_category) IN ('material', 'gem', 'consumable', 'chest')
+                  OR COALESCE(ml.item_category, it.market_category, it.item_category) IN ('material', 'gem', 'consumable', 'chest', 'sweepTicket')
               )
               AND ml.price <= ?
             """,
@@ -389,5 +463,8 @@ public class RobotBrainService {
     }
 
     private record ScoredAction(RobotDecisionAction action, RobotActionScore score) {
+    }
+
+    private record SweepPlan(DungeonConfig dungeon, int times) {
     }
 }

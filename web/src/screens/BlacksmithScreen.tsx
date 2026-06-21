@@ -160,6 +160,16 @@ import {
   invalidateGameQueries,
 } from '../components/ui';
 
+function hasEquipmentTransferProgress(item: Item) {
+  return item.enhancementLevel > 0
+    || (item.enhancementLuck ?? 0) > 0
+    || (item.refineLevel ?? 0) > 0
+    || (item.ascensionLevel ?? 0) > 0
+    || (item.ascensionLuck ?? 0) > 0
+    || (item.sockets?.length ?? 0) > 0
+    || (item.affixes?.length ?? 0) > 0;
+}
+
 export function BlacksmithScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
   const queryClient = useQueryClient();
@@ -214,7 +224,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
     }
     return sortItems([...Object.values(data.equippedItems), ...data.inventory].filter(isEquipmentItem), 'quality');
   }, [data]);
-  const sourceItems = useMemo(() => allEquipment.filter((item) => item.enhancementLevel > 0), [allEquipment]);
+  const sourceItems = useMemo(() => allEquipment.filter(hasEquipmentTransferProgress), [allEquipment]);
   const targetItems = useMemo(() => allEquipment.filter((item) => item.id !== sourceItemId), [allEquipment, sourceItemId]);
   const selectedSource = allEquipment.find((item) => item.id === sourceItemId) ?? null;
   const selectableTransferTargets = useMemo(() => {
@@ -223,8 +233,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
     }
     return allEquipment.filter((item) =>
       item.id !== selectedSource.id
-      && item.itemType === selectedSource.itemType
-      && item.enhancementLevel < selectedSource.enhancementLevel,
+      && item.itemType === selectedSource.itemType,
     );
   }, [allEquipment, selectedSource]);
   const selectedTarget = selectableTransferTargets.find((item) => item.id === targetItemId) ?? null;
@@ -234,7 +243,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
     && selectedTarget
     && selectedSource.id !== selectedTarget.id
     && selectedSource.itemType === selectedTarget.itemType
-    && selectedSource.enhancementLevel > selectedTarget.enhancementLevel,
+    && hasEquipmentTransferProgress(selectedSource),
   );
 
   useEffect(() => {
@@ -374,10 +383,10 @@ export function BlacksmithScreen({ token }: { token: string }) {
         throw new Error('请选择有效的来源装备和目标装备');
       }
       if (selectedSource.itemType !== selectedTarget.itemType) {
-        throw new Error('强化转移只能转移到相同部位装备');
+        throw new Error('装备转移只能转移到相同部位装备');
       }
-      if (selectedTarget.enhancementLevel >= selectedSource.enhancementLevel) {
-        throw new Error('目标装备强化等级必须低于来源装备');
+      if (!hasEquipmentTransferProgress(selectedSource)) {
+        throw new Error('来源装备没有可转移的养成进度');
       }
       return gameApi.transferEnhancement(token, sourceItemId, targetItemId);
     },
@@ -388,7 +397,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
       queryClient.setQueryData(['inventory', token], result.inventory);
       setSourceItemId(null);
       setTargetItemId(result.targetItem.id);
-      setNotice(`已继承到 ${equipmentDisplayName(result.targetItem)}`);
+      setNotice(`已转移到 ${equipmentDisplayName(result.targetItem)}`);
       await invalidateGameQueries(queryClient, token);
     },
   });
@@ -500,8 +509,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
     const currentTarget = allEquipment.find((equipment) =>
       equipment.id === targetItemId
       && equipment.id !== item.id
-      && equipment.itemType === item.itemType
-      && equipment.enhancementLevel < item.enhancementLevel,
+      && equipment.itemType === item.itemType,
     );
     if (!currentTarget) {
       setTargetItemId(null);
@@ -522,7 +530,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
   const ascendableCount = processingData.equipment.filter((entry) => (entry.item.ascensionLevel ?? 0) < 5).length;
   const forgeViews: Array<{ id: ForgeView; title: string; detail: string; icon: ReactNode; badge: string }> = [
     { id: 'enhance', title: '装备强化', detail: '提升基础属性与战力', icon: <Hammer size={18} />, badge: `${enhanceableCount}` },
-    { id: 'transfer', title: '强化转移', detail: '把高强化继承到低强化装备', icon: <Repeat2 size={18} />, badge: `${sourceItems.length}` },
+    { id: 'transfer', title: '装备转移', detail: '迁移强化 · 淬炼 · 宝石', icon: <Repeat2 size={18} />, badge: `${sourceItems.length}` },
     { id: 'refine', title: '深渊淬炼', detail: '消耗深渊材料定向强化', icon: <Sparkles size={18} />, badge: `${refineableCount}` },
     { id: 'socket', title: '宝石镶嵌', detail: '开孔 · 镶嵌', icon: <Gem size={18} />, badge: `${socketableCount}` },
     { id: 'gem', title: '宝石合成', detail: '三合一 · 一键合成', icon: <Sparkles size={18} />, badge: `${gemCount}` },
@@ -676,7 +684,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
                   <strong>{sourceItems.length}</strong>
                 </div>
                 <div className="transfer-list">
-                  {sourceItems.length === 0 && <EmptyState text="暂无带强化等级的装备。" />}
+                  {sourceItems.length === 0 && <EmptyState text="暂无带养成进度的装备。" />}
                   {sourceItems.map((item) => (
                     <TransferItemOption
                       key={item.id}
@@ -694,7 +702,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
                 </div>
                 <div className="transfer-list">
                   {!selectedSource && <EmptyState text="先选择来源装备。" />}
-                  {selectedSource && selectableTransferTargets.length === 0 && <EmptyState text="暂无同部位、低强化的可继承目标。" />}
+                  {selectedSource && selectableTransferTargets.length === 0 && <EmptyState text="暂无同部位可转移目标。" />}
                   {selectedSource && selectableTransferTargets.map((item) => (
                     <TransferItemOption
                       key={item.id}
@@ -711,7 +719,7 @@ export function BlacksmithScreen({ token }: { token: string }) {
                     title="来源装备"
                     item={selectedSource}
                     emptyTitle="未选择"
-                    emptyText="选择带强化等级的装备作为来源。"
+                    emptyText="选择带养成进度的装备作为来源。"
                     emptyMeta="无来源"
                   />
                   <CompareCard
@@ -719,11 +727,11 @@ export function BlacksmithScreen({ token }: { token: string }) {
                     item={selectedTarget}
                     highlight
                     emptyTitle="未选择"
-                    emptyText="目标装备必须同部位，且强化等级低于来源。"
+                    emptyText="目标装备必须同部位，已有孔位宝石会返还背包。"
                     emptyMeta="无目标"
                   />
                 </div>
-                {selectedSource && selectedTarget && !canTransfer && <div className="modal-warning">目标装备强化等级必须低于来源装备。</div>}
+                {selectedSource && selectedTarget && !canTransfer && <div className="modal-warning">装备转移需要同部位且来源有养成进度。</div>}
                 {sourceItemId != null && targetItemId != null && sourceItemId === targetItemId && <div className="modal-warning">来源装备和目标装备不能相同。</div>}
                 <div className="result-modal-actions">
                   <button className="primary-action" disabled={busy || !canTransfer} onClick={() => transferMutation.mutate()}>

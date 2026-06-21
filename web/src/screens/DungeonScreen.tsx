@@ -195,6 +195,7 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
   const [selectedSpecialId, setSelectedSpecialId] = useState<string | null>(null);
   const [sweepResult, setSweepResult] = useState<DungeonSweepResult | null>(null);
   const [selectedLoot, setSelectedLoot] = useState<Item | null>(null);
+  const [pendingSweepConfirm, setPendingSweepConfirm] = useState<{ dungeon: Dungeon; times: number } | null>(null);
   const { data, isLoading, error } = useQuery({
     queryKey: ['dungeons', token],
     queryFn: () => gameApi.dungeons(token),
@@ -215,7 +216,7 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
     },
   });
   const sweepMutation = useMutation({
-    mutationFn: (dungeonId: string) => gameApi.sweepDungeon(token, dungeonId, 10),
+    mutationFn: ({ dungeonId, times }: { dungeonId: string; times: number }) => gameApi.sweepDungeon(token, dungeonId, times),
     onSuccess: async (result) => {
       setSweepResult(result);
       await invalidateGameQueries(queryClient, token);
@@ -232,6 +233,25 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
     refreshDungeonLobby();
   }
 
+  function requestSweep(dungeon: Dungeon, times: number) {
+    if (times === 50) {
+      setPendingSweepConfirm({ dungeon, times });
+      return;
+    }
+    sweepMutation.mutate({ dungeonId: dungeon.id, times });
+  }
+
+  function confirmPendingSweep() {
+    if (!pendingSweepConfirm) {
+      return;
+    }
+    sweepMutation.mutate({
+      dungeonId: pendingSweepConfirm.dungeon.id,
+      times: pendingSweepConfirm.times,
+    });
+    setPendingSweepConfirm(null);
+  }
+
   if (isLoading) {
     return <LoadingScreen title="读取副本情报" />;
   }
@@ -243,6 +263,8 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
   const stamina = homeQuery.data?.stamina ?? data.find((dungeon) => dungeon.stamina)?.stamina;
   const normalDungeons = data.filter((dungeon) => !isSpecialDungeon(dungeon));
   const specialDungeons = data.filter(isSpecialDungeon);
+  const normalSweepTickets = data[0]?.normalSweepTickets ?? 0;
+  const specialSweepTickets = data[0]?.specialSweepTickets ?? 0;
   const selectedSpecialDungeon = specialDungeons.find((dungeon) => dungeon.id === selectedSpecialId) ?? specialDungeons[0] ?? null;
   const clearedCount = normalDungeons.filter((dungeon) => dungeon.cleared).length;
   const runnableUnclearedCount = normalDungeons.filter((dungeon) => !dungeon.cleared && dungeonMeetsGate(dungeon)).length;
@@ -282,6 +304,8 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
           </div>
         )}
         <StaminaPanel stamina={stamina} compact />
+        <Metric label="普通扫荡符" value={formatNumber(normalSweepTickets)} />
+        <Metric label="特殊扫荡符" value={formatNumber(specialSweepTickets)} />
         <Metric label="正常副本" value={normalDungeons.length.toString()} />
         <Metric label="特殊副本" value={specialDungeons.length.toString()} />
         <Metric label="当前结果" value={mode === 'normal' ? `${visibleDungeons.length}/${normalDungeons.length}` : specialDungeons.length.toString()} />
@@ -364,7 +388,7 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
             <div className="filter-result-card bloodmoon">
               <span>特殊副本</span>
               <strong>{specialDungeons.length}</strong>
-              <small>传说与不朽装备核心来源，不开放扫荡。</small>
+              <small>手动通关记录评分，后续扫荡按历史最佳评分结算。</small>
             </div>
           )}
         </aside>
@@ -386,7 +410,7 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
                     loading={mutation.isPending}
                     sweepLoading={sweepMutation.isPending}
                     onRun={() => mutation.mutate(dungeon.id)}
-                    onSweep={() => sweepMutation.mutate(dungeon.id)}
+                    onSweep={(times) => requestSweep(dungeon, times)}
                   />
                 ))}
               </div>
@@ -398,8 +422,10 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
               combatPower={combatPower}
               playerLevel={playerLevel}
               loading={mutation.isPending}
+              sweepLoading={sweepMutation.isPending}
               onSelect={setSelectedSpecialId}
               onRun={(dungeonId) => mutation.mutate(dungeonId)}
+              onSweep={(dungeon, times) => requestSweep(dungeon, times)}
             />
           )}
         </section>
@@ -418,6 +444,16 @@ export function DungeonScreen({ token, onResult }: { token: string; onResult: (r
           title="扫荡失败"
           message={sweepMutation.error.message}
           onClose={() => sweepMutation.reset()}
+        />
+      )}
+      {pendingSweepConfirm && (
+        <ConfirmDialog
+          title={`确认扫荡 ${pendingSweepConfirm.times} 次`}
+          message={`将消耗 ${pendingSweepConfirm.times} 点疲劳和 ${pendingSweepConfirm.times} 个${isSpecialDungeon(pendingSweepConfirm.dungeon) ? '特殊扫荡符' : '普通扫荡符'}，副本：${pendingSweepConfirm.dungeon.name}。`}
+          confirmLabel="确认扫荡"
+          cancelLabel="再想想"
+          onConfirm={confirmPendingSweep}
+          onCancel={() => setPendingSweepConfirm(null)}
         />
       )}
       {sweepResult && <SweepSummaryModal result={sweepResult} onClose={() => setSweepResult(null)} onSelectLoot={setSelectedLoot} />}

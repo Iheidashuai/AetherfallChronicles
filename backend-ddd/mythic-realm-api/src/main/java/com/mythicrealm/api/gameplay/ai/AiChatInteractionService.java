@@ -271,8 +271,11 @@ public class AiChatInteractionService {
 
         ValidationResult validation = validateModelResponse(callResult.content(), candidates);
         int replyCount = 0;
+        List<ValidatedReply> orderedReplies = validation.replies().stream()
+            .sorted(Comparator.comparingInt(ValidatedReply::delayMs))
+            .toList();
         if (validation.valid()) {
-            for (ValidatedReply reply : validation.replies()) {
+            for (ValidatedReply reply : orderedReplies) {
                 insertReply(
                     reply.robot(),
                     reply.text(),
@@ -313,7 +316,7 @@ public class AiChatInteractionService {
             handleSkippedOrFallback(interaction, candidates, "validation_error", truncate(String.join("; ", validation.errors()), 1000));
             return;
         }
-        String selectedIds = validation.replies().stream()
+        String selectedIds = orderedReplies.stream()
             .map(reply -> Long.toString(reply.robot().id()))
             .collect(Collectors.joining(","));
         finish(interaction.id(), "completed", "live", false, replyCount, selectedIds, null);
@@ -469,10 +472,18 @@ public class AiChatInteractionService {
     }
 
     private List<RobotCandidate> chooseCandidates(Interaction interaction) {
-        List<RobotCandidate> pool = candidatePool(interaction);
+        List<RobotCandidate> pool = new ArrayList<>(candidatePool(interaction));
         RobotCandidate mentioned = mentionedRobot(interaction.triggerText(), pool);
+        if (mentioned == null) {
+            RobotCandidate databaseMentioned = mentionedRobotFromDatabase(interaction);
+            if (databaseMentioned != null && pool.stream().noneMatch(candidate -> candidate.id() == databaseMentioned.id())) {
+                pool.add(databaseMentioned);
+            }
+            mentioned = databaseMentioned;
+        }
+        RobotCandidate scoredMentioned = mentioned;
         return pool.stream()
-            .sorted(Comparator.comparingDouble(candidate -> -scoreCandidate(candidate, mentioned, interaction.triggerText())))
+            .sorted(Comparator.comparingDouble(candidate -> -scoreCandidate(candidate, scoredMentioned, interaction.triggerText())))
             .limit(Math.min(8, Math.max(5, pool.size())))
             .toList();
     }
@@ -554,6 +565,46 @@ public class AiChatInteractionService {
             }
         }
         return null;
+    }
+
+    private RobotCandidate mentionedRobotFromDatabase(Interaction interaction) {
+        String text = interaction.triggerText();
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        Long guildId = interaction.channel().startsWith("guild:") ? parseGuildId(interaction.channel()) : null;
+        String guildFilter = guildId == null
+            ? ""
+            : "AND EXISTS (SELECT 1 FROM guild_member gm WHERE gm.player_id = p.id AND gm.guild_id = ?) ";
+        List<Object> args = new ArrayList<>();
+        args.add(interaction.channel());
+        args.add(interaction.playerId() == null ? -1L : interaction.playerId());
+        args.add(text);
+        args.add(text);
+        if (guildId != null) {
+            args.add(guildId);
+        }
+        List<RobotCandidate> matches = jdbcTemplate.query(
+            """
+            SELECT p.id, p.name, p.title, p.profession, p.level, p.personality, p.personality_archetype,
+                   p.current_activity_text,
+                   COALESCE(mem.familiarity, 0) AS familiarity,
+                   COALESCE(mem.attitude, 0) AS attitude,
+                   COALESCE(mem.trust, 0) AS trust,
+                   COALESCE(mem.banter_level, 0) AS banter_level,
+                   (SELECT MAX(cm.created_at) FROM chat_message cm WHERE cm.player_id = p.id AND cm.channel = ?) AS last_spoke_at
+            FROM player p
+            LEFT JOIN ai_robot_relationship_memory mem ON mem.robot_id = p.id AND mem.player_id = ?
+            WHERE p.controller_type = 'robot'
+              AND (? LIKE CONCAT('%@', p.name, '%') OR ? LIKE CONCAT('%', p.name, '%'))
+            """ + guildFilter + """
+            ORDER BY CHAR_LENGTH(p.name) DESC
+            LIMIT 1
+            """,
+            (rs, rowNum) -> mapCandidate(rs),
+            args.toArray()
+        );
+        return matches.stream().findFirst().orElse(null);
     }
 
     private List<BriefMessage> recentMessages(String channel) {

@@ -62,6 +62,9 @@ public class RobotActivityLogService {
             kind,
             normalizedText
         );
+    }
+
+    public void trimRetention() {
         jdbcTemplate.update(
             "DELETE FROM robot_activity_log WHERE id NOT IN (SELECT id FROM (SELECT id FROM robot_activity_log ORDER BY created_at DESC, id DESC LIMIT ?) recent)",
             properties.getActivityLogRetention()

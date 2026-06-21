@@ -105,10 +105,11 @@ public class InventoryController {
     @PostMapping("/{itemId}/use")
     InventoryService.UseItemResult useItem(
         @RequestHeader(name = "Authorization", required = false) String authorization,
-        @PathVariable("itemId") long itemId
+        @PathVariable("itemId") long itemId,
+        @RequestBody(required = false) QuantityRequest request
     ) {
         PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
-        var result = inventoryService.useItem(player, itemId);
+        var result = inventoryService.useItem(player, itemId, request == null ? 1 : request.quantityOrOne());
         for (ItemEffectEvent event : result.events()) {
             questService.recordEvent(player.id(), new QuestEvent(event.type(), event.targetId(), event.amount()));
         }
@@ -118,11 +119,12 @@ public class InventoryController {
     @PostMapping("/recipes/{recipeId}/craft")
     InventoryService.CraftResult craftRecipe(
         @RequestHeader(name = "Authorization", required = false) String authorization,
-        @PathVariable("recipeId") String recipeId
+        @PathVariable("recipeId") String recipeId,
+        @RequestBody(required = false) QuantityRequest request
     ) {
         PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
-        var result = inventoryService.craftRecipe(player, recipeId);
-        questService.recordEvent(player.id(), new QuestEvent("fragmentCrafted", recipeId, 1));
+        var result = inventoryService.craftRecipe(player, recipeId, request == null ? 1 : request.quantityOrOne());
+        questService.recordEvent(player.id(), new QuestEvent("fragmentCrafted", recipeId, result.quantity()));
         return result;
     }
 
@@ -181,5 +183,11 @@ public class InventoryController {
     }
 
     record EnhanceRequest(List<Long> stoneItemIds) {
+    }
+
+    record QuantityRequest(Integer quantity) {
+        int quantityOrOne() {
+            return quantity == null ? 1 : quantity;
+        }
     }
 }
