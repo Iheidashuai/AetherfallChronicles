@@ -335,7 +335,7 @@ public class MarketService {
                 return;
             }
             actionCount += reclaimExpiredRobotListings(multiplier);
-            for (int round = 0; round < multiplier; round++) {
+            for (int round = 0; round < marketPulseRounds(multiplier); round++) {
                 actionCount += simulateMarketRound();
             }
         } finally {
@@ -370,6 +370,7 @@ public class MarketService {
               AND seller.controller_type = 'robot'
               AND ml.created_at <= ?
             ORDER BY ml.created_at ASC, ml.id ASC
+            LIMIT 80
             """,
             (rs, rowNum) -> new ExpiredRobotListing(
                 rs.getLong("id"),
@@ -402,6 +403,11 @@ public class MarketService {
             reclaimed++;
         }
         return reclaimed;
+    }
+
+    static int marketPulseRounds(int multiplier) {
+        int safeMultiplier = Math.max(1, multiplier);
+        return Math.max(1, Math.min(4, (int) Math.ceil(Math.sqrt(safeMultiplier))));
     }
 
     static int robotListingReclaimGold(long price) {

@@ -33,4 +33,18 @@ class RobotActionBudgetPlanTest {
         assertTrue(plan.tryConsume(RobotIntentCategory.WORLD_CHAT));
         assertFalse(plan.tryConsume(RobotIntentCategory.WORLD_CHAT));
     }
+
+    @Test
+    void lowBackpressureBudgetCanProtectTenTimesSpeed() {
+        RobotSimulationProperties properties = new RobotSimulationProperties();
+
+        RobotActionBudgetPlan plan = RobotActionBudgetPlan.from(properties, 10, 0.04);
+
+        assertEquals(9, plan.limit(RobotIntentCategory.COMBAT));
+        assertEquals(8, plan.limit(RobotIntentCategory.EQUIPMENT));
+        assertEquals(8, plan.limit(RobotIntentCategory.MARKET));
+        assertEquals(12, plan.limit(RobotIntentCategory.LIGHT));
+        assertEquals(0, plan.limit(RobotIntentCategory.WORLD_CHAT));
+        assertEquals(12, plan.activityLogLimit());
+    }
 }

@@ -22,7 +22,7 @@ public class RobotActionBudgetPlan {
 
     public static RobotActionBudgetPlan from(RobotSimulationProperties properties, int multiplier, double budgetFactor) {
         RobotSimulationProperties.ActionBudgets budgets = properties.getActionBudgets();
-        double factor = Math.max(0.1, Math.min(1.0, budgetFactor));
+        double factor = Math.max(0.03, Math.min(1.0, budgetFactor));
         Map<RobotIntentCategory, Integer> limits = new EnumMap<>(RobotIntentCategory.class);
         limits.put(RobotIntentCategory.COMBAT, limit(budgets.getCombatBase(), budgets.getCombatCap(), multiplier, factor));
         limits.put(RobotIntentCategory.EQUIPMENT, limit(budgets.getEquipmentBase(), budgets.getEquipmentCap(), multiplier, factor));

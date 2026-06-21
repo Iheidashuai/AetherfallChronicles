@@ -60,6 +60,7 @@ public class RobotSimulationEngine {
         long totalStarted = System.nanoTime();
         long decisionMs = 0;
         long executionMs = 0;
+        int effectiveExecutionParallelism = effectiveExecutionParallelism();
         int robotCount = 0;
         List<RobotIntent> planned = List.of();
         List<RobotIntent> selected = List.of();
@@ -79,6 +80,7 @@ public class RobotSimulationEngine {
                     0,
                     elapsedMs(totalStarted),
                     false,
+                    effectiveExecutionParallelism,
                     startedAt,
                     "{}"
                 );
@@ -100,7 +102,8 @@ public class RobotSimulationEngine {
             selected = selection.selected();
 
             long executionStarted = System.nanoTime();
-            ExecutionResult execution = execute(selected);
+            effectiveExecutionParallelism = effectiveExecutionParallelism();
+            ExecutionResult execution = execute(selected, effectiveExecutionParallelism);
             failedCount += execution.failedCount();
             executionErrors = execution.errorTypes();
             executionMs = elapsedMs(executionStarted);
@@ -121,6 +124,7 @@ public class RobotSimulationEngine {
                 executionMs,
                 totalMs,
                 false,
+                effectiveExecutionParallelism,
                 startedAt,
                 actionSummary(planned, selected, failedCount, budget, nextBackpressure, executionErrors)
             );
@@ -141,6 +145,7 @@ public class RobotSimulationEngine {
                 executionMs,
                 totalMs,
                 false,
+                effectiveExecutionParallelism,
                 startedAt,
                 errorSummary(error, nextBackpressure)
             );
@@ -239,12 +244,13 @@ public class RobotSimulationEngine {
         return new Selection(selected, deferred);
     }
 
-    private ExecutionResult execute(List<RobotIntent> intents) {
+    private ExecutionResult execute(List<RobotIntent> intents, int effectiveParallelism) {
         if (intents.isEmpty()) {
             return new ExecutionResult(0, Map.of());
         }
+        java.util.concurrent.Semaphore executionPermits = new java.util.concurrent.Semaphore(Math.max(1, effectiveParallelism));
         List<CompletableFuture<ExecutionOutcome>> futures = intents.stream()
-            .map(intent -> CompletableFuture.supplyAsync(() -> executeOne(intent), executionExecutor))
+            .map(intent -> CompletableFuture.supplyAsync(() -> executeOne(intent, executionPermits), executionExecutor))
             .toList();
         int failed = 0;
         Map<String, Long> errorTypes = new LinkedHashMap<>();
@@ -259,16 +265,24 @@ public class RobotSimulationEngine {
         return new ExecutionResult(failed, errorTypes);
     }
 
-    private ExecutionOutcome executeOne(RobotIntent intent) {
+    private ExecutionOutcome executeOne(RobotIntent intent, java.util.concurrent.Semaphore executionPermits) {
         try {
-            if (intent.action() == null && intent.context() == null && !"rest".equals(intent.actionKey())) {
-                robotBrainService.thinkAndAct(intent.actor(), intent.target());
-            } else {
-                robotBrainService.execute(intent);
+            executionPermits.acquire();
+            try {
+                if (intent.action() == null && intent.context() == null && !"rest".equals(intent.actionKey())) {
+                    robotBrainService.thinkAndAct(intent.actor(), intent.target());
+                } else {
+                    robotBrainService.execute(intent);
+                }
+            } finally {
+                executionPermits.release();
             }
             return new ExecutionOutcome(true, null);
         } catch (ApiException ignored) {
             return new ExecutionOutcome(true, null);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return new ExecutionOutcome(false, error.getClass().getSimpleName());
         } catch (Exception error) {
             return new ExecutionOutcome(false, error.getClass().getSimpleName());
         }
@@ -294,6 +308,7 @@ public class RobotSimulationEngine {
         long executionMs,
         long totalMs,
         boolean skipped,
+        int effectiveExecutionParallelism,
         Instant startedAt,
         String actionSummary
     ) {
@@ -312,7 +327,7 @@ public class RobotSimulationEngine {
             skipped,
             state.backpressureActive(),
             state.budgetFactor(),
-            Math.max(1, properties.getExecutionParallelism()),
+            Math.max(1, effectiveExecutionParallelism),
             actionSummary,
             startedAt,
             Instant.now()
@@ -326,7 +341,7 @@ public class RobotSimulationEngine {
                 int slow = current.slowTicks() + 1;
                 if (slow >= 3) {
                     double proportional = current.budgetFactor() * (budgetMs / (double) Math.max(1, totalMs)) * 0.95;
-                    return new BackpressureState(Math.max(0.12, Math.min(current.budgetFactor() * 0.8, proportional)), slow, 0);
+                    return new BackpressureState(Math.max(0.04, Math.min(current.budgetFactor() * 0.8, proportional)), slow, 0);
                 }
                 return new BackpressureState(current.budgetFactor(), slow, 0);
             }
@@ -339,6 +354,13 @@ public class RobotSimulationEngine {
             }
             return new BackpressureState(current.budgetFactor(), 0, 0);
         });
+    }
+
+    private int effectiveExecutionParallelism() {
+        double factor = Math.max(0.03, Math.min(1.0, backpressure.get().budgetFactor()));
+        int configured = Math.max(1, properties.getExecutionParallelism());
+        int scaled = (int) Math.ceil(configured * Math.sqrt(factor));
+        return Math.max(2, Math.min(configured, scaled));
     }
 
     private String actionSummary(

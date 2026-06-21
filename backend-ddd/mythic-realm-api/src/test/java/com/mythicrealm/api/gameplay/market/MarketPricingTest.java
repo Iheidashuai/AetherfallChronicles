@@ -62,6 +62,13 @@ class MarketPricingTest {
     }
 
     @Test
+    void marketPulseRoundsScaleSublinearlyWithSpeedMultiplier() {
+        assertEquals(1, MarketService.marketPulseRounds(1));
+        assertEquals(3, MarketService.marketPulseRounds(5));
+        assertEquals(4, MarketService.marketPulseRounds(10));
+    }
+
+    @Test
     void marketItemForeignKeyAllowsConsumedSoldItems() throws IOException {
         String schema = Files.readString(Path.of("../mythic-realm-starter/src/main/resources/db/latest_schema.sql"));
 
