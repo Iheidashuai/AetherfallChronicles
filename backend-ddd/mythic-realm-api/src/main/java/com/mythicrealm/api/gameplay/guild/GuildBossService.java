@@ -1,5 +1,6 @@
 package com.mythicrealm.api.gameplay.guild;
 
+import com.mythicrealm.api.gameplay.ai.AiSocialEventService;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
@@ -47,18 +48,21 @@ public class GuildBossService {
     private final InventoryService inventoryService;
     private final StaminaService staminaService;
     private final GuildService guildService;
+    private final AiSocialEventService aiSocialEventService;
     private final ConcurrentHashMap<Long, Object> bossMonitors = new ConcurrentHashMap<>();
 
     public GuildBossService(
         JdbcTemplate jdbcTemplate,
         InventoryService inventoryService,
         StaminaService staminaService,
-        GuildService guildService
+        GuildService guildService,
+        AiSocialEventService aiSocialEventService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.inventoryService = inventoryService;
         this.staminaService = staminaService;
         this.guildService = guildService;
+        this.aiSocialEventService = aiSocialEventService;
     }
 
     public GuildBossView bossFor(PlayerRecord player) {
@@ -115,11 +119,13 @@ public class GuildBossService {
             );
             recordContribution(guildId, playerId, applied);
             if (killed) {
+                String text = "【" + boss.name() + "】被公会击败！更强的挑战即将降临。";
                 jdbcTemplate.update(
                     "INSERT INTO chat_message (sender_name, kind, text, channel) VALUES ('公会战报', 'system', ?, ?)",
-                    "【" + boss.name() + "】被公会击败！更强的挑战即将降临。",
+                    text,
                     GuildService.channelFor(guildId)
                 );
+                aiSocialEventService.guildBoss(guildId, text);
                 BossRow next = ensureBoss(guildId);
                 return new DamageOutcome(next, applied, true, next.tier());
             }

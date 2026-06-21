@@ -162,6 +162,7 @@ import {
 
 export function RobotActivityScreen({ token }: { token: string }) {
   const setScreen = useAppStore((state) => state.setScreen);
+  const admin = useAppStore((state) => state.admin);
   const pendingWorldEventAction = useAppStore((state) => state.pendingWorldEventAction);
   const clearPendingWorldEventAction = useAppStore((state) => state.clearPendingWorldEventAction);
   const [selectedRobot, setSelectedRobot] = useState<RobotActivityView | null>(null);
@@ -242,7 +243,14 @@ export function RobotActivityScreen({ token }: { token: string }) {
         <section className="robot-roster main-panel">
           <div className="robot-list-head">
             <SectionTitle icon={<Gauge size={18} />} title="冒险者名册" />
-            <span>点击冒险者查看档案和个人历史动态</span>
+            <div className="robot-list-actions">
+              <span>点击冒险者查看档案和个人历史动态</span>
+              {admin && (
+                <button className="mini-action admin-action" onClick={() => setScreen('ai-usage')}>
+                  <Gauge size={14} /> AI 用量
+                </button>
+              )}
+            </div>
           </div>
           <div className="robot-filter-panel">
             <label className="robot-filter-field name">

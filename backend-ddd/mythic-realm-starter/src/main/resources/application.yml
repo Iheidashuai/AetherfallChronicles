@@ -1,4 +1,10 @@
 spring:
+  config:
+    import:
+      - optional:file:.local/application-ai.yml
+      - optional:file:../.local/application-ai.yml
+      - optional:file:../../.local/application-ai.yml
+
   application:
     name: mythic-realm
 
@@ -28,6 +34,15 @@ mythic:
   database:
     schema-location: classpath:db/latest_schema.sql
     rebuild-on-start: false
+  admin:
+    usernames: 123456
+  ai:
+    provider: openai-compatible
+    chat:
+      enabled: false
+      dry-run: false
+      max-calls-per-minute: 6
+      channel-cooldown-seconds: 10
   config:
     version: v2.0-combat-db-source
 

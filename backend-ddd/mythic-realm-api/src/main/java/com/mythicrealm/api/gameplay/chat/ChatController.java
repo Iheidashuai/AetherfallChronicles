@@ -34,17 +34,24 @@ public class ChatController {
     }
 
     @GetMapping("/messages")
-    List<ChatService.ChatMessageView> messages(@RequestHeader(name = "Authorization", required = false) String authorization) {
+    List<ChatService.ChatMessageView> messages(
+        @RequestHeader(name = "Authorization", required = false) String authorization,
+        @RequestParam(defaultValue = "world") String scope
+    ) {
         PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
         questService.recordEvent(player.id(), QuestEvent.of("chatOpened"));
-        return chatService.messages();
+        return chatService.messages(player, scope);
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    SseEmitter stream(@RequestParam String token, @RequestParam(defaultValue = "0") long afterId) {
+    SseEmitter stream(
+        @RequestParam String token,
+        @RequestParam(defaultValue = "world") String scope,
+        @RequestParam(defaultValue = "0") long afterId
+    ) {
         PlayerRecord player = playerService.requireByAccount(sessionService.require("Bearer " + token));
         questService.recordEvent(player.id(), QuestEvent.of("chatOpened"));
-        return chatService.stream(afterId);
+        return chatService.stream(player, scope, afterId);
     }
 
     @PostMapping("/messages")
@@ -53,9 +60,9 @@ public class ChatController {
         @Valid @RequestBody SendMessageRequest request
     ) {
         PlayerRecord player = playerService.requireByAccount(sessionService.require(authorization));
-        return chatService.send(player, request.text());
+        return chatService.send(player, request.text(), request.scope());
     }
 
-    record SendMessageRequest(@NotBlank String text) {
+    record SendMessageRequest(@NotBlank String text, String scope) {
     }
 }

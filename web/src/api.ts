@@ -969,6 +969,51 @@ export type AuthResponse = {
   token: string;
   username: string;
   hasPlayer: boolean;
+  admin: boolean;
+};
+
+export type AiUsageSummary = {
+  todayPromptTokens: number;
+  todayCompletionTokens: number;
+  todayTotalTokens: number;
+  allPromptTokens: number;
+  allCompletionTokens: number;
+  allTotalTokens: number;
+  provider: string;
+  model: string;
+  avgLatencyMs: number;
+  failureRate: number;
+  fallbackCount: number;
+  totalCalls: number;
+  successCalls: number;
+  failedCalls: number;
+};
+
+export type AiModelCallRow = {
+  id: number;
+  interactionId?: number | null;
+  provider: string;
+  model?: string | null;
+  feature: string;
+  promptVersion: string;
+  mode: string;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+  tokenSource: string;
+  latencyMs: number;
+  success: boolean;
+  errorType?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+};
+
+export type AiModelCallDetail = AiModelCallRow & {
+  requestPayload?: string | null;
+  promptText?: string | null;
+  rawResponse?: string | null;
+  parsedResponse?: string | null;
+  validationErrors?: string | null;
 };
 
 export type GlobalAnnouncement = {
@@ -1351,9 +1396,12 @@ export const gameApi = {
     api<BuildActivationResult>(`/api/builds/${buildId}/activate`, { method: 'POST' }, token),
   simulateBuild: (token: string, buildId: number, tier: number) =>
     api<RiftSimulationResult>(`/api/builds/${buildId}/simulate`, { method: 'POST', body: JSON.stringify({ tier }) }, token),
-  chatMessages: (token: string) => api<ChatMessage[]>('/api/chat/messages', {}, token),
-  sendChat: (token: string, text: string) => api<ChatMessage>('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text }) }, token),
-  chatStreamUrl: (token: string, afterId = 0) => `/api/chat/stream?${new URLSearchParams({ token, afterId: String(afterId) }).toString()}`,
+  chatMessages: (token: string, scope: 'world' | 'guild' = 'world') =>
+    api<ChatMessage[]>(`/api/chat/messages?${new URLSearchParams({ scope }).toString()}`, {}, token),
+  sendChat: (token: string, text: string, scope: 'world' | 'guild' = 'world') =>
+    api<ChatMessage>('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text, scope }) }, token),
+  chatStreamUrl: (token: string, afterId = 0, scope: 'world' | 'guild' = 'world') =>
+    `/api/chat/stream?${new URLSearchParams({ token, scope, afterId: String(afterId) }).toString()}`,
   leaderboard: (token: string) => api<LeaderboardEntry[]>('/api/leaderboard/power', {}, token),
   robotActivity: (token: string) => api<RobotActivitySnapshot>('/api/robots/activity', {}, token),
   robotActivityDetail: (token: string, robotId: number) => api<RobotActivityDetail>(`/api/robots/${robotId}/activity`, {}, token),
@@ -1362,6 +1410,9 @@ export const gameApi = {
     api<RechargeResult>('/api/recharge', { method: 'POST', body: JSON.stringify({ rmbAmount }) }, token),
   announcements: (token: string) => api<GlobalAnnouncement[]>('/api/announcements', {}, token),
   worldEvents: (token: string) => api<WorldEvent[]>('/api/world-events', {}, token),
+  aiUsageSummary: (token: string) => api<AiUsageSummary>('/api/ai/usage/summary', {}, token),
+  aiUsageCalls: (token: string, limit = 100) => api<AiModelCallRow[]>(`/api/ai/usage/calls?${new URLSearchParams({ limit: String(limit) }).toString()}`, {}, token),
+  aiUsageCall: (token: string, id: number) => api<AiModelCallDetail>(`/api/ai/usage/calls/${id}`, {}, token),
   guildBrowse: (token: string) => api<GuildSummary[]>('/api/guild/guilds', {}, token),
   myGuild: (token: string) => api<GuildHomeResponse>('/api/guild', {}, token),
   joinGuild: (token: string, guildId: number) =>

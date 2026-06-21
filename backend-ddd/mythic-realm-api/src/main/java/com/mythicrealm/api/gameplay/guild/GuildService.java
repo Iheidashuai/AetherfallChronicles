@@ -1,11 +1,12 @@
 package com.mythicrealm.api.gameplay.guild;
 
+import com.mythicrealm.api.gameplay.ai.AiSocialEventService;
 import com.mythicrealm.api.gameplay.common.ApiException;
+import com.mythicrealm.api.gameplay.chat.ChatService;
 import com.mythicrealm.api.gameplay.player.PlayerRecord;
 import com.mythicrealm.api.gameplay.stamina.StaminaService;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +22,6 @@ public class GuildService {
         "今天先各刷各的，晚点看看要不要一起推本。",
         "有装备需求的吱一声，会里互通有无。"
     );
-    private static final List<String> GUILD_REPLY_LINES = List.of(
-        "收到，公会频道记下了。",
-        "稳，等会儿一起上分。",
-        "欢迎欢迎，缺啥喊一声。",
-        "这话题我顶，等下细聊。"
-    );
-
     private static final long LEVEL_STEP = 3_000_000L;
     private static final int MAX_GUILD_LEVEL = 20;
     private static final long DONATE_GOLD_PER_COIN = 1_000L;
@@ -37,10 +31,19 @@ public class GuildService {
 
     private final JdbcTemplate jdbcTemplate;
     private final StaminaService staminaService;
+    private final ChatService chatService;
+    private final AiSocialEventService aiSocialEventService;
 
-    public GuildService(JdbcTemplate jdbcTemplate, StaminaService staminaService) {
+    public GuildService(
+        JdbcTemplate jdbcTemplate,
+        StaminaService staminaService,
+        ChatService chatService,
+        AiSocialEventService aiSocialEventService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.staminaService = staminaService;
+        this.chatService = chatService;
+        this.aiSocialEventService = aiSocialEventService;
     }
 
     public static String channelFor(long guildId) {
@@ -75,12 +78,14 @@ public class GuildService {
         }
         int next = (int) Math.min(MAX_GUILD_LEVEL, 1 + total / LEVEL_STEP);
         if (next > current) {
+            String text = "公会升级到 Lv." + next + "！全员增益提升。";
             jdbcTemplate.update("UPDATE guild SET level = ? WHERE id = ?", next, guildId);
             jdbcTemplate.update(
                 "INSERT INTO chat_message (sender_name, kind, text, channel) VALUES ('公会战报', 'system', ?, ?)",
-                "公会升级到 Lv." + next + "！全员增益提升。",
+                text,
                 channelFor(guildId)
             );
+            aiSocialEventService.guildLevel(guildId, text);
         }
     }
 
@@ -161,38 +166,21 @@ public class GuildService {
     }
 
     public List<GuildChatMessage> chat(PlayerRecord player) {
-        Long guildId = requireGuildId(player.id());
-        ensureGuildOpening(guildId);
-        return recentChat(guildId);
+        return chatService.messages(player, "guild").stream()
+            .map(message -> new GuildChatMessage(
+                message.id(),
+                message.senderName(),
+                message.kind(),
+                message.text(),
+                message.createdAt()
+            ))
+            .toList();
     }
 
     @Transactional
     public List<GuildChatMessage> sendChat(PlayerRecord player, String rawText) {
-        Long guildId = requireGuildId(player.id());
-        String text = sanitize(rawText);
-        if (text.isBlank()) {
-            throw ApiException.badRequest("消息不能为空。");
-        }
-        insertMessage(player.id(), player.name(), "player", text, guildId);
-        // A guildmate bot replies so the channel feels responsive (event-driven banter arrives in later phases).
-        jdbcTemplate.query(
-            """
-            SELECT p.id, p.name FROM guild_member m
-            JOIN player p ON p.id = m.player_id
-            WHERE m.guild_id = ? AND p.controller_type = 'robot'
-            ORDER BY RAND() LIMIT 1
-            """,
-            rs -> {
-                if (rs.next()) {
-                    String reply = GUILD_REPLY_LINES.get(ThreadLocalRandom.current().nextInt(GUILD_REPLY_LINES.size()));
-                    insertMessage(rs.getLong("id"), rs.getString("name"), "robot", reply, guildId);
-                }
-                return null;
-            },
-            guildId
-        );
-        trimGuildChat(guildId);
-        return recentChat(guildId);
+        chatService.send(player, rawText, "guild");
+        return chat(player);
     }
 
     private GuildView guildView(long guildId, long viewerPlayerId) {
@@ -380,6 +368,7 @@ public class GuildService {
             player.name() + " 为公会捐献了 " + amount + " 金，公会资金增加。",
             channelFor(guildId)
         );
+        aiSocialEventService.guildDonation(guildId, player.name() + " 为公会捐献了 " + amount + " 金，公会资金增加。");
         return new DonateResult(amount, coin, currentGuildCoin(player.id()), guildView(guildId, player.id()));
     }
 

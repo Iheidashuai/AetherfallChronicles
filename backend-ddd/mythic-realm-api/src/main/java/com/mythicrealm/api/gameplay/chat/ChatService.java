@@ -1,5 +1,6 @@
 package com.mythicrealm.api.gameplay.chat;
 
+import com.mythicrealm.api.gameplay.ai.AiChatInteractionService;
 import com.mythicrealm.api.gameplay.common.ApiException;
 import com.mythicrealm.api.gameplay.inventory.InventoryService;
 import com.mythicrealm.api.gameplay.leaderboard.LeaderboardService;
@@ -43,39 +44,46 @@ public class ChatService {
     private final PlayerService playerService;
     private final InventoryService inventoryService;
     private final LeaderboardService leaderboardService;
+    private final AiChatInteractionService aiChatInteractionService;
     private final ExecutorService streamExecutor = Executors.newCachedThreadPool();
 
     public ChatService(
         JdbcTemplate jdbcTemplate,
         PlayerService playerService,
         InventoryService inventoryService,
-        LeaderboardService leaderboardService
+        LeaderboardService leaderboardService,
+        AiChatInteractionService aiChatInteractionService
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.playerService = playerService;
         this.inventoryService = inventoryService;
         this.leaderboardService = leaderboardService;
+        this.aiChatInteractionService = aiChatInteractionService;
     }
 
     @Transactional
-    public List<ChatMessageView> messages() {
-        ensureOpeningMessages();
-        return recentMessages();
+    public List<ChatMessageView> messages(PlayerRecord player, String rawScope) {
+        String channel = resolveChannel(player, rawScope);
+        ensureOpeningMessages(channel);
+        return recentMessages(channel);
     }
 
-    public SseEmitter stream(long afterId) {
-        ensureOpeningMessages();
+    public SseEmitter stream(PlayerRecord player, String rawScope, long afterId) {
+        String channel = resolveChannel(player, rawScope);
+        ensureOpeningMessages(channel);
         SseEmitter emitter = new SseEmitter(0L);
         AtomicBoolean open = new AtomicBoolean(true);
         emitter.onCompletion(() -> open.set(false));
         emitter.onTimeout(() -> open.set(false));
         emitter.onError(error -> open.set(false));
-        streamExecutor.execute(() -> runStream(emitter, open, Math.max(0, afterId)));
+        streamExecutor.execute(() -> runStream(emitter, open, Math.max(0, afterId), channel));
         return emitter;
     }
 
     @Transactional
-    public ChatMessageView send(PlayerRecord player, String rawText) {
+    public ChatMessageView send(PlayerRecord player, String rawText, String rawScope) {
+        String channel = resolveChannel(player, rawScope);
+        String scope = normalizeScope(rawScope);
         String text = sanitize(rawText);
         if (text.isBlank()) {
             throw ApiException.badRequest("消息不能为空");
@@ -83,44 +91,23 @@ public class ChatService {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO chat_message (player_id, sender_name, kind, text) VALUES (?, ?, 'player', ?)",
+                "INSERT INTO chat_message (player_id, sender_name, kind, text, channel) VALUES (?, ?, 'player', ?, ?)",
                 Statement.RETURN_GENERATED_KEYS
             );
             statement.setLong(1, player.id());
             statement.setString(2, player.name());
             statement.setString(3, text);
+            statement.setString(4, channel);
             return statement;
         }, keyHolder);
         Number playerMessageId = keyHolder.getKey();
-        List<RobotLite> robots = jdbcTemplate.query(
-            "SELECT id, name, title FROM player WHERE controller_type = 'robot' ORDER BY RAND() LIMIT 3",
-            (rs, rowNum) -> new RobotLite(rs.getLong("id"), rs.getString("name"), rs.getString("title"))
-        );
-        if (robots.isEmpty()) {
-            jdbcTemplate.update(
-                "INSERT INTO chat_message (sender_name, kind, text) VALUES ('公会书记', 'system', ?)",
-                replyFor(text)
-            );
-        } else {
-            RobotLite robot = robots.get(0);
-            jdbcTemplate.update(
-                "INSERT INTO chat_message (player_id, sender_name, kind, text) VALUES (?, ?, 'robot', ?)",
-                robot.id(),
-                robot.name(),
-                replyFor(text)
-            );
+        if (playerMessageId != null) {
+            aiChatInteractionService.enqueuePlayerMessage(player, playerMessageId.longValue(), scope, channel, text);
         }
-        if (robots.size() > 1) {
-            jdbcTemplate.update(
-                "INSERT INTO chat_message (player_id, sender_name, kind, text) VALUES (?, ?, 'robot', ?)",
-                robots.get(1).id(),
-                robots.get(1).name(),
-                followUpFor(player.name(), text)
-            );
-        }
-        trimOldMessages();
+        trimOldMessages(channel, "guild".equals(scope) ? 140 : 300);
         if (playerMessageId == null) {
-            return recentMessages().get(recentMessages().size() - 1);
+            List<ChatMessageView> messages = recentMessages(channel);
+            return messages.get(messages.size() - 1);
         }
         return messageById(playerMessageId.longValue());
     }
@@ -130,16 +117,16 @@ public class ChatService {
         streamExecutor.shutdownNow();
     }
 
-    private void runStream(SseEmitter emitter, AtomicBoolean open, long afterId) {
+    private void runStream(SseEmitter emitter, AtomicBoolean open, long afterId, String channel) {
         long lastId = afterId;
         long nextAmbientAt = System.currentTimeMillis() + nextAmbientDelayMillis();
         try {
             while (open.get()) {
-                List<ChatMessageView> pending = messagesAfter(lastId);
-                if (pending.isEmpty() && System.currentTimeMillis() >= nextAmbientAt) {
-                    insertAmbientMessage();
+                List<ChatMessageView> pending = messagesAfter(lastId, channel);
+                if ("world".equals(channel) && pending.isEmpty() && System.currentTimeMillis() >= nextAmbientAt) {
+                    insertAmbientMessage(channel);
                     nextAmbientAt = System.currentTimeMillis() + nextAmbientDelayMillis();
-                    pending = messagesAfter(lastId);
+                    pending = messagesAfter(lastId, channel);
                 }
                 if (pending.isEmpty()) {
                     sleep(open, 900);
@@ -166,7 +153,7 @@ public class ChatService {
         }
     }
 
-    private void insertAmbientMessage() {
+    private void insertAmbientMessage(String channel) {
         List<RobotLite> robots = jdbcTemplate.query(
             "SELECT id, name, title FROM player WHERE controller_type = 'robot' ORDER BY RAND() LIMIT 1",
             (rs, rowNum) -> new RobotLite(rs.getLong("id"), rs.getString("name"), rs.getString("title"))
@@ -174,24 +161,26 @@ public class ChatService {
         String text = AMBIENT_LINES.get(ThreadLocalRandom.current().nextInt(AMBIENT_LINES.size()));
         if (robots.isEmpty()) {
             jdbcTemplate.update(
-                "INSERT INTO chat_message (sender_name, kind, text) VALUES (?, 'system', ?)",
+                "INSERT INTO chat_message (sender_name, kind, text, channel) VALUES (?, 'system', ?, ?)",
                 "公会书记",
-                text
+                text,
+                channel
             );
         } else {
             RobotLite robot = robots.get(0);
             jdbcTemplate.update(
-                "INSERT INTO chat_message (player_id, sender_name, kind, text) VALUES (?, ?, 'robot', ?)",
+                "INSERT INTO chat_message (player_id, sender_name, kind, text, channel) VALUES (?, ?, 'robot', ?, ?)",
                 robot.id(),
                 robot.name(),
-                text
+                text,
+                channel
             );
         }
-        trimOldMessages();
+        trimOldMessages(channel, 300);
     }
 
     private long nextAmbientDelayMillis() {
-        return ThreadLocalRandom.current().nextLong(2_800, 6_800);
+        return ThreadLocalRandom.current().nextLong(35_000, 70_000);
     }
 
     private void sleep(AtomicBoolean open, long millis) {
@@ -203,67 +192,122 @@ public class ChatService {
         }
     }
 
-    private void trimOldMessages() {
+    private void trimOldMessages(String channel, int limit) {
         jdbcTemplate.update(
             """
             DELETE FROM chat_message
-            WHERE channel = 'world'
+            WHERE channel = ?
               AND id NOT IN (
                 SELECT id FROM (
                     SELECT id FROM chat_message
-                    WHERE channel = 'world'
+                    WHERE channel = ?
                     ORDER BY id DESC
-                    LIMIT 260
+                    LIMIT ?
                 ) recent_messages
             )
-            """
+            """,
+            channel,
+            channel,
+            limit
         );
     }
 
-    private void ensureOpeningMessages() {
-        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM chat_message WHERE channel = 'world'", Integer.class);
+    private void ensureOpeningMessages(String channel) {
+        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM chat_message WHERE channel = ?", Integer.class, channel);
         if (count != null && count > 0) {
             return;
         }
+        if (!"world".equals(channel)) {
+            ensureGuildOpening(channel);
+            return;
+        }
         jdbcTemplate.update(
-            "INSERT INTO chat_message (sender_name, kind, text) VALUES ('公会书记', 'system', '传讯水晶已接入 H5 远征记录。')"
+            "INSERT INTO chat_message (sender_name, kind, text, channel) VALUES ('公会书记', 'system', '传讯水晶已接入 H5 远征记录。', ?)",
+            channel
         );
         jdbcTemplate.update(
             """
-            INSERT INTO chat_message (player_id, sender_name, kind, text)
-            SELECT id, name, 'robot', CONCAT(title, ' 已抵达银冠公会大厅。')
+            INSERT INTO chat_message (player_id, sender_name, kind, text, channel)
+            SELECT id, name, 'robot', CONCAT(title, ' 已抵达银冠公会大厅。'), ?
             FROM player
             WHERE controller_type = 'robot'
             ORDER BY level DESC, gold DESC
             LIMIT 3
-            """
+            """,
+            channel
         );
     }
 
-    private List<ChatMessageView> recentMessages() {
+    private void ensureGuildOpening(String channel) {
+        Long guildId = parseGuildChannel(channel);
+        if (guildId == null) {
+            return;
+        }
+        jdbcTemplate.query(
+            """
+            SELECT p.id, p.name
+            FROM guild_member gm
+            JOIN player p ON p.id = gm.player_id
+            WHERE gm.guild_id = ? AND p.controller_type = 'robot'
+            ORDER BY (gm.role = 'leader') DESC, RAND()
+            LIMIT 3
+            """,
+            rs -> {
+                int index = 0;
+                List<String> lines = List.of("公会频道接通，今天有人一起推本吗？", "我在大厅看战报，Boss 有动静喊我。", "缺装备可以先说，商会里我也会留意。");
+                while (rs.next() && index < lines.size()) {
+                    jdbcTemplate.update(
+                        "INSERT INTO chat_message (player_id, sender_name, kind, text, channel) VALUES (?, ?, 'robot', ?, ?)",
+                        rs.getLong("id"),
+                        rs.getString("name"),
+                        lines.get(index),
+                        channel
+                    );
+                    index++;
+                }
+                return null;
+            },
+            guildId
+        );
+    }
+
+    private List<ChatMessageView> recentMessages(String channel) {
         List<RawMessage> raw = jdbcTemplate.query(
             """
             SELECT id, player_id, sender_name, kind, text, created_at
             FROM chat_message
-            WHERE channel = 'world'
+            WHERE channel = ? AND deliver_at <= CURRENT_TIMESTAMP
             ORDER BY id DESC
             LIMIT 80
             """,
-            (rs, rowNum) -> mapRawMessage(rs)
+            (rs, rowNum) -> mapRawMessage(rs),
+            channel
         ).reversed();
         return toViews(raw);
     }
 
-    private List<ChatMessageView> messagesAfter(long afterId) {
+    private List<ChatMessageView> messagesAfter(long afterId, String channel) {
         return toViews(jdbcTemplate.query(
             """
-            SELECT id, player_id, sender_name, kind, text, created_at
-            FROM chat_message
-            WHERE id > ? AND channel = 'world'
-            ORDER BY id ASC
+            SELECT cm.id, cm.player_id, cm.sender_name, cm.kind, cm.text, cm.created_at
+            FROM chat_message cm
+            WHERE cm.channel = ?
+              AND cm.id > ?
+              AND cm.deliver_at <= CURRENT_TIMESTAMP
+              AND NOT EXISTS (
+                SELECT 1
+                FROM chat_message hidden
+                WHERE hidden.channel = cm.channel
+                  AND hidden.id > ?
+                  AND hidden.id < cm.id
+                  AND hidden.deliver_at > CURRENT_TIMESTAMP
+              )
+            ORDER BY cm.id ASC
             LIMIT 24
             """,
             (rs, rowNum) -> mapRawMessage(rs),
+            channel,
+            afterId,
             afterId
         ));
     }
@@ -277,7 +321,46 @@ public class ChatService {
             """,
             (rs, rowNum) -> mapRawMessage(rs),
             messageId
-        )).stream().findFirst().orElseGet(() -> recentMessages().get(recentMessages().size() - 1));
+        )).stream().findFirst().orElseThrow(() -> ApiException.notFound("消息不存在"));
+    }
+
+    private String resolveChannel(PlayerRecord player, String rawScope) {
+        String scope = normalizeScope(rawScope);
+        if ("world".equals(scope)) {
+            return "world";
+        }
+        Long guildId = currentGuildId(player.id());
+        if (guildId == null) {
+            throw ApiException.badRequest("加入公会后才能使用公会频道。");
+        }
+        return "guild:" + guildId;
+    }
+
+    private String normalizeScope(String rawScope) {
+        String scope = rawScope == null || rawScope.isBlank() ? "world" : rawScope.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!"world".equals(scope) && !"guild".equals(scope)) {
+            throw ApiException.badRequest("未知聊天频道");
+        }
+        return scope;
+    }
+
+    private Long currentGuildId(long playerId) {
+        return jdbcTemplate.query(
+            "SELECT guild_id FROM guild_member WHERE player_id = ?",
+            rs -> rs.next() ? rs.getLong("guild_id") : null,
+            playerId
+        );
+    }
+
+    private Long parseGuildChannel(String channel) {
+        if (channel == null || !channel.startsWith("guild:")) {
+            return null;
+        }
+        try {
+            return Long.parseLong(channel.substring("guild:".length()));
+        } catch (NumberFormatException error) {
+            return null;
+        }
     }
 
     private RawMessage mapRawMessage(java.sql.ResultSet rs) throws java.sql.SQLException {

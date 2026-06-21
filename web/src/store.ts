@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type Screen = 'auth' | 'create-player' | 'home' | 'character' | 'inventory' | 'item-catalog' | 'skills' | 'blacksmith' | 'quests' | 'market' | 'shop' | 'builds' | 'endgame' | 'arena' | 'arena-result' | 'guild' | 'chat' | 'leaderboard' | 'robots' | 'recharge' | 'dungeons' | 'result' | 'rift-result';
+export type Screen = 'auth' | 'create-player' | 'home' | 'character' | 'inventory' | 'item-catalog' | 'skills' | 'blacksmith' | 'quests' | 'market' | 'shop' | 'builds' | 'endgame' | 'arena' | 'arena-result' | 'guild' | 'chat' | 'leaderboard' | 'robots' | 'ai-usage' | 'recharge' | 'dungeons' | 'result' | 'rift-result';
 
 export type PendingWorldEventAction = {
   label: string;
@@ -12,9 +12,10 @@ export type PendingWorldEventAction = {
 type AppState = {
   token: string | null;
   username: string | null;
+  admin: boolean;
   screen: Screen;
   pendingWorldEventAction: PendingWorldEventAction | null;
-  setSession: (token: string, username: string, hasPlayer: boolean) => void;
+  setSession: (token: string, username: string, hasPlayer: boolean, admin: boolean) => void;
   setScreen: (screen: Screen) => void;
   setPendingWorldEventAction: (action: PendingWorldEventAction) => void;
   clearPendingWorldEventAction: () => void;
@@ -24,17 +25,20 @@ type AppState = {
 const storedToken = localStorage.getItem('mythic.token');
 const storedUsername = localStorage.getItem('mythic.username');
 const storedHasPlayer = localStorage.getItem('mythic.hasPlayer');
+const storedAdmin = localStorage.getItem('mythic.admin');
 
 export const useAppStore = create<AppState>((set) => ({
   token: storedToken,
   username: storedUsername,
+  admin: storedAdmin === 'true',
   screen: storedToken ? (storedHasPlayer === 'false' ? 'create-player' : 'home') : 'auth',
   pendingWorldEventAction: null,
-  setSession: (token, username, hasPlayer) => {
+  setSession: (token, username, hasPlayer, admin) => {
     localStorage.setItem('mythic.token', token);
     localStorage.setItem('mythic.username', username);
     localStorage.setItem('mythic.hasPlayer', String(hasPlayer));
-    set({ token, username, screen: hasPlayer ? 'home' : 'create-player' });
+    localStorage.setItem('mythic.admin', String(admin));
+    set({ token, username, admin, screen: hasPlayer ? 'home' : 'create-player' });
   },
   setScreen: (screen) => set({ screen }),
   setPendingWorldEventAction: (action) => set({ pendingWorldEventAction: action }),
@@ -43,6 +47,7 @@ export const useAppStore = create<AppState>((set) => ({
     localStorage.removeItem('mythic.token');
     localStorage.removeItem('mythic.username');
     localStorage.removeItem('mythic.hasPlayer');
-    set({ token: null, username: null, screen: 'auth', pendingWorldEventAction: null });
+    localStorage.removeItem('mythic.admin');
+    set({ token: null, username: null, admin: false, screen: 'auth', pendingWorldEventAction: null });
   },
 }));

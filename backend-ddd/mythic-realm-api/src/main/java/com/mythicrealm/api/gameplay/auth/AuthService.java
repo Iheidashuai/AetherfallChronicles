@@ -1,6 +1,7 @@
 package com.mythicrealm.api.gameplay.auth;
 
 import com.mythicrealm.api.gameplay.common.ApiException;
+import com.mythicrealm.api.gameplay.admin.AdminProperties;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.Optional;
@@ -15,11 +16,18 @@ public class AuthService {
     private final JdbcTemplate jdbcTemplate;
     private final PasswordHasher passwordHasher;
     private final SessionService sessionService;
+    private final AdminProperties adminProperties;
 
-    public AuthService(JdbcTemplate jdbcTemplate, PasswordHasher passwordHasher, SessionService sessionService) {
+    public AuthService(
+        JdbcTemplate jdbcTemplate,
+        PasswordHasher passwordHasher,
+        SessionService sessionService,
+        AdminProperties adminProperties
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordHasher = passwordHasher;
         this.sessionService = sessionService;
+        this.adminProperties = adminProperties;
     }
 
     @Transactional
@@ -40,7 +48,13 @@ public class AuthService {
             throw ApiException.badRequest("用户名已存在");
         }
         long accountId = keyHolder.getKey().longValue();
-        return new AuthResponse(sessionService.createSession(accountId), username.trim(), false);
+        String normalizedUsername = username.trim();
+        return new AuthResponse(
+            sessionService.createSession(accountId),
+            normalizedUsername,
+            false,
+            adminProperties.isAdminUsername(normalizedUsername)
+        );
     }
 
     @Transactional
@@ -55,7 +69,12 @@ public class AuthService {
             Integer.class,
             credential.accountId()
         ) > 0;
-        return new AuthResponse(sessionService.createSession(credential.accountId()), credential.username(), hasPlayer);
+        return new AuthResponse(
+            sessionService.createSession(credential.accountId()),
+            credential.username(),
+            hasPlayer,
+            adminProperties.isAdminUsername(credential.username())
+        );
     }
 
     private Optional<AccountCredential> findCredential(String username) {
@@ -83,6 +102,6 @@ public class AuthService {
     private record AccountCredential(long accountId, String username, String passwordHash) {
     }
 
-    public record AuthResponse(String token, String username, boolean hasPlayer) {
+    public record AuthResponse(String token, String username, boolean hasPlayer, boolean admin) {
     }
 }

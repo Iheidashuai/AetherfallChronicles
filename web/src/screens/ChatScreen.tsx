@@ -170,11 +170,11 @@ export function ChatScreen({ token }: { token: string }) {
   const chatListRef = useRef<HTMLDivElement | null>(null);
   const lastMessageIdRef = useRef(0);
   const { data, isLoading, error } = useQuery({
-    queryKey: ['chat', token],
-    queryFn: () => gameApi.chatMessages(token),
+    queryKey: ['chat', token, 'world'],
+    queryFn: () => gameApi.chatMessages(token, 'world'),
   });
   const sendMutation = useMutation({
-    mutationFn: (messageText: string) => gameApi.sendChat(token, messageText),
+    mutationFn: (messageText: string) => gameApi.sendChat(token, messageText, 'world'),
     onSuccess: async (message) => {
       appendIncomingMessage(message);
       setText('');
@@ -218,7 +218,7 @@ export function ChatScreen({ token }: { token: string }) {
       return undefined;
     }
     let closed = false;
-    const source = new EventSource(gameApi.chatStreamUrl(token, lastMessageIdRef.current));
+    const source = new EventSource(gameApi.chatStreamUrl(token, lastMessageIdRef.current, 'world'));
     source.onopen = () => {
       if (!closed) {
         setStreamConnected(true);

@@ -1,9 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Coins, LogOut, MessageCircle, Send, Shield, Skull, Swords, Trophy, UserRound } from 'lucide-react';
 import { gameApi } from '../api';
-import type { GuildBossView, GuildChatMessage, GuildSummary, GuildView } from '../api';
+import type { ChatMessage, GuildBossView, GuildSummary, GuildView } from '../api';
 import { useAppStore } from '../store';
 import { EmptyState, ErrorScreen, LoadingScreen, SectionTitle, TopBar } from '../components/ui';
 
@@ -313,17 +313,19 @@ function GuildShop({ token }: { token: string }) {
 }
 
 function GuildChat({ token }: { token: string }) {
-  const queryClient = useQueryClient();
   const [text, setText] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [streamConnected, setStreamConnected] = useState(false);
+  const chatLogRef = useRef<HTMLDivElement | null>(null);
+  const lastMessageIdRef = useRef(0);
   const chatQuery = useQuery({
-    queryKey: ['guild', 'chat'],
-    queryFn: () => gameApi.guildChat(token),
-    refetchInterval: 5000,
+    queryKey: ['guild', 'chat', token],
+    queryFn: () => gameApi.chatMessages(token, 'guild'),
   });
   const sendMutation = useMutation({
-    mutationFn: (message: string) => gameApi.sendGuildChat(token, message),
-    onSuccess: (messages) => {
-      queryClient.setQueryData(['guild', 'chat'], messages);
+    mutationFn: (message: string) => gameApi.sendChat(token, message, 'guild'),
+    onSuccess: (message) => {
+      appendIncomingMessage(message);
       setText('');
     },
   });
@@ -337,16 +339,78 @@ function GuildChat({ token }: { token: string }) {
     sendMutation.mutate(trimmed);
   };
 
-  const messages = chatQuery.data ?? [];
+  function appendIncomingMessage(message: ChatMessage) {
+    if (!message || !Number.isFinite(message.id)) {
+      return;
+    }
+    setMessages((previous) => {
+      if (previous.some((item) => item.id === message.id)) {
+        return previous;
+      }
+      const next = [...previous, message].sort((left, right) => left.id - right.id).slice(-120);
+      lastMessageIdRef.current = next.at(-1)?.id ?? lastMessageIdRef.current;
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (!chatQuery.data) {
+      return;
+    }
+    const initialMessages = [...chatQuery.data].sort((left, right) => left.id - right.id);
+    setMessages(initialMessages);
+    lastMessageIdRef.current = initialMessages.at(-1)?.id ?? 0;
+  }, [chatQuery.data]);
+
+  useEffect(() => {
+    if (!chatQuery.data) {
+      return undefined;
+    }
+    let closed = false;
+    const source = new EventSource(gameApi.chatStreamUrl(token, lastMessageIdRef.current, 'guild'));
+    source.onopen = () => {
+      if (!closed) {
+        setStreamConnected(true);
+      }
+    };
+    source.onerror = () => {
+      if (!closed) {
+        setStreamConnected(false);
+      }
+    };
+    source.addEventListener('message', (event: MessageEvent) => {
+      try {
+        appendIncomingMessage(JSON.parse(event.data) as ChatMessage);
+      } catch {
+        // Ignore malformed stream chunks.
+      }
+    });
+    return () => {
+      closed = true;
+      source.close();
+      setStreamConnected(false);
+    };
+  }, [token, Boolean(chatQuery.data)]);
+
+  useEffect(() => {
+    const node = chatLogRef.current;
+    if (!node || messages.length === 0) {
+      return;
+    }
+    node.scrollTop = node.scrollHeight;
+  }, [messages]);
 
   return (
     <div className="guild-chat">
-      <SectionTitle icon={<MessageCircle size={16} />} title="公会频道" />
-      <div className="guild-chat-log">
+      <div className="guild-chat-title">
+        <SectionTitle icon={<MessageCircle size={16} />} title="公会频道" />
+        <i className={`stream-indicator ${streamConnected ? 'online' : ''}`} />
+      </div>
+      <div className="guild-chat-log" ref={chatLogRef}>
         {messages.length === 0 ? (
           <EmptyState text="公会频道还很安静，发条消息热场吧。" />
         ) : (
-          messages.map((message: GuildChatMessage) => (
+          messages.map((message: ChatMessage) => (
             <div key={message.id} className={`guild-chat-line ${message.kind}`}>
               <span className="guild-chat-sender">{message.senderName}</span>
               <span className="guild-chat-text">{message.text}</span>

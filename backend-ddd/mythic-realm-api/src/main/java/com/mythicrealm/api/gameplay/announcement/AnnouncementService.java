@@ -1,5 +1,6 @@
 package com.mythicrealm.api.gameplay.announcement;
 
+import com.mythicrealm.api.gameplay.ai.AiSocialEventService;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -13,9 +14,11 @@ public class AnnouncementService {
     private static final List<Integer> LEVEL_MILESTONES = List.of(45, 60, 75, 90);
 
     private final JdbcTemplate jdbcTemplate;
+    private final AiSocialEventService aiSocialEventService;
 
-    public AnnouncementService(JdbcTemplate jdbcTemplate) {
+    public AnnouncementService(JdbcTemplate jdbcTemplate, AiSocialEventService aiSocialEventService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.aiSocialEventService = aiSocialEventService;
     }
 
     @Transactional
@@ -84,6 +87,7 @@ public class AnnouncementService {
         if (inserted == 0) {
             return;
         }
+        aiSocialEventService.worldHighlight(kind, actorName, text, priority);
         jdbcTemplate.update(
             "DELETE FROM global_announcement WHERE id NOT IN (SELECT id FROM (SELECT id FROM global_announcement ORDER BY created_at DESC, id DESC LIMIT 80) recent)"
         );

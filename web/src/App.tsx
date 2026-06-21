@@ -173,6 +173,7 @@ import { BlacksmithScreen } from './screens/BlacksmithScreen';
 import { QuestScreen } from './screens/QuestScreen';
 import { MarketScreen } from './screens/MarketScreen';
 import { RobotActivityScreen } from './screens/RobotActivityScreen';
+import { AiUsageScreen } from './screens/AiUsageScreen';
 import { ShopScreen } from './screens/ShopScreen';
 import { BuildsScreen } from './screens/BuildsScreen';
 import { EndgameRiftScreen } from './screens/EndgameRiftScreen';
@@ -237,6 +238,7 @@ export function App() {
           {screen === 'chat' && token && <ChatScreen token={token} />}
           {screen === 'leaderboard' && token && <LeaderboardScreen token={token} />}
           {screen === 'robots' && token && <RobotActivityScreen token={token} />}
+          {screen === 'ai-usage' && token && <AiUsageScreen token={token} />}
           {screen === 'recharge' && token && <RechargeScreen token={token} />}
           {screen === 'dungeons' && token && (
             <DungeonScreen

@@ -171,7 +171,7 @@ export function AuthScreen() {
     mutationFn: () => (mode === 'login' ? authApi.login(username, password) : authApi.register(username, password)),
     onSuccess: (data) => {
       setError(null);
-      setSession(data.token, data.username, data.hasPlayer);
+      setSession(data.token, data.username, data.hasPlayer, data.admin);
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -214,4 +214,3 @@ export function AuthScreen() {
     </section>
   );
 }
-
